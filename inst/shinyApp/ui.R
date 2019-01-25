@@ -76,7 +76,9 @@ dashboardPage(
           hr(),
           actionButton("btn_TAXO_DONE", "Go on"),
           hr(),
-          verbatimTextOutput("out_taxo_error")
+          verbatimTextOutput("out_taxo_error"),
+          hr(),
+          verbatimTextOutput("out_wd_error")
         )
       ),
 

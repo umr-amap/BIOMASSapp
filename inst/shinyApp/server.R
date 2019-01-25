@@ -109,8 +109,12 @@ function(input, output, session) {
 
 
   observeEvent(input$btn_TAXO_DONE, {
+
+    # show a progress bar
     withProgress(message = "Searching the wood density", value = 0, {
+      # if the users have selected the correct taxo + get wd
       if (input$rad_WD == "corr") {
+        # correct the taxo and catch the error if there is error
         taxo <- tryCatch({
           if (input$sel_SPECIES == "<unselected>") {
             correctTaxo(genus = inv()[, eval(parse(text = input$sel_GENUS))])
@@ -120,24 +124,50 @@ function(input, output, session) {
               species = inv()[, eval(parse(text = input$sel_SPECIES))]
             )
           }
-        }, error = function(e) e, warning = function(e) e)
-        browser()
+        }, error = function(e) e)
+
+        # if there is an error display it
         if (length(taxo) == 2) {
+          output$out_taxo_error <- renderPrint({ taxo$message })
+        } else { # if not a message will appear
           output$out_taxo_error <- renderPrint({
-            taxo$message
-          })
-        } else {
-          output$out_taxo_error <- renderPrint({
-            print("The name has been modified:")
+            print("How much name has been modified:")
             table(taxo$nameModified)
           })
         }
+        # update the progression
+        incProgress(1 / 2, detail = "Correct the taxonomy completed")
+        genus = taxo$genusCorrected
+        species = taxo$speciesCorrected
+      } else {
+
+        # if the users do not choose the coorect taxo
+        genus = inv()[eval(parse(text = input$sel_GENUS))]
+        if (input$sel_SPECIES == "<unselected>"){
+          split = tstrsplit_NA(genus)
+          genus = split[, 1]
+          species = split[, 2]
+        } else {
+          species = inv()[eval(parse(text = input$sel_SPECIES))]
+        }
       }
-      incProgress(1 / 2, detail = "Correct the taxonomy completed")
+      wd = tryCatch(getWoodDensity(genus, species), error = function(e) e, warning = function(e) e)
+
+      # if there is an error display it
+      if (length(wd) == 2){
+        output$out_wd_error <- renderPrint({ taxo$message })
+      } else { # if not a message will appear
+        output$out_wd_error = renderPrint({
+          print("How much tree level at which wood density has been calculated:")
+          table(wd$levelWD)
+        })
+      }
+
+      incProgress(1, detail = "Get the wood density completed")
     })
 
-    showMenuItem("tab_HEIGHT")
-    updateTabItems(session, "mnu_MENU", "tab_HEIGHT")
+    # showMenuItem("tab_HEIGHT")
+    # updateTabItems(session, "mnu_MENU", "tab_HEIGHT")
   })
 
 
