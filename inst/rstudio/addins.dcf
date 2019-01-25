@@ -1,0 +1,4 @@
+Name: BIOMASS-app
+Description: Graphical user application for BIOMASS
+Binding: app
+Interactive: true
