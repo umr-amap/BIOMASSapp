@@ -1,18 +1,19 @@
 library(shiny)
 library(shinydashboard)
 library(data.table)
-#library(leaflet)
+# library(leaflet)
 library(shinyjs)
 library(shinyalert)
 library(shinyFeedback)
+library(BIOMASS)
 
 # set maximum input file size (here 30Mo)
-options(shiny.maxRequestSize=30*1024^2)
+options(shiny.maxRequestSize = 30 * 1024^2)
 
 # ajoute un id a un box de maniere a pouvoir le montrer/cacher
 boxWithId <- function(..., title = NULL, footer = NULL, status = NULL,
-  solidHeader = FALSE, background = NULL, width = 6, height = NULL,
-  collapsible = FALSE, collapsed = FALSE,id = NULL) {
+                      solidHeader = FALSE, background = NULL, width = 6, height = NULL,
+                      collapsible = FALSE, collapsed = FALSE, id = NULL) {
   b <- match.call(expand.dots = TRUE)
   bid <- id
   b$id <- NULL
@@ -23,10 +24,22 @@ boxWithId <- function(..., title = NULL, footer = NULL, status = NULL,
 }
 
 hideMenuItem <- function(tabName) {
-  shinyjs::hide(selector=sprintf("a[data-value='%s']",tabName))
+  shinyjs::hide(selector = sprintf("a[data-value='%s']", tabName))
 }
 
 showMenuItem <- function(tabName) {
-  shinyjs::show(selector=sprintf("a[data-value='%s']",tabName))
+  shinyjs::show(selector = sprintf("a[data-value='%s']", tabName))
+}
+
+ifheigth = function(x, y, z){
+  if (y && z)
+    if (!x)
+      return(F)
+
+  if( !y && !z )
+    return(F)
+
+  return(T)
+
 }
 

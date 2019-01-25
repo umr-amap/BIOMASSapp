@@ -10,33 +10,43 @@ dashboardPage(
     )
   ),
   dashboardBody(
+    useShinyalert(),
     useShinyFeedback(),
     useShinyjs(),
     tabItems(
+
+      # load dataset ------------------------------------------------------------
+
       tabItem(
         "tab_LOAD",
         fluidRow(
-          box(
+          box( # box with the file input
             title = "Inventory file", width = 6,
             fileInput("file_DATASET", "Select data file")
           ),
 
-          hidden(boxWithId(
+          hidden(boxWithId( # box for the input
             id = "box_FIELDS", title = "Column selection", width = 6,
+
+            # obligatory argument
             selectInput("sel_DIAMETER", "Diameter", choices = NULL),
             selectInput("sel_PLOT", "Plot name", choices = NULL),
 
+            # wood density argument
             hr(),
             selectInput("sel_WD", "Wood density", choices = NULL),
             selectInput("sel_GENUS", "Genus (if unspecified), species is assumed to be 'genus species'", choices = NULL),
             selectInput("sel_SPECIES", "Species", choices = NULL),
-            hidden(div("Imposible combinaison", id = "msg", style = "color:red;")),
-            hr(),
+            hidden(div("Imposible combinaison", id = "msg_wd", style = "color:red;")),
 
+            # Heigth argument
+            hr(),
             selectInput("sel_H", "Height", choices = NULL),
             selectInput("sel_LONG", "Coordinate longitude", choices = NULL),
             selectInput("sel_LAT", "Coordinate latitude", choices = NULL),
+            hidden(div("Imposible combinaison", id = "msg_h", style = "color:red;")),
 
+            # action button to continue
             hr(),
             actionButton("btn_DATASET_LOADED", "Continue", color = "#0040FF")
           )),
@@ -47,6 +57,11 @@ dashboardPage(
           ))
         )
       ),
+
+
+
+      # Taxonomy ----------------------------------------------------------------
+
       tabItem(
         "tab_TAXO",
         box(
@@ -59,18 +74,29 @@ dashboardPage(
             )
           ),
           hr(),
-          actionButton("btn_TAXO_DONE", "Go on")
+          actionButton("btn_TAXO_DONE", "Go on"),
+          hr(),
+          verbatimTextOutput("out_taxo_error")
         )
       ),
+
+
+      # heigth ------------------------------------------------------------------
+
+
       tabItem(
         "tab_HEIGHT",
-        box(title = "HD model",
-            checkboxGroupInput("chkgrp_HEIGHT", "Choose the HD model:",
-                               c(
-                                 "HD local model" = "HDloc",
-                                 "Feldpausch" = "feld",
-                                 "Chave" = "chave"
-                                 )))
+        box(
+          title = "HD model",
+          checkboxGroupInput(
+            "chkgrp_HEIGHT", "Choose the HD model:",
+            c(
+              "HD local model" = "HDloc",
+              "Feldpausch" = "feld",
+              "Chave" = "chave"
+            )
+          )
+        )
       )
       # ,tabItem("tab_MAP",
       #   fluidRow(

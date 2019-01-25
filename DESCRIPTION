@@ -16,5 +16,8 @@ LazyData: true
 Imports:
 	shiny,
 	shinydashboard,
-	data.table,
-	shinyjs
+	data.table (>= 1.9.8),
+	shinyjs,
+	shinyalert,
+	shinyFeedback,
+	BIOMASS (>= 2.0)
