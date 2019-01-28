@@ -73,13 +73,15 @@ dashboardPage(
               "get the WD" = "WD"
             )
           ),
-          hr(),
-          actionButton("btn_TAXO_DONE", "Go on"),
-          hr(),
+          actionButton("btn_TAXO_RESULT", "Go on")
+        ),
+        hidden(boxWithId(
+          id = "box_RESULT_TAXO", title = "Result", width = 12,
           verbatimTextOutput("out_taxo_error"),
           hr(),
-          verbatimTextOutput("out_wd_error")
-        )
+          verbatimTextOutput("out_wd_error"),
+          actionButton("btn_TAXO_DONE", "continue")
+        ))
       ),
 
 
@@ -89,7 +91,7 @@ dashboardPage(
       tabItem(
         "tab_HEIGHT",
         box(
-          title = "HD model",
+          title = "HD model", width = 12,
           checkboxGroupInput(
             "chkgrp_HEIGHT", "Choose the HD model:",
             c(
@@ -98,7 +100,18 @@ dashboardPage(
               "Chave" = "chave"
             )
           )
-        )
+        ),
+        hidden(boxWithId(id = "box_RESULT_FELD", title = "Feldpausch",
+                  selectInput("sel_FELD", "Choose your Feldpausch region:", choices = rownames(feldCoef))
+                  )),
+        hidden(boxWithId(id = "box_RESULT_HDMOD", title = "HD local model", width = 12,
+                         renderPlot("out_plot_HD"),
+                         renderTable("out_tab_HD"),
+                         radioButtons("rad_HDMOD", "Choose your HD model:", choices = "NULL")
+        )),
+        hidden(boxWithId(id = "box_RESULT_HDEND", title = NULL,
+                         actionButton("btn_HD_DONE", "continue")
+        ))
       )
       # ,tabItem("tab_MAP",
       #   fluidRow(

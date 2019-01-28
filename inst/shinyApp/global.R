@@ -33,19 +33,19 @@ showMenuItem <- function(tabName) {
 
 # to use for the heigth if there is a long but no lat (or inverse) error and
 # if there is no argument to either H long and lat
-ifheigth = function(x, y, z){
-  if (y && z)
-    if (!x)
+ifheigth <- function(x, y, z) {
+  if (y && z) {
+    if (!x) {
       return(F)
+    }
+  }
 
-  if( !y && !z )
+  if (!y && !z) {
     return(F)
+  }
 
   return(T)
-
 }
-
-
 
 tstrsplit_NA <- function(x, pattern = " ", count = 2) {
   # NOTE extraneous columns ignored maybe better paste them together

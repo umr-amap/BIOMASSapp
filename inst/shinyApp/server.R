@@ -107,9 +107,8 @@ function(input, output, session) {
 
   # taxonomy ----------------------------------------------------------------
 
-
-  observeEvent(input$btn_TAXO_DONE, {
-
+  observeEvent(input$btn_TAXO_RESULT, {
+    showElement("box_RESULT_TAXO")
     # show a progress bar
     withProgress(message = "Searching the wood density", value = 0, {
       # if the users have selected the correct taxo + get wd
@@ -128,7 +127,9 @@ function(input, output, session) {
 
         # if there is an error display it
         if (length(taxo) == 2) {
-          output$out_taxo_error <- renderPrint({ taxo$message })
+          output$out_taxo_error <- renderPrint({
+            taxo$message
+          })
         } else { # if not a message will appear
           output$out_taxo_error <- renderPrint({
             print("How much name has been modified:")
@@ -137,42 +138,71 @@ function(input, output, session) {
         }
         # update the progression
         incProgress(1 / 2, detail = "Correct the taxonomy completed")
-        genus = taxo$genusCorrected
-        species = taxo$speciesCorrected
+        genus <- taxo$genusCorrected
+        species <- taxo$speciesCorrected
       } else {
 
         # if the users do not choose the coorect taxo
-        genus = inv()[eval(parse(text = input$sel_GENUS))]
-        if (input$sel_SPECIES == "<unselected>"){
-          split = tstrsplit_NA(genus)
-          genus = split[, 1]
-          species = split[, 2]
+        genus <- inv()[, eval(parse(text = input$sel_GENUS))]
+        if (input$sel_SPECIES == "<unselected>") {
+          split <- tstrsplit_NA(genus)
+          genus <- split[, 1]
+          species <- split[, 2]
         } else {
-          species = inv()[eval(parse(text = input$sel_SPECIES))]
+          species <- inv()[, eval(parse(text = input$sel_SPECIES))]
         }
       }
-      wd = tryCatch(getWoodDensity(genus, species), error = function(e) e, warning = function(e) e)
+      wd <- tryCatch(getWoodDensity(genus, species), error = function(e) e, warning = function(e) e)
 
       # if there is an error display it
-      if (length(wd) == 2){
-        output$out_wd_error <- renderPrint({ taxo$message })
+      if (length(wd) == 2) {
+        output$out_wd_error <- renderPrint({
+          taxo$message
+        })
       } else { # if not a message will appear
-        output$out_wd_error = renderPrint({
+        inv(cbind(inv(), wd[, -(1:3)])) # bind + remove family genus and species columns
+        output$out_wd_error <- renderPrint({
           print("How much tree level at which wood density has been calculated:")
-          table(wd$levelWD)
+          inv()[, .N, by = levelWD]
         })
       }
-
       incProgress(1, detail = "Get the wood density completed")
     })
+  })
 
-    # showMenuItem("tab_HEIGHT")
-    # updateTabItems(session, "mnu_MENU", "tab_HEIGHT")
+  observeEvent(input$btn_TAXO_DONE, {
+    if (any(!c("meanWD", "sdWD", "levelWD", "nInd") %in% names(inv()))) {
+      shinyalert("Oops", "Somethings went wrong with the function, please check this", type = "error")
+    } else {
+      showMenuItem("tab_HEIGHT")
+      updateTabItems(session, "mnu_MENU", "tab_HEIGHT")
+    }
   })
 
 
-
   observeEvent(input$chkgrp_HEIGHT, {
-    print(input$chkgrp_HEIGHT)
+    sapply(input$chkgrp_HEIGHT, function(id) {
+      if (id == "HDloc") {
+        plot.new()
+        dev.control(displaylist = "enable")
+        tab <- if (input$sel_H != "<unselected>") {
+          modelHD(
+            D = inv()[, eval(parse(text = input$sel_DIAMETER))],
+            H = inv()[, eval(parse(text = input$sel_H))]
+          )
+        } else {
+          modelHD(D = NouraguesHD$D, NouraguesHD$H)
+        }
+        plotHD <- recordPlot()
+        dev.off()
+        output$out_plot_HD <- renderPlot({
+          replayPlot(plotHD)
+        })
+        output$out_tab_HD <- renderTable(tab)
+        updateRadioButtons(session, inputId = "rad_HDMOD", choices = tab[, "method"])
+
+        showElement("box_RESULT_HDMOD")
+      }
+    })
   })
 }
