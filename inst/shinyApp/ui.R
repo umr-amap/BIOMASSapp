@@ -5,7 +5,8 @@ dashboardPage(
       id = "mnu_MENU",
       menuItem("Load dataset", tabName = "tab_LOAD"),
       menuItem("Taxonomy and Wood density", tabName = "tab_TAXO"),
-      menuItem("Model HD", tabName = "tab_HEIGHT")
+      menuItem("Model HD", tabName = "tab_HEIGHT"),
+      menuItem("AGB calculation", tabName = "tab_AGB")
       # ,menuItem("Map",tabName = "tab_MAP")
     )
   ),
@@ -113,6 +114,12 @@ dashboardPage(
                          actionButton("btn_HD_DONE", "continue")
         ))
       )
+      , tabItem("tab_AGB",
+                fluidRow(
+                  box(title = "AGB mode",
+                      radioButtons("rad_AGB_MOD", choices = c("AGB" = "agb", "AGB + error", "agbe")),
+                      actionButton("btn_AGB", "Go on"))
+                ))
       # ,tabItem("tab_MAP",
       #   fluidRow(
       #     box("Inventory plot map",width=12,

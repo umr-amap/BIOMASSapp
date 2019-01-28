@@ -9,6 +9,7 @@ function(input, output, session) {
     # cacher certains menus au demarrage
     hideMenuItem("tab_TAXO")
     hideMenuItem("tab_HEIGHT")
+    hideMenuItem("tab_AGB")
     # hideMenuItem("tab_MAP")
   })
 
@@ -198,14 +199,34 @@ function(input, output, session) {
         dev.off()
         output$out_plot_HD <- renderPlot(replayPlot(plotHD))
         output$out_tab_HD <- renderTable(tab)
-        updateRadioButtons(session, inputId = "rad_HDMOD", choices = tab[, "method"])
+        updateRadioButtons(session, inputId = "rad_HDMOD", choices = tab[, "method"], selected = "log2")
 
         showElement("box_RESULT_HDMOD")
       }
 
-      if (id == "feld")
+      if (id == "feld"){
+        if (input$sel_LONG == "<unselected>")
+          updateSelectInput(session, "sel_FELD", choices = c(rownames(feldCoef)))
+        else {
+          updateSelectInput(session, "sel_FELD", choices = c("<automatic>", rownames(feldCoef)))
+        }
         showElement("box_RESULT_FELD")
+      }
+
+      showElement("box_RESULT_HDEND")
     })
   })
 }
 
+observeEvent(input$btn_HD_DONE, {
+
+  showMenuItem("tab_AGB")
+  updateTabItems(session, "mnu_MENU", "tab_AGB")
+
+})
+
+observeEvent(input$btn_AGB, {
+
+
+
+})
