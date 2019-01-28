@@ -170,8 +170,9 @@ function(input, output, session) {
     })
   })
 
+  # when the taxo is done
   observeEvent(input$btn_TAXO_DONE, {
-    if (any(!c("meanWD", "sdWD", "levelWD", "nInd") %in% names(inv()))) {
+    if (any(!c("meanWD", "sdWD", "levelWD", "nInd") %in% names(inv()))) { # verify if there is all the column present
       shinyalert("Oops", "Somethings went wrong with the function, please check this", type = "error")
     } else {
       showMenuItem("tab_HEIGHT")
@@ -195,14 +196,16 @@ function(input, output, session) {
         }
         plotHD <- recordPlot()
         dev.off()
-        output$out_plot_HD <- renderPlot({
-          replayPlot(plotHD)
-        })
+        output$out_plot_HD <- renderPlot(replayPlot(plotHD))
         output$out_tab_HD <- renderTable(tab)
         updateRadioButtons(session, inputId = "rad_HDMOD", choices = tab[, "method"])
 
         showElement("box_RESULT_HDMOD")
       }
+
+      if (id == "feld")
+        showElement("box_RESULT_FELD")
     })
   })
 }
+

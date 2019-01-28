@@ -105,8 +105,8 @@ dashboardPage(
                   selectInput("sel_FELD", "Choose your Feldpausch region:", choices = rownames(feldCoef))
                   )),
         hidden(boxWithId(id = "box_RESULT_HDMOD", title = "HD local model", width = 12,
-                         renderPlot("out_plot_HD"),
-                         renderTable("out_tab_HD"),
+                         plotOutput("out_plot_HD"),
+                         tableOutput("out_tab_HD"),
                          radioButtons("rad_HDMOD", "Choose your HD model:", choices = "NULL")
         )),
         hidden(boxWithId(id = "box_RESULT_HDEND", title = NULL,
