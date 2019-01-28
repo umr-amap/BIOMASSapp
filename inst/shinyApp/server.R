@@ -225,8 +225,53 @@ observeEvent(input$btn_HD_DONE, {
 
 })
 
+AGB_res = reactiveVal(list())
 observeEvent(input$btn_AGB, {
 
+  D = inv()[, eval(parse(text = input$sel_DIAMETER))]
+  plot_id = inv()[, eval(parse(text = input$sel_PLOT))]
 
+  # WD treatment
+  if( all( c("meanWD", "sdWD", "levelWD", "nInd") %in% names(inv()) )){
+    wd = inv()[, meanWD]
+    errWD = inv()[, sdWD]
+  } else {
+    wd = inv()[, eval(parse(text = input$sel_WD))]
+    errWD = rep(0, length(wd))
+  }
+
+  # coordinate treatement
+  if (input$sel_LAT != "<unselected>"){
+    coord = data.table(long = inv()[, eval(parse(text = input$sel_LONG))],
+               lat = inv()[, eval(parse(text = input$sel_LAT))])
+  }
+
+  # Heigth treatment
+  sapply(input$chkgrp_HEIGHT, function(id){
+    if (id == "HDloc"){
+      mod <- if (input$sel_H != "<unselected>") {
+        modelHD(
+          D = inv()[, eval(parse(text = input$sel_DIAMETER))],
+          H = inv()[, eval(parse(text = input$sel_H))], method = input$rad_HDMOD
+        )
+      } else {
+        modelHD(D = NouraguesHD$D, NouraguesHD$H, method = input$rad_HDMOD)
+      }
+
+      tryCatch({
+        if (input$rad_AGB_MOD == "agb"){
+          H = retrieveH(D, model = mod)
+        }
+
+      })
+    }
+
+    if(id == "feld"){
+      if (input$sel_FELD == "<automatic>"){
+
+      }
+    }
+
+  })
 
 })

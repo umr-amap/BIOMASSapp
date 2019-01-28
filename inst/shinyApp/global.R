@@ -57,3 +57,41 @@ tstrsplit_NA <- function(x, pattern = " ", count = 2) {
   }
   split
 }
+
+
+AGB_predict <- function(AGBmod, D, WD, errWD, H = NULL, errH = NULL, HDmodel = NULL, coord = NULL, region = NULL) {
+  if (!is.null(coord)) {
+    return(ifelse(AGBmod == "agb",
+      computeAGB(D, WD, coord = coord),
+      AGBmonteCarlo(D, WD, errWD, coord = coord, Dpropag = "chave2004")
+    ))
+  }
+
+  if (AGBmod == "agb") {
+    if (!is.null(HDmodel)) {
+      H <- retrieveH(D, model = HDmodel)$H
+    }
+    if (!is.null(region)){
+      H = retrieveH(D, region = region)$H
+    }
+    AGB <- computeAGB(D, WD, H = H)
+  }
+
+  if (AGBmod == "agbe") {
+    if (!is.null(region)){
+      H = retrieveH(D, region = region)
+      errH = H$RSE
+      H = H$H
+    }
+
+    AGB = AGBmonteCarlo(D, WD, errWD,
+                  H = ifelse(is.null(H), NULL, H),
+                  errH = ifelse(is.null(errH), NULL, errH),
+                  HDmodel = ifelse(is.null(HDmodel), NULL, HDmodel),
+                  Dpropag = "chave2004"
+                  )
+
+  }
+
+  return(AGB)
+}
