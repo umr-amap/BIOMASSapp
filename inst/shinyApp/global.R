@@ -59,7 +59,10 @@ tstrsplit_NA <- function(x, pattern = " ", count = 2) {
 }
 
 
+
+# for the AGB predict
 AGB_predict <- function(AGBmod, D, WD, errWD, H = NULL, errH = NULL, HDmodel = NULL, coord = NULL, region = NULL) {
+  # if there is the coordinate
   if (!is.null(coord)) {
     return(ifelse(AGBmod == "agb",
       computeAGB(D, WD, coord = coord),
@@ -67,6 +70,7 @@ AGB_predict <- function(AGBmod, D, WD, errWD, H = NULL, errH = NULL, HDmodel = N
     ))
   }
 
+  # if the user want the AGB
   if (AGBmod == "agb") {
     if (!is.null(HDmodel)) {
       H <- retrieveH(D, model = HDmodel)$H

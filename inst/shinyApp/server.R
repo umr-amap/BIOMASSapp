@@ -185,96 +185,96 @@ function(input, output, session) {
   })
 
 
+  # Heigth parameters -------------------------------------------------------
+
+
   observeEvent(input$chkgrp_HEIGHT, {
-    sapply(input$chkgrp_HEIGHT, function(id) {
+    sapply(input$chkgrp_HEIGHT, function(id) { # Travel throught all the option
+
+      ## If they want to construct an HD model
       if (id == "HDloc") {
-        plot.new()
-        dev.control(displaylist = "enable")
-        tab <- if (input$sel_H != "<unselected>") {
+        tab <- if (input$sel_H != "<unselected>") { # if there is H selected
+          # command a new plot for the render plot
+          plot.new()
+          dev.control(displaylist = "enable")
+
+          # Do the HD model
           modelHD(
             D = inv()[, eval(parse(text = input$sel_DIAMETER))],
             H = inv()[, eval(parse(text = input$sel_H))]
           )
-        } else {
-          modelHD(D = NouraguesHD$D, NouraguesHD$H)
-        }
-        plotHD <- recordPlot()
-        dev.off()
-        output$out_plot_HD <- renderPlot(replayPlot(plotHD))
-        output$out_tab_HD <- renderTable(tab)
-        updateRadioButtons(session, inputId = "rad_HDMOD", choices = tab[, "method"], selected = "log2")
 
-        showElement("box_RESULT_HDMOD")
+          # record the plot
+          plotHD <- recordPlot()
+          dev.off()
+
+          # render the plot
+          output$out_plot_HD <- renderPlot(replayPlot(plotHD))
+          # render the table
+          output$out_tab_HD <- renderTable(tab, digits = 4)
+          # update the radio button with the method and choose the minimun of the RSE
+          updateRadioButtons(session,
+            inputId = "rad_HDMOD",
+            choices = tab[, "method"],
+            selected = tab$method[which.min(tab$RSE)],
+            inline = T
+          )
+
+          # show the box for the result of HDmod
+          showElement("box_RESULT_HDMOD")
+        } else {
+          shinyalert(title = "Oops", text = "You do not have H selected", type = "error")
+          updateCheckboxGroupInput(session, "chkgrp_HEIGHT",
+            selected = input$chkgrp_HEIGHT[!input$chkgrp_HEIGHT %in% "HDloc"]
+          )
+        }
       }
 
-      if (id == "feld"){
-        if (input$sel_LONG == "<unselected>")
-          updateSelectInput(session, "sel_FELD", choices = c(rownames(feldCoef)))
-        else {
-          updateSelectInput(session, "sel_FELD", choices = c("<automatic>", rownames(feldCoef)))
-        }
+      # if the user command a feldpausch region
+      if (id == "feld") {
+        updateSelectInput(session, "sel_FELD",
+          choices = c(
+            ifelse(input$sel_LONG == "<unselected>", NULL, "<automatic>"),
+            rownames(feldCoef)
+          )
+        )
         showElement("box_RESULT_FELD")
       }
 
-      showElement("box_RESULT_HDEND")
+      if (!is.null(input$chkgrp_HEIGHT) || input$sel_H != "<unselected>") {
+        showElement("box_RESULT_HDEND")
+      }
     })
   })
-}
 
-observeEvent(input$btn_HD_DONE, {
-
-  showMenuItem("tab_AGB")
-  updateTabItems(session, "mnu_MENU", "tab_AGB")
-
-})
-
-AGB_res = reactiveVal(list())
-observeEvent(input$btn_AGB, {
-
-  D = inv()[, eval(parse(text = input$sel_DIAMETER))]
-  plot_id = inv()[, eval(parse(text = input$sel_PLOT))]
-
-  # WD treatment
-  if( all( c("meanWD", "sdWD", "levelWD", "nInd") %in% names(inv()) )){
-    wd = inv()[, meanWD]
-    errWD = inv()[, sdWD]
-  } else {
-    wd = inv()[, eval(parse(text = input$sel_WD))]
-    errWD = rep(0, length(wd))
-  }
-
-  # coordinate treatement
-  if (input$sel_LAT != "<unselected>"){
-    coord = data.table(long = inv()[, eval(parse(text = input$sel_LONG))],
-               lat = inv()[, eval(parse(text = input$sel_LAT))])
-  }
-
-  # Heigth treatment
-  sapply(input$chkgrp_HEIGHT, function(id){
-    if (id == "HDloc"){
-      mod <- if (input$sel_H != "<unselected>") {
-        modelHD(
-          D = inv()[, eval(parse(text = input$sel_DIAMETER))],
-          H = inv()[, eval(parse(text = input$sel_H))], method = input$rad_HDMOD
-        )
-      } else {
-        modelHD(D = NouraguesHD$D, NouraguesHD$H, method = input$rad_HDMOD)
-      }
-
-      tryCatch({
-        if (input$rad_AGB_MOD == "agb"){
-          H = retrieveH(D, model = mod)
-        }
-
-      })
+  observeEvent(input$btn_HD_DONE, {
+    if (is.null(input$chkgrp_HEIGHT) || input$sel_H == "<unselected>") {
+      shinyalert("Oops", "There is no H and HD model", type = "error")
+    } else {
+      showMenuItem("tab_AGB")
+      updateTabItems(session, "mnu_MENU", "tab_AGB")
     }
-
-    if(id == "feld"){
-      if (input$sel_FELD == "<automatic>"){
-
-      }
-    }
-
   })
 
-})
+
+
+  # AGB section -------------------------------------------------------------
+
+  observeEvent(input$btn_AGB_DONE, {
+
+    # take the mode of AGB
+    AGBmod <- input$rad_AGB_MOD
+
+    D <- inv()[, eval(parse(text = input$sel_DIAMETER))]
+    plot_id <- inv()[, eval(parse(text = input$sel_PLOT))]
+
+    # WD treatement
+    if (c("meanWD", "sdWD", "levelWD", "nInd") %in% names(inv())) {
+      wd <- inv()[, meanWD]
+      errWD <- inv()[, sdWD]
+    } else {
+      wd <- inv()[, eval(parse(text = input$sel_WD))]
+      errWD <- rep(0, length(wd))
+    }
+  })
+}
