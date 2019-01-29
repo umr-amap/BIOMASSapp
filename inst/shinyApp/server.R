@@ -120,11 +120,11 @@ function(input, output, session) {
         # correct the taxo and catch the error if there is error
         taxo <- tryCatch({
           if (input$sel_SPECIES == "<unselected>") {
-            correctTaxo(genus = inv()[, eval(parse(text = input$sel_GENUS))])
+            correctTaxo(genus = inv()[, ..input$sel_GENUS])
           } else {
             correctTaxo(
-              genus = inv()[, eval(parse(text = input$sel_GENUS))],
-              species = inv()[, eval(parse(text = input$sel_SPECIES))]
+              genus = inv()[, ..input$sel_GENUS],
+              species = inv()[, ..input$sel_SPECIES]
             )
           }
         }, error = function(e) e)
@@ -147,13 +147,13 @@ function(input, output, session) {
       } else {
 
         # if the users do not choose the coorect taxo
-        genus <- inv()[, eval(parse(text = input$sel_GENUS))]
+        genus <- inv()[, ..input$sel_GENUS]
         if (input$sel_SPECIES == "<unselected>") {
           split <- tstrsplit_NA(genus)
           genus <- split[, 1]
           species <- split[, 2]
         } else {
-          species <- inv()[, eval(parse(text = input$sel_SPECIES))]
+          species <- inv()[, ..input$sel_SPECIES]
         }
       }
       wd <- tryCatch(getWoodDensity(genus, species), error = function(e) e, warning = function(e) e)
@@ -200,8 +200,8 @@ function(input, output, session) {
 
           # Do the HD model
           modelHD(
-            D = inv()[, eval(parse(text = input$sel_DIAMETER))],
-            H = inv()[, eval(parse(text = input$sel_H))]
+            D = inv()[, ..input$sel_DIAMETER],
+            H = inv()[, ..input$sel_H]
           )
 
           # record the plot
@@ -259,22 +259,76 @@ function(input, output, session) {
 
 
   # AGB section -------------------------------------------------------------
-
+  AGB_sum = reactiveVal()
   observeEvent(input$btn_AGB_DONE, {
+
+
+    # AGB list
+    AGB_res = list()
 
     # take the mode of AGB
     AGBmod <- input$rad_AGB_MOD
 
-    D <- inv()[, eval(parse(text = input$sel_DIAMETER))]
-    plot_id <- inv()[, eval(parse(text = input$sel_PLOT))]
+    D <- inv()[, ..input$sel_DIAMETER]
+    plot_id <- inv()[, ..input$sel_PLOT]
 
     # WD treatement
     if (c("meanWD", "sdWD", "levelWD", "nInd") %in% names(inv())) {
       wd <- inv()[, meanWD]
       errWD <- inv()[, sdWD]
     } else {
-      wd <- inv()[, eval(parse(text = input$sel_WD))]
-      errWD <- rep(0, length(wd))
+      wd <- inv()[, ..input$sel_WD]
+      errWD = NULL
     }
+
+    # coord treatement
+    if (input$sel_LONG != "<unselected>"){
+      coord = data.table(
+        long = inv()[, ..input$sel_LONG],
+        lat = inv()[, ..input$sel_LAT]
+      )
+    }
+
+    # Heigth treatement
+    if (input$sel_H != "<unselected>")
+      H = inv()[, ..input$sel_H]
+
+    if ("HDloc" %in% input$chkgrp_HEIGHT){
+      HD_mod = modelHD(D, H, method = input$rad_HDMOD)
+
+      AGB_res$HDloc = AGB_predict(AGBmod, D, WD, errWD, HDmodel = HD_mod)
+    }
+
+    if ("feld" %in% input$chkgrp_HEIGHT){
+      if (input$sel_FELD == "<automatic>")
+        region = computeFeldRegion(coord)
+      else
+        region = input$sel_FELD
+      AGB_res$feld = AGB_predict(AGBmod, D, WD, errWD, region = region)
+    }
+
+    if ("chave" %in% input$chkgrp_HEIGHT){
+      AGB_res$chave = AGB_predict(AGBmod, D, WD, errWD, coord = coord)
+    }
+
+    if (is.null(input$chkgrp_HEIGHT)){
+      AGB_res$heigth = AGB_predict(AGBmod, D, WD, H)
+    }
+
+    AGB_sum() = data.table(plot = unique(plot_id))
+    for (i in 1:length(AGB_res)){
+      AGB_m = setDT(summaryByPlot(AGB_res[[i]], plot = plot_id))
+      setnames(AGB_m, names(AGB_m)[-1], paste(names(AGB_m)[-1], names(AGB_res)[i], sep = "-"))
+
+      AGB_sum() = merge(AGB_sum(), AGB_m, by = "plot", all.x = T)
+    }
+
+    output$out_plot_AGB = renderPlot({
+
+
+
+    })
+
+
   })
 }

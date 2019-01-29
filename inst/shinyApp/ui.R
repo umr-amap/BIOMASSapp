@@ -118,11 +118,16 @@ dashboardPage(
                          actionButton("btn_HD_DONE", "continue")
         ))
       )
+
+
+# AGB -----------------------------------------------------------------
       , tabItem("tab_AGB",
                 fluidRow(
                   box(title = "AGB mode",
                       radioButtons("rad_AGB_MOD", NULL, choices = c("AGB" = "agb", "AGB + error" = "agbe"), inline = T),
-                      actionButton("btn_AGB_DONE", "Go on"))
+                      actionButton("btn_AGB_DONE", "Go on")),
+                  hidden(boxWithId(id = "box_AGB_res", title = "AGB result"),
+                        plotOutput("out_plot_AGB"))
                 ))
       # ,tabItem("tab_MAP",
       #   fluidRow(
