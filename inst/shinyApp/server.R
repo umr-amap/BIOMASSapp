@@ -1,12 +1,12 @@
 function(input, output, session) {
 
-  # stopper le serveur si la session est terminee
+  # stop the serveur in the end of the session
   session$onSessionEnded(function() {
     stopApp()
   })
 
   observe({
-    # cacher certains menus au demarrage
+    # hide few menu at the begining
     hideMenuItem("tab_TAXO")
     hideMenuItem("tab_HEIGHT")
     hideMenuItem("tab_AGB")
@@ -19,7 +19,10 @@ function(input, output, session) {
   inv <- reactiveVal()
   observeEvent(input$file_DATASET, {
     # importer le fichier
-    inv(fread(file = input$file_DATASET$datapath))
+    inv(fread(
+      file = input$file_DATASET$datapath,
+      skip = ifelse(is.na(input$num_skip_line), "__auto__", input$num_skip_line)
+    ))
 
     # montrer les boites
     showElement("box_DATASET")
@@ -127,7 +130,7 @@ function(input, output, session) {
         }, error = function(e) e)
 
         # if there is an error display it
-        if (length(taxo) == 2) {
+        if (!is.data.frame(taxo)) {
           output$out_taxo_error <- renderPrint({
             taxo$message
           })
@@ -156,7 +159,7 @@ function(input, output, session) {
       wd <- tryCatch(getWoodDensity(genus, species), error = function(e) e, warning = function(e) e)
 
       # if there is an error display it
-      if (length(wd) == 2) {
+      if (!is.data.frame(wd)) {
         output$out_wd_error <- renderPrint({
           taxo$message
         })

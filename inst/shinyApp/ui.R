@@ -23,7 +23,11 @@ dashboardPage(
         fluidRow(
           box( # box with the file input
             title = "Inventory file", width = 6,
-            fileInput("file_DATASET", "Select data file")
+            fileInput("file_DATASET", "Select data file", accept = c(
+              "text/csv",
+              "text/comma-separated-values,text/plain",
+              ".csv")),
+            numericInput("num_skip_line", "Skip lines", value = 0, min = 0)
           ),
 
           hidden(boxWithId( # box for the input
@@ -94,7 +98,7 @@ dashboardPage(
         box(
           title = "HD model", width = 12,
           checkboxGroupInput(
-            "chkgrp_HEIGHT", "Choose the HD model:",
+            "chkgrp_HEIGHT", "Choose the HD model:", inline = T,
             c(
               "HD local model" = "HDloc",
               "Feldpausch" = "feld",
@@ -117,8 +121,8 @@ dashboardPage(
       , tabItem("tab_AGB",
                 fluidRow(
                   box(title = "AGB mode",
-                      radioButtons("rad_AGB_MOD", choices = c("AGB" = "agb", "AGB + error", "agbe")),
-                      actionButton("btn_AGB", "Go on"))
+                      radioButtons("rad_AGB_MOD", NULL, choices = c("AGB" = "agb", "AGB + error" = "agbe"), inline = T),
+                      actionButton("btn_AGB_DONE", "Go on"))
                 ))
       # ,tabItem("tab_MAP",
       #   fluidRow(
