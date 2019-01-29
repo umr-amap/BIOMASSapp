@@ -61,7 +61,7 @@ tstrsplit_NA <- function(x, pattern = " ", count = 2) {
 
 
 # for the AGB predict
-AGB_predict <- function(AGBmod, D, WD, errWD, H = NULL, errH = NULL, HDmodel = NULL, coord = NULL, region = NULL) {
+AGB_predict <- function(AGBmod, D, WD, errWD, H = NULL, HDmodel = NULL, coord = NULL, region = NULL) {
   # if there is the coordinate
   if (!is.null(coord)) {
     return(ifelse(AGBmod == "agb",
@@ -70,19 +70,34 @@ AGB_predict <- function(AGBmod, D, WD, errWD, H = NULL, errH = NULL, HDmodel = N
     ))
   }
 
-  # if the user want the AGB
+  if (is.null(errWD) && AGBmod != "agb"){
+    shinyalert("oops", "You did attribute the WD vector,\n you can not do the propagation error",
+               type = "warning")
+    AGBmod = "agb"
+  }
+
+  if (!is.null(H) && AGBmod != "agb"){
+    shinyalert("oops", paste0("You did attribute the H vector,\n",
+                              "you can not do the propagation error,\n",
+                              "whithout an HD model"),
+               type = "warning")
+    AGBmod = "agb"
+  }
+
+
+  # if the user want the AGB without error
   if (AGBmod == "agb") {
-    if (!is.null(HDmodel)) {
+    if (!is.null(HDmodel)) { # HD model
       H <- retrieveH(D, model = HDmodel)$H
     }
-    if (!is.null(region)){
+    if (!is.null(region)){ # feld region
       H = retrieveH(D, region = region)$H
     }
     AGB <- computeAGB(D, WD, H = H)
   }
 
   if (AGBmod == "agbe") {
-    if (!is.null(region)){
+    if (!is.null(region)){ # feld region
       H = retrieveH(D, region = region)
       errH = H$RSE
       H = H$H
@@ -90,7 +105,7 @@ AGB_predict <- function(AGBmod, D, WD, errWD, H = NULL, errH = NULL, HDmodel = N
 
     AGB = AGBmonteCarlo(D, WD, errWD,
                   H = ifelse(is.null(H), NULL, H),
-                  errH = ifelse(is.null(errH), NULL, errH),
+                  errH = ifelse(is.null(H), NULL, errH),
                   HDmodel = ifelse(is.null(HDmodel), NULL, HDmodel),
                   Dpropag = "chave2004"
                   )
