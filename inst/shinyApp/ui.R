@@ -87,7 +87,7 @@ dashboardPage(
           hr(),
           verbatimTextOutput("out_wd_error")
         )),
-        hidden(boxWithId(id = "box_TAXO_DONE"), actionButton("btn_TAXO_DONE", "continue"))
+        hidden(boxWithId(id = "box_TAXO_DONE", actionButton("btn_TAXO_DONE", "continue")))
       ),
 
 
@@ -110,7 +110,7 @@ dashboardPage(
         ),
         hidden(boxWithId(
           id = "box_RESULT_FELD", title = "Feldpausch",
-          selectInput("sel_FELD", "Choose your Feldpausch region:", choices = rownames(feldCoef))
+          selectInput("sel_FELD", "Choose your Feldpausch region:", choices = NULL)
         )),
         hidden(boxWithId(
           id = "box_RESULT_HDMOD", title = "HD local model", width = 12,

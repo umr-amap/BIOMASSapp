@@ -244,10 +244,10 @@ function(input, output, session) {
       hideElement("box_RESULT_FELD")
     }
 
-    if (!is.null(id) || input$sel_H != "<unselected>") {
-      showElement("box_RESULT_HDEND")
-    } else {
+    if (is.null(id) && input$sel_H == "<unselected>") {
       hideElement("box_RESULT_HDEND")
+    } else {
+      showElement("box_RESULT_HDEND")
     }
   })
 
@@ -304,7 +304,8 @@ function(input, output, session) {
 
     length_progression <- length(input$chkgrp_HEIGHT)
 
-    if (length_progression != 0) {
+    if (length_progression != 0) { # if we have a model
+
       withProgress(message = "AGB build", value = 0, {
         if ("HDloc" %in% input$chkgrp_HEIGHT) { # if we have an HD local
           HD_mod <- modelHD(D, H, method = input$rad_HDMOD)
