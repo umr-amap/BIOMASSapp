@@ -22,23 +22,25 @@ function(input, output, session) {
     input$num_skip_line
   }, {
     # importer le fichier
-    inv(fread(
-      file = input$file_DATASET$datapath,
-      skip = ifelse(is.na(input$num_skip_line) || input$num_skip_line == 0, "__auto__", input$num_skip_line),
-      data.table = F
-    ))
+    if (!is.null(input$file_DATASET)) {
+      inv(fread(
+        file = input$file_DATASET$datapath,
+        skip = ifelse(is.na(input$num_skip_line) || input$num_skip_line == 0, "__auto__", input$num_skip_line),
+        data.table = F
+      ))
 
-    # montrer les boites
-    showElement("box_DATASET")
-    showElement("box_FIELDS")
+      # montrer les boites
+      showElement("box_DATASET")
+      showElement("box_FIELDS")
 
-    # afficher son contenu
-    output$table_DATASET <- renderDataTable(inv())
+      # afficher son contenu
+      output$table_DATASET <- renderDataTable(inv())
 
-    selectionField <- c("sel_DIAMETER", "sel_PLOT", "sel_WD", "sel_GENUS", "sel_SPECIES", "sel_H", "sel_LONG", "sel_LAT")
-    # remplir les selecteurs de champs avec les noms de champs
-    for (id in selectionField) {
-      updateSelectInput(session, id, choices = c("<unselected>", names(inv())))
+      selectionField <- c("sel_DIAMETER", "sel_PLOT", "sel_WD", "sel_GENUS", "sel_SPECIES", "sel_H", "sel_LONG", "sel_LAT")
+      # remplir les selecteurs de champs avec les noms de champs
+      for (id in selectionField) {
+        updateSelectInput(session, id, choices = c("<unselected>", names(inv())))
+      }
     }
   })
 
