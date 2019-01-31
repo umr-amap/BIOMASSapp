@@ -21,7 +21,7 @@ function(input, output, session) {
     input$file_DATASET
     input$num_skip_line
   }, {
-    # importer le fichier
+    # file importation
     if (!is.null(input$file_DATASET)) {
       inv(fread(
         file = input$file_DATASET$datapath,
@@ -29,15 +29,15 @@ function(input, output, session) {
         data.table = F
       ))
 
-      # montrer les boites
+      # show the box
       showElement("box_DATASET")
       showElement("box_FIELDS")
 
-      # afficher son contenu
+      # show the content
       output$table_DATASET <- renderDataTable(inv())
 
       selectionField <- c("sel_DIAMETER", "sel_PLOT", "sel_WD", "sel_GENUS", "sel_SPECIES", "sel_H", "sel_LONG", "sel_LAT")
-      # remplir les selecteurs de champs avec les noms de champs
+      # fill the selector with the column name
       for (id in selectionField) {
         updateSelectInput(session, id, choices = c("<unselected>", names(inv())))
       }
