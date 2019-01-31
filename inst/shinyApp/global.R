@@ -64,24 +64,30 @@ tstrsplit_NA <- function(x, pattern = " ", count = 2) {
 AGB_predict <- function(AGBmod, D, WD, errWD, H = NULL, HDmodel = NULL, coord = NULL, region = NULL) {
   # if there is the coordinate
   if (!is.null(coord)) {
-    return(ifelse(AGBmod == "agb",
-      computeAGB(D, WD, coord = coord),
+    AGB <- if (AGBmod == "agb") {
+      computeAGB(D, WD, coord = coord)
+    } else {
       AGBmonteCarlo(D, WD, errWD, coord = coord, Dpropag = "chave2004")
-    ))
+    }
+    return(AGB)
   }
 
-  if (is.null(errWD) && AGBmod != "agb"){
+  if (is.null(errWD) && AGBmod != "agb") {
     shinyalert("oops", "You did attribute the WD vector,\n you can not do the propagation error",
-               type = "warning")
-    AGBmod = "agb"
+      type = "warning"
+    )
+    AGBmod <- "agb"
   }
 
-  if (!is.null(H) && AGBmod != "agb"){
-    shinyalert("oops", paste0("You did attribute the H vector,\n",
-                              "you can not do the propagation error,\n",
-                              "whithout an HD model"),
-               type = "warning")
-    AGBmod = "agb"
+  if (!is.null(H) && AGBmod != "agb") {
+    shinyalert("oops", paste0(
+      "You did attribute the H vector,\n",
+      "you can not do the propagation error,\n",
+      "whithout an HD model"
+    ),
+    type = "warning"
+    )
+    AGBmod <- "agb"
   }
 
 
@@ -90,26 +96,25 @@ AGB_predict <- function(AGBmod, D, WD, errWD, H = NULL, HDmodel = NULL, coord = 
     if (!is.null(HDmodel)) { # HD model
       H <- retrieveH(D, model = HDmodel)$H
     }
-    if (!is.null(region)){ # feld region
-      H = retrieveH(D, region = region)$H
+    if (!is.null(region)) { # feld region
+      H <- retrieveH(D, region = region)$H
     }
     AGB <- computeAGB(D, WD, H = H)
   }
 
   if (AGBmod == "agbe") {
-    if (!is.null(region)){ # feld region
-      H = retrieveH(D, region = region)
-      errH = H$RSE
-      H = H$H
+    if (!is.null(region)) { # feld region
+      H <- retrieveH(D, region = region)
+      errH <- H$RSE
+      H <- H$H
     }
 
-    AGB = AGBmonteCarlo(D, WD, errWD,
-                  H = ifelse(is.null(H), NULL, H),
-                  errH = ifelse(is.null(H), NULL, errH),
-                  HDmodel = ifelse(is.null(HDmodel), NULL, HDmodel),
-                  Dpropag = "chave2004"
-                  )
-
+    AGB <- AGBmonteCarlo(D, WD, errWD,
+      H = if (is.null(H)) NULL else H,
+      errH = if (is.null(H)) NULL else errH,
+      HDmodel = if (is.null(HDmodel)) NULL else HDmodel,
+      Dpropag = "chave2004"
+    )
   }
 
   return(AGB)

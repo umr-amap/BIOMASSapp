@@ -17,11 +17,15 @@ function(input, output, session) {
   # load dataset ------------------------------------------------------------
 
   inv <- reactiveVal()
-  observeEvent(input$file_DATASET, {
+  observeEvent(ignoreInit = T, {
+      input$file_DATASET
+      input$num_skip_line
+    }, {
     # importer le fichier
     inv(fread(
       file = input$file_DATASET$datapath,
-      skip = ifelse(is.na(input$num_skip_line), "__auto__", input$num_skip_line)
+      skip = ifelse(is.na(input$num_skip_line) || input$num_skip_line == 0, "__auto__", input$num_skip_line),
+      data.table = F
     ))
 
     # montrer les boites
@@ -37,12 +41,6 @@ function(input, output, session) {
       updateSelectInput(session, id, choices = c("<unselected>", names(inv())))
     }
 
-    # plots <- inv()[,by=plotId,.(long=mean(long),lat=mean(lat))]
-    # output$map_PLOT <- renderLeaflet(
-    #   leaflet(plots) %>%
-    #     addTiles() %>%
-    #     addMarkers(lng=~long,lat=~lat)
-    # )
   })
 
   # If the diameter is unselected => red box
@@ -120,11 +118,11 @@ function(input, output, session) {
         # correct the taxo and catch the error if there is error
         taxo <- tryCatch({
           if (input$sel_SPECIES == "<unselected>") {
-            correctTaxo(genus = inv()[, ..input$sel_GENUS])
+            correctTaxo(genus = inv()[, input$sel_GENUS])
           } else {
             correctTaxo(
-              genus = inv()[, ..input$sel_GENUS],
-              species = inv()[, ..input$sel_SPECIES]
+              genus = inv()[, input$sel_GENUS],
+              species = inv()[, input$sel_SPECIES]
             )
           }
         }, error = function(e) e)
@@ -147,13 +145,13 @@ function(input, output, session) {
       } else {
 
         # if the users do not choose the coorect taxo
-        genus <- inv()[, ..input$sel_GENUS]
+        genus <- inv()[, input$sel_GENUS]
         if (input$sel_SPECIES == "<unselected>") {
           split <- tstrsplit_NA(genus)
           genus <- split[, 1]
           species <- split[, 2]
         } else {
-          species <- inv()[, ..input$sel_SPECIES]
+          species <- inv()[, input$sel_SPECIES]
         }
       }
       wd <- tryCatch(getWoodDensity(genus, species), error = function(e) e, warning = function(e) e)
@@ -167,7 +165,7 @@ function(input, output, session) {
         inv(cbind(inv(), wd[, -(1:3)])) # bind + remove family genus and species columns
         output$out_wd_error <- renderPrint({
           print("How much tree level at which wood density has been calculated:")
-          inv()[, .N, by = levelWD]
+          table(wd$levelWD)
         })
       }
       incProgress(1, detail = "Get the wood density completed")
@@ -200,8 +198,8 @@ function(input, output, session) {
 
           # Do the HD model
           modelHD(
-            D = inv()[, ..input$sel_DIAMETER],
-            H = inv()[, ..input$sel_H]
+            D = inv()[, input$sel_DIAMETER],
+            H = inv()[, input$sel_H]
           )
 
           # record the plot
@@ -259,76 +257,120 @@ function(input, output, session) {
 
 
   # AGB section -------------------------------------------------------------
-  AGB_sum = reactiveVal()
+  AGB_sum <- reactiveVal()
   observeEvent(input$btn_AGB_DONE, {
 
 
     # AGB list
-    AGB_res = list()
+    AGB_res <- list()
 
     # take the mode of AGB
     AGBmod <- input$rad_AGB_MOD
 
-    D <- inv()[, ..input$sel_DIAMETER]
-    plot_id <- inv()[, ..input$sel_PLOT]
+    D <- inv()[, input$sel_DIAMETER]
+    plot_id <- inv()[, input$sel_PLOT]
 
     # WD treatement
-    if (c("meanWD", "sdWD", "levelWD", "nInd") %in% names(inv())) {
-      wd <- inv()[, meanWD]
-      errWD <- inv()[, sdWD]
+    if (all(c("meanWD", "sdWD", "levelWD", "nInd") %in% names(inv()))) {
+      WD <- inv()[, "meanWD"]
+      errWD <- inv()[, "sdWD"]
     } else {
-      wd <- inv()[, ..input$sel_WD]
-      errWD = NULL
+      wd <- inv()[, input$sel_WD]
+      errWD <- NULL
     }
 
     # coord treatement
-    if (input$sel_LONG != "<unselected>"){
-      coord = data.table(
-        long = inv()[, ..input$sel_LONG],
-        lat = inv()[, ..input$sel_LAT]
+    if (input$sel_LONG != "<unselected>") {
+      coord <- data.table(
+        long = inv()[, input$sel_LONG],
+        lat = inv()[, input$sel_LAT]
       )
     }
 
     # Heigth treatement
-    if (input$sel_H != "<unselected>")
-      H = inv()[, ..input$sel_H]
+    if (input$sel_H != "<unselected>") {
+      H <- inv()[, input$sel_H]
+    } # if H is unselected
 
-    if ("HDloc" %in% input$chkgrp_HEIGHT){
-      HD_mod = modelHD(D, H, method = input$rad_HDMOD)
+    length_progression <- length(input$chkgrp_HEIGHT)
 
-      AGB_res$HDloc = AGB_predict(AGBmod, D, WD, errWD, HDmodel = HD_mod)
+    if (length_progression != 0) {
+      withProgress(message = "AGB build", value = 0, {
+        if ("HDloc" %in% input$chkgrp_HEIGHT) { # if we have an HD local
+          HD_mod <- modelHD(D, H, method = input$rad_HDMOD)
+
+          AGB_res$HDlocal <- AGB_predict(AGBmod, D, WD, errWD, HDmodel = HD_mod)
+          incProgress(1 / length_progression, detail = "AGB using HD local: Done")
+        }
+
+        if ("feld" %in% input$chkgrp_HEIGHT) { # if we want the feldpausch region
+          if (input$sel_FELD == "<automatic>") {
+            region <- computeFeldRegion(coord)
+          } else {
+            region <- input$sel_FELD
+          }
+          AGB_res$feld <- AGB_predict(AGBmod, D, WD, errWD, region = region)
+          incProgress(1 / length_progression, detail = "AGB using feldpausch region: Done")
+        }
+
+        if ("chave" %in% input$chkgrp_HEIGHT) { # if we want the chave model
+          AGB_res$chave <- AGB_predict(AGBmod, D, WD, errWD, coord = coord)
+          incProgress(1 / length_progression, detail = "AGB using chave: Done")
+        }
+      })
+    }
+    if (is.null(input$chkgrp_HEIGHT)) { # if we have 0 model
+      AGB_res$heigth <- AGB_predict(AGBmod, D, WD, H)
     }
 
-    if ("feld" %in% input$chkgrp_HEIGHT){
-      if (input$sel_FELD == "<automatic>")
-        region = computeFeldRegion(coord)
-      else
-        region = input$sel_FELD
-      AGB_res$feld = AGB_predict(AGBmod, D, WD, errWD, region = region)
-    }
-
-    if ("chave" %in% input$chkgrp_HEIGHT){
-      AGB_res$chave = AGB_predict(AGBmod, D, WD, errWD, coord = coord)
-    }
-
-    if (is.null(input$chkgrp_HEIGHT)){
-      AGB_res$heigth = AGB_predict(AGBmod, D, WD, H)
-    }
-
-    AGB_sum() = data.table(plot = unique(plot_id))
-    for (i in 1:length(AGB_res)){
-      AGB_m = setDT(summaryByPlot(AGB_res[[i]], plot = plot_id))
-      setnames(AGB_m, names(AGB_m)[-1], paste(names(AGB_m)[-1], names(AGB_res)[i], sep = "-"))
-
-      AGB_sum() = merge(AGB_sum(), AGB_m, by = "plot", all.x = T)
-    }
-
-    output$out_plot_AGB = renderPlot({
 
 
+    # list that use to stock the result
+    AGB_sum(lapply(AGB_res, summaryByPlot, plot_id))
 
+    # plot the output
+    output$out_plot_AGB <- renderPlot({
+
+      # take the order of the first result
+      plot_order <- order(AGB_sum()[[1]]$AGB)
+
+      # sekeleton of the plot
+      plot(plot_order,
+        main = "", type = "n",
+        ylim = range(sapply(AGB_sum(), function(x) {
+          range(x[, -1], na.rm = T)
+        })),
+        xlab = "", ylab = "AGB",
+        xaxt = "n"
+      )
+      axis(1, at = 1:length(plot_order), labels = AGB_sum()[[1]]$plot[plot_order], las = 2)
+
+      if (ncol(AGB_sum()[[1]]) == 2) {
+        color <- c(HDlocal = "blue", feld = "red", chave = "green")
+        lapply(names(AGB_sum()), function(x) {
+          points(1:length(plot_order), AGB_sum()[[x]][plot_order, "AGB"], col = color[x], pch = 20)
+        })
+      } else {
+        color <- rgb(
+          red = c(0, 255, 0), green = c(0, 0, 255), blue = c(255, 0, 0), alpha = c(255, 128, 128),
+          names = c("HDlocal", "feld", "chave"), maxColorValue = 255
+        )
+        lapply(names(AGB_sum())[-1], function(x) {
+          polygon(c(seq_along(plot_order), length(plot_order):1),
+            c(AGB_sum()[[x]][plot_order, "Cred_2.5"], rev(AGB_sum()[[x]][plot_order, "Cred_97.5"])),
+            col = color[x], border = NA
+          )
+        })
+
+        with(AGB_sum()[[1]], {
+          points(seq_along(plot_order), AGB[plot_order], pch = 20, cex = 1.5, col = color[names(AGB_sum())[1]])
+          segments(seq_along(plot_order), Cred_2.5[plot_order], y1 = Cred_97.5[plot_order], col = color[names(AGB_sum())[1]])
+        })
+      }
+
+      legend("bottomright", legend = names(AGB_sum()), col = color[names(AGB_sum())], pch = 1)
     })
 
-
+    showElement(id = "box_AGB_res")
   })
 }
