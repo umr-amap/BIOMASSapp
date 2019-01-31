@@ -1,15 +1,13 @@
 Package: BIOMASSapp
 Type: Package
-Title: What the Package Does (Title Case)
+Title: The shiny application of BIOMASS
 Version: 0.1.0
-Author: Who wrote it
 Authors@R: c(
 	person("Maxime", "Réjou-Méchain", email = "maxime.rejou@gmail.com", role = c("aut", "cre", "dtc")),
 	person("Arthur", "Pere", email = "arthur.pere@cirad.fr", role = c("aut")),
 	person("Guillaume","Cornu", email = "gcornu@cirad.fr", role = c("aut"), comment = c(ORCID="0000-0002-7523-5176"))
   )
-Description: More about what it does (maybe more than one line)
-    Use four spaces when indenting paragraphs within the Description.
+Description: It does things like BIOMASS package but with a shiny application
 License: GPL-2
 Encoding: UTF-8
 LazyData: true
