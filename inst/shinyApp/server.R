@@ -188,62 +188,67 @@ function(input, output, session) {
 
 
   observeEvent(input$chkgrp_HEIGHT, {
-    sapply(input$chkgrp_HEIGHT, function(id) { # Travel throught all the option
+    id <- input$chkgrp_HEIGHT
 
-      ## If they want to construct an HD model
-      if (id == "HDloc") {
-        if (input$sel_H != "<unselected>") { # if there is H selected
-          # command a new plot for the render plot
-          plot.new()
-          dev.control(displaylist = "enable")
+    ## If they want to construct an HD model
+    if ("HDloc" %in% id) {
+      if (input$sel_H != "<unselected>") { # if there is H selected
+        # command a new plot for the render plot
+        plot.new()
+        dev.control(displaylist = "enable")
 
-          # Do the HD model
-          tab_modelHD <- modelHD(
-            D = inv()[, input$sel_DIAMETER],
-            H = inv()[, input$sel_H]
-          )
-
-          # record the plot
-          plotHD <- recordPlot()
-          dev.off()
-
-          # render the plot
-          output$out_plot_HD <- renderPlot(replayPlot(plotHD))
-          # render the table
-          output$out_tab_HD <- renderTable(tab_modelHD, digits = 4)
-          # update the radio button with the method and choose the minimun of the RSE
-          updateRadioButtons(session,
-            inputId = "rad_HDMOD",
-            choices = tab_modelHD[, "method"],
-            selected = tab_modelHD$method[which.min(tab_modelHD$RSE)],
-            inline = T
-          )
-
-          # show the box for the result of HDmod
-          showElement("box_RESULT_HDMOD")
-        } else {
-          shinyalert(title = "Oops", text = "You do not have H selected", type = "error")
-          updateCheckboxGroupInput(session, "chkgrp_HEIGHT",
-            selected = input$chkgrp_HEIGHT[!input$chkgrp_HEIGHT %in% "HDloc"]
-          )
-        }
-      }
-
-      # if the user command a feldpausch region
-      if (id == "feld") {
-        updateSelectInput(session, "sel_FELD",
-          choices = c(
-            ifelse(input$sel_LONG == "<unselected>", NULL, "<automatic>"),
-            rownames(feldCoef)
-          )
+        # Do the HD model
+        tab_modelHD <- modelHD(
+          D = inv()[, input$sel_DIAMETER],
+          H = inv()[, input$sel_H]
         )
-        showElement("box_RESULT_FELD")
-      }
 
-      if (!is.null(input$chkgrp_HEIGHT) || input$sel_H != "<unselected>") {
-        showElement("box_RESULT_HDEND")
+        # record the plot
+        plotHD <- recordPlot()
+        dev.off()
+
+        # render the plot
+        output$out_plot_HD <- renderPlot(replayPlot(plotHD))
+        # render the table
+        output$out_tab_HD <- renderTable(tab_modelHD, digits = 4)
+        # update the radio button with the method and choose the minimun of the RSE
+        updateRadioButtons(session,
+          inputId = "rad_HDMOD",
+          choices = tab_modelHD[, "method"],
+          selected = tab_modelHD$method[which.min(tab_modelHD$RSE)],
+          inline = T
+        )
+
+        # show the box for the result of HDmod
+        showElement("box_RESULT_HDMOD")
+      } else {
+        shinyalert(title = "Oops", text = "You do not have H selected", type = "error")
+        updateCheckboxGroupInput(session, "chkgrp_HEIGHT",
+          selected = input$chkgrp_HEIGHT[!input$chkgrp_HEIGHT %in% "HDloc"]
+        )
       }
-    })
+    } else {
+      hideElement("box_RESULT_HDMOD")
+    }
+
+    # if the user command a feldpausch region
+    if ("feld" %in% id) {
+      updateSelectInput(session, "sel_FELD",
+        choices = c(
+          ifelse(input$sel_LONG == "<unselected>", NULL, "<automatic>"),
+          rownames(feldCoef)
+        )
+      )
+      showElement("box_RESULT_FELD")
+    } else {
+      hideElement("box_RESULT_FELD")
+    }
+
+    if (!is.null(id) || input$sel_H != "<unselected>") {
+      showElement("box_RESULT_HDEND")
+    } else {
+      hideElement("box_RESULT_HDEND")
+    }
   })
 
   observeEvent(input$btn_HD_DONE, {

@@ -26,7 +26,8 @@ dashboardPage(
             fileInput("file_DATASET", "Select data file", accept = c(
               "text/csv",
               "text/comma-separated-values,text/plain",
-              ".csv")),
+              ".csv"
+            )),
             numericInput("num_skip_line", "Skip lines", value = 0, min = 0)
           ),
 
@@ -98,7 +99,8 @@ dashboardPage(
         box(
           title = "HD model", width = 12,
           checkboxGroupInput(
-            "chkgrp_HEIGHT", "Choose the HD model:", inline = T,
+            "chkgrp_HEIGHT", "Choose the HD model:",
+            inline = T,
             c(
               "HD local model" = "HDloc",
               "Feldpausch" = "feld",
@@ -106,30 +108,38 @@ dashboardPage(
             )
           )
         ),
-        hidden(boxWithId(id = "box_RESULT_FELD", title = "Feldpausch",
-                  selectInput("sel_FELD", "Choose your Feldpausch region:", choices = rownames(feldCoef))
-                  )),
-        hidden(boxWithId(id = "box_RESULT_HDMOD", title = "HD local model", width = 12,
-                         plotOutput("out_plot_HD"),
-                         tableOutput("out_tab_HD"),
-                         radioButtons("rad_HDMOD", "Choose your HD model:", choices = "NULL")
+        hidden(boxWithId(
+          id = "box_RESULT_FELD", title = "Feldpausch",
+          selectInput("sel_FELD", "Choose your Feldpausch region:", choices = rownames(feldCoef))
         )),
-        hidden(boxWithId(id = "box_RESULT_HDEND", title = NULL,
-                         actionButton("btn_HD_DONE", "continue")
+        hidden(boxWithId(
+          id = "box_RESULT_HDMOD", title = "HD local model", width = 12,
+          plotOutput("out_plot_HD"),
+          tableOutput("out_tab_HD"),
+          radioButtons("rad_HDMOD", "Choose your HD model:", choices = "NULL")
+        )),
+        hidden(boxWithId(
+          id = "box_RESULT_HDEND", title = NULL,
+          actionButton("btn_HD_DONE", "continue")
         ))
       )
 
 
-# AGB -----------------------------------------------------------------
-      , tabItem("tab_AGB",
-                fluidRow(
-                  box(title = "AGB mode",
-                      radioButtons("rad_AGB_MOD", NULL, choices = c("AGB" = "agb", "AGB + error" = "agbe"), inline = T),
-                      actionButton("btn_AGB_DONE", "Go on")),
-                  hidden(boxWithId(id = "box_AGB_res", title = "AGB result", width = 12,
-                        plotOutput("out_plot_AGB")
-                        ))
-                ))
+      # AGB -----------------------------------------------------------------
+      , tabItem(
+        "tab_AGB",
+        fluidRow(
+          box(
+            title = "AGB mode",
+            radioButtons("rad_AGB_MOD", NULL, choices = c("AGB" = "agb", "AGB + error" = "agbe"), inline = T),
+            actionButton("btn_AGB_DONE", "Go on")
+          ),
+          hidden(boxWithId(
+            id = "box_AGB_res", title = "AGB result", width = 12,
+            plotOutput("out_plot_AGB")
+          ))
+        )
+      )
       # ,tabItem("tab_MAP",
       #   fluidRow(
       #     box("Inventory plot map",width=12,
