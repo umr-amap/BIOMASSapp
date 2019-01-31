@@ -18,9 +18,9 @@ function(input, output, session) {
 
   inv <- reactiveVal()
   observeEvent(ignoreInit = T, {
-      input$file_DATASET
-      input$num_skip_line
-    }, {
+    input$file_DATASET
+    input$num_skip_line
+  }, {
     # importer le fichier
     inv(fread(
       file = input$file_DATASET$datapath,
@@ -40,7 +40,6 @@ function(input, output, session) {
     for (id in selectionField) {
       updateSelectInput(session, id, choices = c("<unselected>", names(inv())))
     }
-
   })
 
   # If the diameter is unselected => red box
@@ -53,9 +52,9 @@ function(input, output, session) {
 
   # If the diameter is unselected => red box
   observeEvent(input$sel_PLOT, {
-    feedbackDanger("sel_PLOT",
+    feedbackWarning("sel_PLOT",
       condition = input$sel_PLOT == "<unselected>",
-      text = "argument obligatory"
+      text = ""
     )
   })
 
@@ -63,8 +62,6 @@ function(input, output, session) {
   observeEvent(input$btn_DATASET_LOADED, {
     if (input$sel_DIAMETER == "<unselected>") { # if diameter is not selected
       shinyalert("Oops!", "D is unselected", type = "error")
-    } else if (input$sel_PLOT == "<unselected>") { # if the plot is not selected
-      shinyalert("Oops!", "Plot id is unselected", type = "error")
     } else if (!xor(input$sel_WD == "<unselected>", input$sel_GENUS == "<unselected>")) {
       # if the wd is not selected or genus not selected but not the two
       shinyalert("Oops!", "Either select the wood density or genus and species or genus", type = "error")
@@ -246,7 +243,7 @@ function(input, output, session) {
   })
 
   observeEvent(input$btn_HD_DONE, {
-    if (is.null(input$chkgrp_HEIGHT) || input$sel_H == "<unselected>") {
+    if (is.null(input$chkgrp_HEIGHT) && input$sel_H == "<unselected>") {
       shinyalert("Oops", "There is no H and HD model", type = "error")
     } else {
       showMenuItem("tab_AGB")
@@ -268,7 +265,11 @@ function(input, output, session) {
     AGBmod <- input$rad_AGB_MOD
 
     D <- inv()[, input$sel_DIAMETER]
-    plot_id <- inv()[, input$sel_PLOT]
+    if (input$sel_PLOT != "<unselected>") {
+      plot_id <- inv()[, input$sel_PLOT]
+    } else {
+      plot_id <- NULL
+    }
 
     # WD treatement
     if (all(c("meanWD", "sdWD", "levelWD", "nInd") %in% names(inv()))) {
@@ -324,52 +325,57 @@ function(input, output, session) {
     }
 
 
+    if (!is.null(plot_id)) {
+      # list that use to stock the result
+      AGB_sum(lapply(AGB_res, summaryByPlot, plot_id))
 
-    # list that use to stock the result
-    AGB_sum(lapply(AGB_res, summaryByPlot, plot_id))
+      # plot the output
+      output$out_plot_AGB <- renderPlot({
 
-    # plot the output
-    output$out_plot_AGB <- renderPlot({
+        # take the order of the first result
+        plot_order <- order(AGB_sum()[[1]]$AGB)
 
-      # take the order of the first result
-      plot_order <- order(AGB_sum()[[1]]$AGB)
-
-      # sekeleton of the plot
-      plot(plot_order,
-        main = "", type = "n",
-        ylim = range(sapply(AGB_sum(), function(x) {
-          range(x[, -1], na.rm = T)
-        })),
-        xlab = "", ylab = "AGB",
-        xaxt = "n"
-      )
-      axis(1, at = 1:length(plot_order), labels = AGB_sum()[[1]]$plot[plot_order], las = 2)
-
-      if (ncol(AGB_sum()[[1]]) == 2) {
-        color <- c(HDlocal = "blue", feld = "red", chave = "green")
-        lapply(names(AGB_sum()), function(x) {
-          points(1:length(plot_order), AGB_sum()[[x]][plot_order, "AGB"], col = color[x], pch = 20)
-        })
-      } else {
-        color <- rgb(
-          red = c(0, 255, 0), green = c(0, 0, 255), blue = c(255, 0, 0), alpha = c(255, 128, 128),
-          names = c("HDlocal", "feld", "chave"), maxColorValue = 255
+        # sekeleton of the plot
+        plot(plot_order,
+          main = "", type = "n",
+          ylim = range(sapply(AGB_sum(), function(x) {
+            range(x[, -1], na.rm = T)
+          })),
+          xlab = "", ylab = "AGB",
+          xaxt = "n"
         )
-        lapply(names(AGB_sum())[-1], function(x) {
-          polygon(c(seq_along(plot_order), length(plot_order):1),
-            c(AGB_sum()[[x]][plot_order, "Cred_2.5"], rev(AGB_sum()[[x]][plot_order, "Cred_97.5"])),
-            col = color[x], border = NA
+        axis(1, at = 1:length(plot_order), labels = AGB_sum()[[1]]$plot[plot_order], las = 2)
+
+
+        # if it's just the AGB
+        if (ncol(AGB_sum()[[1]]) == 2) {
+          color <- c(HDlocal = "blue", feld = "red", chave = "green")
+          lapply(names(AGB_sum()), function(x) {
+            points(1:length(plot_order), AGB_sum()[[x]][plot_order, "AGB"], col = color[x], pch = 20)
+          })
+        } else {
+          color <- rgb(
+            red = c(0, 1, 0), green = c(0, 0, 1), blue = c(1, 0, 0), alpha = c(1, 0.5, 0.5),
+            names = c("HDlocal", "feld", "chave")
           )
-        })
+          lapply(names(AGB_sum())[-1], function(x) {
+            polygon(c(seq_along(plot_order), length(plot_order):1),
+              c(AGB_sum()[[x]][plot_order, "Cred_2.5"], rev(AGB_sum()[[x]][plot_order, "Cred_97.5"])),
+              col = color[x], border = NA
+            )
+          })
 
-        with(AGB_sum()[[1]], {
-          points(seq_along(plot_order), AGB[plot_order], pch = 20, cex = 1.5, col = color[names(AGB_sum())[1]])
-          segments(seq_along(plot_order), Cred_2.5[plot_order], y1 = Cred_97.5[plot_order], col = color[names(AGB_sum())[1]])
-        })
-      }
+          with(AGB_sum()[[1]], {
+            points(seq_along(plot_order), AGB[plot_order], pch = 20, cex = 1.5, col = color[names(AGB_sum())[1]])
+            segments(seq_along(plot_order), Cred_2.5[plot_order], y1 = Cred_97.5[plot_order], col = color[names(AGB_sum())[1]])
+          })
+        }
 
-      legend("bottomright", legend = names(AGB_sum()), col = color[names(AGB_sum())], pch = 1)
-    })
+        legend("bottomright", legend = names(AGB_sum()), col = color[names(AGB_sum())], pch = 1)
+      })
+    } else {
+      AGB_sum(AGB_res)
+    }
 
     showElement(id = "box_AGB_res")
   })
