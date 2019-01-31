@@ -84,9 +84,9 @@ dashboardPage(
           id = "box_RESULT_TAXO", title = "Result", width = 12,
           verbatimTextOutput("out_taxo_error"),
           hr(),
-          verbatimTextOutput("out_wd_error"),
-          actionButton("btn_TAXO_DONE", "continue")
-        ))
+          verbatimTextOutput("out_wd_error")
+        )),
+        hidden(boxWithId(id = "box_TAXO_DONE"), actionButton("btn_TAXO_DONE", "continue"))
       ),
 
 

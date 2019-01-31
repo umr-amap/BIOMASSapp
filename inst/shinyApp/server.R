@@ -167,6 +167,8 @@ function(input, output, session) {
       }
       incProgress(1, detail = "Get the wood density completed")
     })
+
+    showElement(id = "box_TAXO_DONE")
   })
 
   # when the taxo is done
@@ -188,13 +190,13 @@ function(input, output, session) {
 
       ## If they want to construct an HD model
       if (id == "HDloc") {
-        tab <- if (input$sel_H != "<unselected>") { # if there is H selected
+        if (input$sel_H != "<unselected>") { # if there is H selected
           # command a new plot for the render plot
           plot.new()
           dev.control(displaylist = "enable")
 
           # Do the HD model
-          modelHD(
+          tab_modelHD <- modelHD(
             D = inv()[, input$sel_DIAMETER],
             H = inv()[, input$sel_H]
           )
@@ -206,12 +208,12 @@ function(input, output, session) {
           # render the plot
           output$out_plot_HD <- renderPlot(replayPlot(plotHD))
           # render the table
-          output$out_tab_HD <- renderTable(tab, digits = 4)
+          output$out_tab_HD <- renderTable(tab_modelHD, digits = 4)
           # update the radio button with the method and choose the minimun of the RSE
           updateRadioButtons(session,
             inputId = "rad_HDMOD",
-            choices = tab[, "method"],
-            selected = tab$method[which.min(tab$RSE)],
+            choices = tab_modelHD[, "method"],
+            selected = tab_modelHD$method[which.min(tab_modelHD$RSE)],
             inline = T
           )
 
