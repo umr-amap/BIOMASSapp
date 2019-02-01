@@ -4,11 +4,10 @@ dashboardPage(
     sidebarMenu(
       id = "mnu_MENU",
       menuItem("Load dataset", tabName = "tab_LOAD"),
-      menuItem("Map",tabName = "tab_MAP"),
+      menuItem("Map", tabName = "tab_MAP"),
       menuItem("Taxonomy and Wood density", tabName = "tab_TAXO"),
       menuItem("Model HD", tabName = "tab_HEIGHT"),
       menuItem("AGB calculation", tabName = "tab_AGB")
-
     )
   ),
   dashboardBody(
@@ -71,18 +70,19 @@ dashboardPage(
       ),
 
 
-# Map ---------------------------------------------------------------------
+      # Map ---------------------------------------------------------------------
 
-tabItem("tab_MAP",
-        hidden(boxWithId(id = "box_long_lat", title = "Choose the Long Lat:", width = 6,
-                  numericInput("num_LONG", "longitude", 3.8614, min = -180, max = 180, step = 0.01),
-                  numericInput("num_LAT", "latitude", 43.652, min = -90, max = 90, step = 0.01)
-                  )
-               ),
+      tabItem(
+        "tab_MAP",
+        h1("Optional"),
+        hidden(boxWithId(
+          id = "box_long_lat", title = "Choose the Long Lat:", width = 6,
+          numericInput("num_LONG", "longitude", 3.8614, min = -180, max = 180, step = 0.01),
+          numericInput("num_LAT", "latitude", 43.652, min = -90, max = 90, step = 0.01)
+        )),
         leafletOutput("map"),
-        actionButton('btn_MAP_END', "Continue")
-
-        ),
+        actionButton("btn_MAP_END", "Continue")
+      ),
 
 
 
@@ -129,17 +129,17 @@ tabItem("tab_MAP",
           )
         ),
         hidden(boxWithId(
-          id = "box_RESULT_FELD", title = "Feldpausch",
-          selectInput("sel_FELD", "Choose your Feldpausch region:", choices = NULL)
-        )),
-        hidden(boxWithId(
-          id = "box_RESULT_HDMOD", title = "HD local model",
+          id = "box_RESULT_HDMOD", title = "HD local model", width = 8,
           plotOutput("out_plot_HD"),
           tableOutput("out_tab_HD"),
           radioButtons("rad_HDMOD", "Choose your HD model:", choices = "NULL")
         )),
         hidden(boxWithId(
-          id = "box_RESULT_HDEND", title = NULL,
+          id = "box_RESULT_FELD", title = "Feldpausch", width = 4,
+          selectInput("sel_FELD", "Choose your Feldpausch region:", choices = NULL)
+        )),
+        hidden(boxWithId(
+          id = "box_RESULT_HDEND", title = NULL, width = 4,
           actionButton("btn_HD_DONE", "continue")
         ))
       )
