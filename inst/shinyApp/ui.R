@@ -36,10 +36,10 @@ dashboardPage(
 
             # obligatory argument
             selectInput("sel_DIAMETER", "Diameter", choices = NULL),
-            selectInput("sel_PLOT", "Plot name", choices = NULL),
 
             # wood density argument
             hr(),
+            h4("Choose either the WD or genus species"),
             selectInput("sel_WD", "Wood density", choices = NULL),
             selectInput("sel_GENUS", "Genus (if unspecified), species is assumed to be 'genus species'", choices = NULL),
             selectInput("sel_SPECIES", "Species", choices = NULL),
@@ -47,10 +47,15 @@ dashboardPage(
 
             # Heigth argument
             hr(),
+            h4("Optional"),
             selectInput("sel_H", "Height", choices = NULL),
             selectInput("sel_LONG", "Coordinate longitude", choices = NULL),
             selectInput("sel_LAT", "Coordinate latitude", choices = NULL),
             hidden(div("Imposible combinaison", id = "msg_h", style = "color:red;")),
+
+            # plot id
+            hr(),
+            selectInput("sel_PLOT", "Plot name", choices = NULL),
 
             # action button to continue
             hr(),
@@ -113,7 +118,7 @@ dashboardPage(
           selectInput("sel_FELD", "Choose your Feldpausch region:", choices = NULL)
         )),
         hidden(boxWithId(
-          id = "box_RESULT_HDMOD", title = "HD local model", width = 12,
+          id = "box_RESULT_HDMOD", title = "HD local model",
           plotOutput("out_plot_HD"),
           tableOutput("out_tab_HD"),
           radioButtons("rad_HDMOD", "Choose your HD model:", choices = "NULL")
