@@ -116,14 +116,10 @@ function(input, output, session) {
       if (input$rad_WD == "corr") {
         # correct the taxo and catch the error if there is error
         taxo <- tryCatch({
-          if (input$sel_SPECIES == "<unselected>") {
-            correctTaxo(genus = inv()[, input$sel_GENUS])
-          } else {
-            correctTaxo(
-              genus = inv()[, input$sel_GENUS],
-              species = inv()[, input$sel_SPECIES]
-            )
-          }
+          correctTaxo(
+            genus = inv()[, input$sel_GENUS],
+            species = if (input$sel_SPECIES == "<unselected>") NULL else inv()[, input$sel_SPECIES]
+          )
         }, error = function(e) e)
 
         # if there is an error display it
@@ -186,9 +182,9 @@ function(input, output, session) {
 
   # Heigth parameters -------------------------------------------------------
   observeEvent(input$sel_H, {
-    if (input$sel_H != "<unselected>")
+    if (input$sel_H != "<unselected>") {
       showElement("box_RESULT_HDEND")
-    else if (is.null(input$chkgrp_HEIGHT) && input$sel_H == "<unselected>"){
+    } else if (is.null(input$chkgrp_HEIGHT) && input$sel_H == "<unselected>") {
       hideElement("box_RESULT_HDEND")
     }
   })
