@@ -148,6 +148,7 @@ function(input, output, session) {
     }
   })
 
+  # End of the map section
   observeEvent(input$btn_MAP_END, {
     if (input$sel_WD == "<unselected>") {
       # if the WD is not selected then show the tab TAXO
@@ -355,12 +356,10 @@ function(input, output, session) {
     }
 
     # coord treatement
-    if (input$sel_LONG != "<unselected>") {
-      coord <- data.table(
-        long = inv()[, input$sel_LONG],
-        lat = inv()[, input$sel_LAT]
-      )
-    }
+    coord <- data.table(
+      longitude = if (input$sel_LONG != "<unselected>") inv()[, input$sel_LONG] else input$num_LONG,
+      latitude = if (input$sel_LAT != "<unselected>") inv()[, input$sel_LAT] else input$num_LAT
+    )
 
     # Heigth treatement
     if (input$sel_H != "<unselected>") {
