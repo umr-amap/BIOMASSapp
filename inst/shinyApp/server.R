@@ -8,9 +8,9 @@ function(input, output, session) {
   observe({
     # hide few menu at the begining
     hideMenuItem("tab_TAXO")
+    hideMenuItem("tab_MAP")
     hideMenuItem("tab_HEIGHT")
     hideMenuItem("tab_AGB")
-    # hideMenuItem("tab_MAP")
   })
 
 
@@ -67,21 +67,13 @@ function(input, output, session) {
     } else if (!xor(input$sel_WD == "<unselected>", input$sel_GENUS == "<unselected>")) {
       # if the wd is not selected or genus not selected but not the two
       shinyalert("Oops!", "Either select the wood density or genus and species or genus", type = "error")
-    } else if (ifheigth(
-      input$sel_H == "<unselected>",
-      input$sel_LONG == "<unselected>",
-      input$sel_LAT == "<unselected>"
-    )) {
+    } else if (xor(input$sel_LONG == "<unselected>", input$sel_LAT == "<unselected>")) {
       # if the H is not selected and one of the two (long or lat) is not selected
-      shinyalert("Oops!", "Please select the heigth or longitude and latitude", type = "error")
-    } else if (input$sel_WD == "<unselected>") {
-      # if the WD is not selected then show the menue of the tab TAXO
-      showMenuItem("tab_TAXO")
-      updateTabItems(session, "mnu_MENU", "tab_TAXO")
+      shinyalert("Oops!", "Please either select or deselect the longitude and latitude", type = "error")
     } else {
       # else show the heigth tab
-      showMenuItem("tab_HEIGHT")
-      updateTabItems(session, "mnu_MENU", "tab_HEIGHT")
+      showMenuItem("tab_MAP")
+      updateTabItems(session, "mnu_MENU", "tab_MAP")
     }
   })
 
@@ -96,14 +88,77 @@ function(input, output, session) {
   # for the Heigth long lat
   observe({
     toggleElement("msg_h",
-      condition = ifheigth(
-        input$sel_H == "<unselected>",
-        input$sel_LONG == "<unselected>",
-        input$sel_LAT == "<unselected>"
-      )
+      condition = xor(input$sel_LONG == "<unselected>", input$sel_LAT == "<unselected>")
     )
   })
 
+
+  # Maps --------------------------------------------------------------------
+
+  observeEvent(input$sel_LONG, {
+    if (input$sel_LONG != "<unselected>") {
+      hideElement("box_long_lat")
+    } else {
+      showElement("box_long_lat")
+    }
+  })
+
+
+  observeEvent({
+    if (input$btn_DATASET_LOADED >= 1) {
+      input$sel_LAT
+      input$sel_LONG
+      input$num_LAT
+      input$num_LONG
+    }
+  }, ignoreInit = T, {
+
+    # Create the table of coordinate
+    coord <- data.table(
+      longitude = if (input$sel_LONG != "<unselected>") inv()[, input$sel_LONG] else input$num_LONG,
+      latitude = if (input$sel_LAT != "<unselected>") inv()[, input$sel_LAT] else input$num_LAT
+    )
+
+    # if the user as made a mistake
+    if (all((sapply(coord, class) == "numeric"))) {
+
+      # if the plot are renseigned take the mean of each plot
+      if (nrow(coord) == nrow(inv()) && input$sel_PLOT != "<unselected>") {
+        coord <- coord[, .(
+          longitude = mean(longitude),
+          latitude = mean(latitude)
+        ),
+        by = inv()[, input$sel_PLOT]
+        ][ .(longitude, latitude) ]
+      }
+
+      # remove all NA coordinate
+      coord <- unique(na.omit(coord))
+
+      # draw the coordinate if there is one remaining
+      if (nrow(coord) != 0) {
+        output$map <- renderLeaflet({
+          leaflet(coord) %>%
+            addTiles() %>%
+            addMarkers(lng = ~longitude, lat = ~latitude)
+        })
+      }
+    } else {
+      shinyalert("Oops", text = "Either the column longitude or latitude are not numeric")
+    }
+  })
+
+  observeEvent(input$btn_MAP_END, {
+    if (input$sel_WD == "<unselected>") {
+      # if the WD is not selected then show the tab TAXO
+      showMenuItem("tab_TAXO")
+      updateTabItems(session, "mnu_MENU", "tab_TAXO")
+    } else {
+      # else show the heigth tab
+      showMenuItem("tab_HEIGHT")
+      updateTabItems(session, "mnu_MENU", "tab_HEIGHT")
+    }
+  })
 
 
   # taxonomy ----------------------------------------------------------------
@@ -188,6 +243,11 @@ function(input, output, session) {
       hideElement("box_RESULT_HDEND")
     }
   })
+
+
+
+
+
 
   observeEvent(input$chkgrp_HEIGHT, ignoreNULL = F, {
     id <- input$chkgrp_HEIGHT
