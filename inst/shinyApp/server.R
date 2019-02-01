@@ -273,7 +273,7 @@ function(input, output, session) {
         # render the plot
         output$out_plot_HD <- renderPlot(replayPlot(plotHD))
         # render the table
-        output$out_tab_HD <- renderTable(tab_modelHD, digits = 4)
+        output$out_tab_HD <- renderTable(tab_modelHD[, -2], digits = 4)
         # update the radio button with the method and choose the minimun of the RSE
         updateRadioButtons(session,
           inputId = "rad_HDMOD",
