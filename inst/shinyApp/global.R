@@ -116,9 +116,9 @@ AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, c
     }
 
     AGB <- AGBmonteCarlo(D, WD, errWD,
-      H = if (is.null(H)) NULL else H,
-      errH = if (is.null(H)) NULL else errH,
-      HDmodel = if (is.null(HDmodel)) NULL else HDmodel,
+      H = if (!is.null(H)) H,
+      errH = if (!is.null(H)) errH,
+      HDmodel = if (!is.null(HDmodel)) HDmodel,
       Dpropag = "chave2004"
     )
   }
