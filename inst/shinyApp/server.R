@@ -298,8 +298,19 @@ function(input, output, session) {
     if ("feld" %in% id) {
       updateSelectInput(session, "sel_FELD",
         choices = c(
-          ifelse(input$sel_LONG == "<unselected>", NULL, "<automatic>"),
-          rownames(feldCoef)
+          if (input$sel_LONG == "<unselected>") NULL else "<automatic>",
+          "Africa",
+          "Central Africa" = "CAfrica",
+          "Eastern Africa" = "EAfrica",
+          "Western Africa" = "WAfrica",
+          "South America" = "SAmerica",
+          "Brazilian Shield" = "BrazilianShield",
+          "Eastern-central Amazonia" = "ECAmazonia",
+          "Guiana Shield" = "GuianaShield",
+          "Western Amazonia" = "WAmazonia",
+          "Southeast Asia" = "SEAsia",
+          "Northern Australia" = "NAustralia",
+          "Pantropical"
         )
       )
       showElement("box_RESULT_FELD")
