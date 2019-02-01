@@ -61,16 +61,9 @@ tstrsplit_NA <- function(x, pattern = " ", count = 2) {
 
 
 # for the AGB predict
-AGB_predict <- function(AGBmod, D, WD, errWD, H = NULL, HDmodel = NULL, coord = NULL, region = NULL) {
-  # if there is the coordinate
-  if (!is.null(coord)) {
-    AGB <- if (AGBmod == "agb") {
-      computeAGB(D, WD, coord = coord)
-    } else {
-      AGBmonteCarlo(D, WD, errWD, coord = coord, Dpropag = "chave2004")
-    }
-    return(AGB)
-  }
+AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, coord = NULL, region = NULL) {
+
+  #### parameters verification
 
   if (is.null(errWD) && AGBmod != "agb") {
     shinyalert("oops", "You did attribute the WD vector,\n you can not do the propagation error",
@@ -88,6 +81,19 @@ AGB_predict <- function(AGBmod, D, WD, errWD, H = NULL, HDmodel = NULL, coord = 
     type = "warning"
     )
     AGBmod <- "agb"
+  }
+
+  ##### calcul of the AGB
+
+
+  # if there is the coordinate
+  if (!is.null(coord)) {
+    AGB <- if (AGBmod == "agb") {
+      computeAGB(D, WD, coord = coord)
+    } else {
+      AGBmonteCarlo(D, WD, errWD, coord = coord, Dpropag = "chave2004")
+    }
+    return(AGB)
   }
 
 

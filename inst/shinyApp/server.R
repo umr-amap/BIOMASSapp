@@ -185,9 +185,15 @@ function(input, output, session) {
 
 
   # Heigth parameters -------------------------------------------------------
+  observeEvent(input$sel_H, {
+    if (input$sel_H != "<unselected>")
+      showElement("box_RESULT_HDEND")
+    else if (is.null(input$chkgrp_HEIGHT) && input$sel_H == "<unselected>"){
+      hideElement("box_RESULT_HDEND")
+    }
+  })
 
-
-  observeEvent(input$chkgrp_HEIGHT, {
+  observeEvent(input$chkgrp_HEIGHT, ignoreNULL = F, {
     id <- input$chkgrp_HEIGHT
 
     ## If they want to construct an HD model
@@ -273,7 +279,10 @@ function(input, output, session) {
     # take the mode of AGB
     AGBmod <- input$rad_AGB_MOD
 
+    # take the diameter
     D <- inv()[, input$sel_DIAMETER]
+
+    # take the plot ID
     if (input$sel_PLOT != "<unselected>") {
       plot_id <- inv()[, input$sel_PLOT]
     } else {
@@ -285,7 +294,7 @@ function(input, output, session) {
       WD <- inv()[, "meanWD"]
       errWD <- inv()[, "sdWD"]
     } else {
-      wd <- inv()[, input$sel_WD]
+      WD <- inv()[, input$sel_WD]
       errWD <- NULL
     }
 
@@ -302,19 +311,27 @@ function(input, output, session) {
       H <- inv()[, input$sel_H]
     } # if H is unselected
 
+    # take the length of the input of check box for the heigth
     length_progression <- length(input$chkgrp_HEIGHT)
+
+
+
+    ####### calculation of the AGB
 
     if (length_progression != 0) { # if we have a model
 
       withProgress(message = "AGB build", value = 0, {
-        if ("HDloc" %in% input$chkgrp_HEIGHT) { # if we have an HD local
-          HD_mod <- modelHD(D, H, method = input$rad_HDMOD)
+
+        # if we have an HD local
+        if ("HDloc" %in% input$chkgrp_HEIGHT) {
+          HD_mod <- modelHD(D, H, method = input$rad_HDMOD) # compute the model
 
           AGB_res$HDlocal <- AGB_predict(AGBmod, D, WD, errWD, HDmodel = HD_mod)
           incProgress(1 / length_progression, detail = "AGB using HD local: Done")
         }
 
-        if ("feld" %in% input$chkgrp_HEIGHT) { # if we want the feldpausch region
+        # if we want the feldpausch region
+        if ("feld" %in% input$chkgrp_HEIGHT) {
           if (input$sel_FELD == "<automatic>") {
             region <- computeFeldRegion(coord)
           } else {
@@ -324,17 +341,22 @@ function(input, output, session) {
           incProgress(1 / length_progression, detail = "AGB using feldpausch region: Done")
         }
 
-        if ("chave" %in% input$chkgrp_HEIGHT) { # if we want the chave model
+        # if we want the chave model
+        if ("chave" %in% input$chkgrp_HEIGHT) {
           AGB_res$chave <- AGB_predict(AGBmod, D, WD, errWD, coord = coord)
           incProgress(1 / length_progression, detail = "AGB using chave: Done")
         }
       })
-    }
-    if (is.null(input$chkgrp_HEIGHT)) { # if we have 0 model
-      AGB_res$heigth <- AGB_predict(AGBmod, D, WD, H)
+    } else { # if we have not any model HD
+      AGB_res$heigth <- AGB_predict(AGBmod, D, WD, H = H)
     }
 
 
+
+
+    ###### After the calculation of the AGB
+
+    # if the plot id is not null
     if (!is.null(plot_id)) {
       # list that use to stock the result
       AGB_sum(lapply(AGB_res, summaryByPlot, plot_id))
@@ -356,32 +378,44 @@ function(input, output, session) {
         )
         axis(1, at = 1:length(plot_order), labels = AGB_sum()[[1]]$plot[plot_order], las = 2)
 
+        # plain color
+        color <- c(HDlocal = "blue", feld = "red", chave = "green", heigth = "black")
 
-        # if it's just the AGB
+        # if it's the AGB without the error propagtion
         if (ncol(AGB_sum()[[1]]) == 2) {
-          color <- c(HDlocal = "blue", feld = "red", chave = "green")
+
+          # trace the points in the graph
           lapply(names(AGB_sum()), function(x) {
             points(1:length(plot_order), AGB_sum()[[x]][plot_order, "AGB"], col = color[x], pch = 20)
           })
         } else {
-          color <- rgb(
-            red = c(0, 1, 0), green = c(0, 0, 1), blue = c(1, 0, 0), alpha = c(1, 0.5, 0.5),
-            names = c("HDlocal", "feld", "chave")
+          # transparent color expect the first which is HDlocal
+          color <- rgb(col2rgb(color) / 255,
+            alpha = c(1, 0.5, 0.5),
+            names = names(color)
           )
+
+          # trace the polygon expect for the first value
           lapply(names(AGB_sum())[-1], function(x) {
-            polygon(c(seq_along(plot_order), length(plot_order):1),
-              c(AGB_sum()[[x]][plot_order, "Cred_2.5"], rev(AGB_sum()[[x]][plot_order, "Cred_97.5"])),
-              col = color[x], border = NA
-            )
+            with(AGB_sum()[[x]], {
+              polygon(
+                x = c(seq_along(plot_order), length(plot_order):1),
+                y = c(Cred_2.5[plot_order], rev(Cred_97.5[plot_order])),
+                col = color[x], border = NA
+              )
+            })
           })
 
+          # trace the points + segments for the first HD model
           with(AGB_sum()[[1]], {
             points(seq_along(plot_order), AGB[plot_order], pch = 20, cex = 1.5, col = color[names(AGB_sum())[1]])
             segments(seq_along(plot_order), Cred_2.5[plot_order], y1 = Cred_97.5[plot_order], col = color[names(AGB_sum())[1]])
           })
         }
 
-        legend("bottomright", legend = names(AGB_sum()), col = color[names(AGB_sum())], pch = 1)
+
+        # draw the legend
+        legend("bottomright", legend = names(AGB_sum()), col = color[names(AGB_sum())], pch = 20)
       })
     } else {
       AGB_sum(AGB_res)
