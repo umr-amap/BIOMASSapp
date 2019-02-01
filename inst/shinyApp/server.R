@@ -56,7 +56,7 @@ function(input, output, session) {
   observeEvent(input$sel_PLOT, {
     feedbackWarning("sel_PLOT",
       condition = input$sel_PLOT == "<unselected>",
-      text = ""
+      text = "Optional (use if you want to compute AGB per plot)"
     )
   })
 
