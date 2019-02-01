@@ -118,7 +118,7 @@ function(input, output, session) {
         taxo <- tryCatch({
           correctTaxo(
             genus = inv()[, input$sel_GENUS],
-            species = if (input$sel_SPECIES == "<unselected>") NULL else inv()[, input$sel_SPECIES]
+            species = if (input$sel_SPECIES != "<unselected>") inv()[, input$sel_SPECIES]
           )
         }, error = function(e) e)
 
@@ -386,9 +386,9 @@ function(input, output, session) {
           })
         } else {
           # transparent color expect the first which is HDlocal
-          color <- rgb(col2rgb(color) / 255,
+          color <- rgb(t(col2rgb(color[1:3])) / 255,
             alpha = c(1, 0.5, 0.5),
-            names = names(color)
+            names = names(color[1:3])
           )
 
           # trace the polygon expect for the first value
