@@ -389,6 +389,9 @@ function(input, output, session) {
         if ("feld" %in% input$chkgrp_HEIGHT) {
           if (input$sel_FELD == "<automatic>") {
             region <- computeFeldRegion(coord)
+            if (anyNA(region)){
+              region[is.na(region)] = "Pantropical"
+            }
           } else {
             region <- input$sel_FELD
           }
