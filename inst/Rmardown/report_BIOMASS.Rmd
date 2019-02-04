@@ -13,326 +13,46 @@ title: "Report BIOMASS"
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, comment = NA, fig.align = "center")
-```
-```{r,message=FALSE,warning=FALSE}
 library(knitr)
-setwd("~/Bureau/document arthur/Analyse TMFO")
 ```
+
 
 
 # Load data
 ```{r load data, message=FALSE}
-if (!require(BIOMASS)) devtools::install_github("AMAP-dev/BIOMASS")
-devtools::load_all("~/Bureau/document arthur/biomass/")
-library(data.table)
-library(ggplot2)
-library(proj4)
 
-# Read data
-dataTene <- fread("data_Tene_FOS.csv", dec = ",")
+# select the column we need
+selectColumn = c(input$sel_PLOT, input$sel_DIAMETER,
+                 input$sel_WD, input$sel_GENUS, input$sel_SPECIES, 
+                 input$sel_H, input$sel_LONG, input$sel_LAT)
+selectedColumn = selectColumn != "<unselected>"
 
-# Recompute relative coordinates at the plot level (coordinates were originally set over the whole experimental design).
-dataTene[, ":="(XRel = x - min(x, na.rm = T), YRel = y - min(y, na.rm = T)), by = plot ]
+data = setDT(inv()[, selectColumn[selectedColumn]])
+setnames(data, names(data), c("plotId", "D",
+                               "WD", "Genus", "Species",
+                               "H", "longitude", "latitude")[selectedColumn])
 
-# DBH in mm to cm
-dataTene[, dbh := dbh / 10]
-
-# read the coordinates
-dataTeneCoord <- fread("Tene_Coord_FOS.csv")
-
-# Get Feldpausch regions
-dataTeneCoord[, Feldregion := computeFeldRegion(cbind(longitude, latitude))]
-dataTene[unique(dataTeneCoord, by = "Plot"),
-  on = c("plot" = "Plot"), ":="(regionFeld = i.Feldregion)
-] # Assign a Feldpausch region to all trees
-
-
-# set the corners
-dataTeneCoordUTM <- setDT(dataTeneCoord[, numberCorner(longlat = cbind(longitude, latitude), plot = Plot, origin = (corner == 2), clockWise = T)])
-
-dataTeneCoordUTM[ , codeUTM := dataTeneCoord[, latlong2UTM(cbind(longitude, latitude))]$codeUTM]
-
-# Divide plots into 100*100 m2 subplots
-dataTenecut <- setDT(dataTeneCoordUTM[, cutPlot(cbind(X, Y), corner = corner, plot = plot, gridsize = 50, dimX = 200, dimY = 200)])
-
-dataTenecut[unique(dataTeneCoordUTM, by = "plot"), on = "plot", codeUTM := i.codeUTM]
-
-# Assign trees to subplots
-dataTene[, subplot := attributeTree(cbind(XRel, YRel), plot, dataTenecut)]
-
-
-# Assign the lat-long coordinates of the plot center to all trees
-dataTene[dataTeneCoord[, .(lat = mean(latitude), long = mean(longitude)), by = Plot][, .(plot = Plot, lat, long)],
-  on = "plot",
-  ":="(lat = i.lat, long = i.long)
-]
-
-# read tree heigth measurements for a subset of trees
-dataTeneHeigth <- fread("Tene_height_FOS.csv", dec = ",")
+kable(head(data), digits = 3, caption = "The head of the table")
 
 ```
 
-# Location of the plots  
-```{r Localisation of the plot, echo=FALSE, message=FALSE, warning=F}
-lat.long <- unique(dataTeneCoord[, .(longitude, latitude)])
-require("ggmap")
-mp <- NULL
-mapWorld <- borders("world", colour = "gray50", fill = "gray50") # create a layer of borders
-mp <- ggplot() + mapWorld
-mp <- mp + geom_point(data = lat.long, aes(x = longitude, y = latitude), color = "red", size = 2)
-mp
+You have selected `r ncol(data)` columns (renamed) and your data table have `r nrow(data)`.
+
+```{r}
+# boolean, T if we want to show
+map_or_not = all(c("longitude", "latitude") %in% names(data)) || "chave" %in% input$chkgrp_HEIGHT || ("feld" %in% input$chkgrp_HEIGHT && input$sel_FELD == "<unselected>")
 ```
 
 
 
-# Retrieve wood density
-```{r correctTaxo, include=FALSE}
-correctTaxonomy <- correctTaxo(genus = dataTene$genus, species = dataTene$species)
-dataTene[, ":="(genusCorrected = correctTaxonomy$genusCorrected,
-  speciesCorrected = correctTaxonomy$speciesCorrected)]
-rm(correctTaxonomy)
-```
-```{r Retrieve wood density, message=FALSE}
-# retrieve the wood density and bring it in the data base
-dataWD <- getWoodDensity(
-  genus = dataTene$genusCorrected,
-  species = dataTene$speciesCorrected,
-  stand = dataTene$plot
-)
-dataTene[, WD := dataWD$meanWD]
-dataTene[, sdWD := dataWD$sdWD]
-```
-```{r include=FALSE}
-levelswd <- 100 * table(dataWD$levelWD) / length(dataWD$levelWD)
-```
-**Overall, `r round(levelswd["species"],1)` % of the values have been attributed at the species level, `r round(levelswd["genus"],1)` % at the genus level, and `r round(100-sum(levelswd[c("species","genus")]),1)` % at the plot level.**
+`r if (!(all(c("longitude", "latitude") %in% names(data)) || "chave" %in% input$chkgrp_HEIGHT || ("feld" %in% input$chkgrp_HEIGHT && input$sel_FELD == "<unselected>"))) {"<!--"}`
+# Location of the plots
+```{r localisation}
 
-
-
-# Construct H-D models
-
-
-
-
-```{r Construct HD model, message=FALSE}
-result <- modelHD(dataTeneHeigth$dbh, dataTeneHeigth$Height)
-method <- result$method[ which.min(result$RSE) ] # Select the method for which the RSE is the minimun
-```
-
-```{r echo=FALSE}
-kable(result, row.names = F, caption = "Comparison of the different methods")
-```
-
-
-
-
-
-We implemented a `r method` model of the form:
-
-`r if(method != "log1") {"<!--"}`
-$$ H = exp(a + b \cdot log(D)) $$
-`r if(method != "log1") {"-->"}`
-
-`r if(method != "log2") {"<!--"}`
-$$ H = exp(a + b \cdot log(D) + c \cdot log(D)^2) $$
-`r if(method != "log2") {"-->"}`
-
-`r if(method != "log3") {"<!--"}`
-$$ H = exp(a + b \cdot log(D) + c \cdot log(D)^2 + d \cdot log(D)^3) $$
-`r if(method != "log3") {"-->"}`
-
-`r if(method != "michaelis") {"<!--"}`
-$$ H= a \cdot \dfrac{D}{b+D} $$
-where *a* represents the asymptotic height of trees in the stand.
-`r if(method != "michaelis") {"-->"}`
-
-
-`r if(method != "weibull") {"<!--"}`
-$$H=a  \cdot (1-exp(-(D/b)^c))$$
-where *a* represents the asymptotic height of trees in the stand.
-`r if(method != "weibull") {"-->"}`
-
-
-
-
-
-
-
-```{r, echo=FALSE}
-HDmodel <- modelHD(dataTeneHeigth$dbh, dataTeneHeigth$Height, method = method)
-kable(cbind(t(HDmodel$coefficients[, 1]), RSE = HDmodel$RSE),
-  digits = 3,
-  caption = paste(HDmodel$method, "model parameters of the H-D relationship among plots")
-)
-```
-
-# Retrieve the heigth of trees
-```{r, warning=FALSE}
-# Using the model HD
-dataTene[, c("Hlocal", "RSElocal") := retrieveH(dbh, model = HDmodel)] # retrieve heigth with the local HD model
-dataTene[, c("Hfeld", "RSEfeld") := retrieveH(dbh, region = unique(regionFeld)), by = regionFeld] # retrieve heigth with Feldpausch's HD models
-dataTene[, c("Hchave", "RSEchave") := retrieveH(dbh, coord = cbind(long, lat))] # retrieve heigth with Chave's HD model
-```
-```{r echo=FALSE, warning=F}
-
-ggplot(
-  data = melt(dataTene, id.vars = "dbh", measure.vars = c("Hlocal", "Hfeld", "Hchave"), variable.name = "Method"),
-  aes(x = dbh, y = value, lty = Method, color = Method)
-) + geom_line() +
-  labs(title = "Comparison of the methods for retrieving tree height", x = "dbh", y = "H") +
-  scale_color_discrete(labels = c("Local", "Feldpausch", "Chave")) +
-  scale_linetype_discrete(labels = c("Local", "Feldpausch", "Chave"))
-
-```
-
-# Estimating biomass and associated uncertainties
-
-Below, we used a Bayesian Monte-Carlo scheme to estimate the mean AGB and associated credibility interval per plot.
-
-## Using a local H-D model
-
-```{r global model, message=FALSE, warning=FALSE}
-resultAGB <- AGBmonteCarlo(
-  D = dataTene$dbh,
-  WD = dataTene$WD,
-  errWD = dataTene$sdWD,
-  H = dataTene$Hlocal,
-  errH = unique(dataTene$RSElocal),
-  Dpropag = "chave2004"
-)
-
-ResHDlocal <- setDT(summaryByPlot(AGB_simu = resultAGB$AGB_simu, plot = dataTene$subplot))
-```
-
-
-```{r, echo=F}
-kable(ResHDlocal, row.names = F, caption = "AGB estimates per plots using the local H-D model", label = "tab:AGB_local", digits = 1)
-```
-
-
-## Using Chave et al. 2014 Equation 7 model
-```{r Chave model}
-resultAGB <- AGBmonteCarlo(
-  D = dataTene$dbh,
-  WD = dataTene$WD,
-  errWD = dataTene$sdWD,
-  coord = dataTeneCoord[1, .(longitude, latitude)],
-  Dpropag = "chave2004"
-)
-ResHDChave <- setDT(summaryByPlot(AGB_simu = resultAGB$AGB_simu, plot = dataTene$subplot))
-```
-
-```{r, echo=F}
-kable(ResHDChave, row.names = F, caption = "AGB estimates per plots using the Chave method", label = "tab:AGB_local", digits = 1)
-```
-
-
-## Using Feldpausch et al. 2012 regional Weibull models
-```{r Feldpaush, message=FALSE, warning=FALSE}
-resultAGB <- AGBmonteCarlo(
-  D = dataTene$dbh,
-  WD = dataTene$WD,
-  errWD = dataTene$sdWD,
-  H = dataTene$Hfeld,
-  errH = unique(dataTene$RSEfeld),
-  Dpropag = "chave2004"
-)
-
-ResHDregion <- setDT(summaryByPlot(AGB_simu = resultAGB$AGB_simu, plot = dataTene$subplot))
-```
-
-```{r, echo=FALSE}
-kable(ResHDregion, row.names = F, caption = "AGB estimates per plots using Feldpaush et al. 2012 H-D models", digits = 1)
-```
-
-
-```{r Calculating the maximum height and the Loreys height per (sub)plot, message=F, warning=F}
-# Max height by subplot
-maxH <- dataTene[, .(
-  Hlocal = max(Hlocal, na.rm = T),
-  Hfeld = max(Hfeld, na.rm = T),
-  Hchave = max(Hchave, na.rm = T)
-), by = subplot ]
-
-# Compute the Lorey height
-dataTene[, BAm := (pi * (dbh / 2)^2) / 10000 ]
-
-dataTene[, ":="(HBAlocal = Hlocal * BAm, HBAfeld = Hfeld * BAm, HBAchave = Hchave * BAm)]
-Lorey <- dataTene[, .(
-  LoreyLocal = sum(HBAlocal, na.rm = T) / sum(BAm, na.rm = T),
-  LoreyFeld = sum(HBAfeld, na.rm = T) / sum(BAm, na.rm = T),
-  LoreyChave = sum(HBAchave, na.rm = T) / sum(BAm, na.rm = T)
-), by = subplot]
-
-# mean of wood density by subplot
-meanWD <- dataTene[, .(meanWD = mean(WD, na.rm = T)), by = subplot]
-```
-
-
-
-# Comparison of the AGB approaches
-
-```{r,fig.width=8, fig.height=5,echo=F}
-order <- ResHDlocal[, order(AGB)]
-ResHDlocal <- ResHDlocal[order, ]
-ResHDregion <- ResHDregion[order, ]
-ResHDChave <- ResHDChave[order, ]
-
-xcoordinate <- 1:nrow(ResHDlocal)
-
-plot(xcoordinate, ResHDlocal$AGB,
-  pch = 20, cex = 1.5, axes = F, xlab = "", ylab = "", col = "blue",
-  ylim = c(0, max(ResHDlocal$Cred_97.5, ResHDregion$Cred_97.5, ResHDChave$Cred_97.5)),
-  main = "Comparison of the AGB approaches", cex.main = 1.2
-)
-
-segments(xcoordinate, ResHDlocal$Cred_2.5, xcoordinate, ResHDlocal$Cred_97.5, lwd = 2, col = "blue")
-lines(xcoordinate, ResHDregion$Cred_2.5, lty = 1, col = "red")
-lines(xcoordinate, ResHDregion$Cred_97.5, lty = 1, col = "red")
-lines(xcoordinate, ResHDChave$Cred_2.5, lty = 2, col = "grey20")
-lines(xcoordinate, ResHDChave$Cred_97.5, lty = 2, col = "grey20")
-axis(side = 1, at = xcoordinate, labels = ResHDlocal$subplot)
-axis(side = 2, at = seq(0, ceiling(max(ResHDlocal$AGB, ResHDregion$AGB, ResHDChave$AGB) + 2000), 100), las = 1)
-legend("topleft", c("Local HD", "Feldpausch", "Chave"),
-  col = c("blue", "red", "grey20"),
-  bg = "white", lty = c(0, 1, 2), pch = c(20, -1, -1)
-)
-```
-
-
-
-
-# Preparing the outputs
-
-```{r,echo=T,message=FALSE}
-
-#### Prepare the 
-dataTenecut[ , c("long", "lat") := project(.(XAbs, YAbs), proj = unique(.BY), inverse = T), by = codeUTM ]
-dataTenecut[, ':='("Lat_cnt" = mean(lat), "Long_cnt" = mean(long)), by = subplot]
-
-ResTot = rbindlist(lapply(split(dataTenecut, by = "subplot", keep.by = T), function(data){
-  name = c("Lat_sw", "Lon_sw", "Lat_nw", "Lon_nw", "Lat_se", "Lon_se", "Lat_ne", "Lon_ne")
+if (all(c("longitude", "latitude") %in% names(data)) || "chave" %in% input$chkgrp_HEIGHT || ("feld" %in% input$chkgrp_HEIGHT && input$sel_FELD == "<unselected>")) {
   
-  v = as.vector( t(data[order(corner), .(lat, long)]) )
-  names(v) = name
-  v = as.list(v)
   
-  v[["subplot"]] = data$subplot[1]
-  v[c("subplot", name)]
-}))
-
-ResTot[unique(dataTenecut, by = "subplot"), on = "subplot", 
-       ':='("Lat_cnt" = i.Lat_cnt, "Long_cnt" = i.Long_cnt)]
-
-# Merge the result of AGB from HD local by subplot
-ResTot[ResHDlocal, on = c(subplot = "plot"), ":="(AGB_local = i.AGB)]
-
-# Merge maximum of the heigth of the trees given for each HD models by subplot
-ResTot[maxH, on = "subplot", ":="(H_max_Local = i.Hlocal)]
-
-# Merge the Lorey heigth given for each HD models by subplot
-ResTot[Lorey, on = "subplot", ":="(H_Lorey_local = i.LoreyLocal)]
-
-# write the file
-fwrite(ResTot, file = "data_AGB.csv", sep = "\t")
+  
+}
 ```
+`r if (!(all(c("longitude", "latitude") %in% names(data)) || "chave" %in% input$chkgrp_HEIGHT || ("feld" %in% input$chkgrp_HEIGHT && input$sel_FELD == "<unselected>"))) {"-->"}`

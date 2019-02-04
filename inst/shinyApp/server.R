@@ -504,20 +504,22 @@ function(input, output, session) {
   })
 
   ##### download the report
-  observeEvent(input$dwl_report, {
-    output$dwl_report = downloadHandler(
+  output$dwl_report = downloadHandler(
       filename = function(){
-        paste("Report-", Sys.Date(), ".html", sep="")
-      }
+        paste0("Report-", Sys.Date(), ".html")
+      },
       content = function(file){
-        render(
-          input = system.file("Rmardown", "report_BIOMASS.Rmd", package = "BIOMASSapp"),
-          output_file = file
-        )
+
+
+        tempReport <- file.path(tempdir(), "report.Rmd")
+        file.copy(system.file("Rmardown", "report_BIOMASS.Rmd", package = "BIOMASSapp"),
+                  tempReport, overwrite = TRUE)
+
+        rmarkdown::render(tempReport, output_file = file)
       }
 
     )
-  })
+
 
 
 }

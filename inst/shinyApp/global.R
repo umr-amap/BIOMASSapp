@@ -5,6 +5,7 @@ library(leaflet)
 library(shinyjs)
 library(shinyalert)
 library(shinyFeedback)
+library(rmarkdown)
 library(BIOMASS)
 
 # set maximum input file size (here 30Mo)
