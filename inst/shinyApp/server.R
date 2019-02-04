@@ -8,8 +8,8 @@ function(input, output, session) {
   observe({
     # hide few menu at the begining
     hideMenuItem("tab_TAXO")
-    hideMenuItem("tab_MAP")
     hideMenuItem("tab_HEIGHT")
+    hideMenuItem("tab_MAP")
     hideMenuItem("tab_AGB")
   })
 
@@ -70,10 +70,14 @@ function(input, output, session) {
     } else if (xor(input$sel_LONG == "<unselected>", input$sel_LAT == "<unselected>")) {
       # if the H is not selected and one of the two (long or lat) is not selected
       shinyalert("Oops!", "Please either select or deselect the longitude and latitude", type = "error")
+    } else if (input$sel_WD == "<unselected>") {
+      # if the WD is not selected then show the tab TAXO
+      showMenuItem("tab_TAXO")
+      updateTabItems(session, "mnu_MENU", "tab_TAXO")
     } else {
       # else show the heigth tab
-      showMenuItem("tab_MAP")
-      updateTabItems(session, "mnu_MENU", "tab_MAP")
+      showMenuItem("tab_HEIGHT")
+      updateTabItems(session, "mnu_MENU", "tab_HEIGHT")
     }
   })
 
@@ -93,73 +97,7 @@ function(input, output, session) {
   })
 
 
-  # Maps --------------------------------------------------------------------
 
-  observeEvent(input$sel_LONG, {
-    if (input$sel_LONG != "<unselected>") {
-      hideElement("box_long_lat")
-    } else {
-      showElement("box_long_lat")
-    }
-  })
-
-
-  observeEvent({
-    if (input$btn_DATASET_LOADED >= 1) {
-      input$sel_LAT
-      input$sel_LONG
-      input$num_LAT
-      input$num_LONG
-    }
-  }, ignoreInit = T, {
-
-    # Create the table of coordinate
-    coord <- data.table(
-      longitude = if (input$sel_LONG != "<unselected>") inv()[, input$sel_LONG] else input$num_LONG,
-      latitude = if (input$sel_LAT != "<unselected>") inv()[, input$sel_LAT] else input$num_LAT
-    )
-
-    # if the user as made a mistake
-    if (all((sapply(coord, class) == "numeric"))) {
-
-      # if the plot are renseigned take the mean of each plot
-      if (nrow(coord) == nrow(inv()) && input$sel_PLOT != "<unselected>") {
-        coord <- coord[, .(
-          longitude = mean(longitude),
-          latitude = mean(latitude)
-        ),
-        by = inv()[, input$sel_PLOT]
-        ][ .(longitude, latitude) ]
-      }
-
-      # remove all NA coordinate
-      coord <- unique(na.omit(coord))
-
-      # draw the coordinate if there is one remaining
-      if (nrow(coord) != 0) {
-        output$map <- renderLeaflet({
-          leaflet(coord) %>%
-            addTiles() %>%
-            addMarkers(lng = ~longitude, lat = ~latitude)
-        })
-      }
-    } else {
-      shinyalert("Oops", text = "Either the column longitude or latitude are not numeric")
-    }
-  })
-
-  # End of the map section
-  observeEvent(input$btn_MAP_END, {
-    if (input$sel_WD == "<unselected>") {
-      # if the WD is not selected then show the tab TAXO
-      showMenuItem("tab_TAXO")
-      updateTabItems(session, "mnu_MENU", "tab_TAXO")
-    } else {
-      # else show the heigth tab
-      showMenuItem("tab_HEIGHT")
-      updateTabItems(session, "mnu_MENU", "tab_HEIGHT")
-    }
-  })
 
 
   # taxonomy ----------------------------------------------------------------
@@ -298,7 +236,7 @@ function(input, output, session) {
     if ("feld" %in% id) {
       updateSelectInput(session, "sel_FELD",
         choices = c(
-          if (input$sel_LONG == "<unselected>") NULL else "<automatic>",
+          "<automatic>",
           "Africa",
           "Central Africa" = "CAfrica",
           "Eastern Africa" = "EAfrica",
@@ -328,6 +266,9 @@ function(input, output, session) {
   observeEvent(input$btn_HD_DONE, {
     if (is.null(input$chkgrp_HEIGHT) && input$sel_H == "<unselected>") {
       shinyalert("Oops", "There is no H and HD model", type = "error")
+    } else if (input$sel_LONG != "<unselected>" || "chave" %in% input$chkgrp_HEIGHT || ("feld" %in% input$chkgrp_HEIGHT && input$sel_FELD == "<unselected>")) {
+      showMenuItem("tab_MAP")
+      updateTabItems(session, "mnu_MENU", "tab_MAP")
     } else {
       showMenuItem("tab_AGB")
       updateTabItems(session, "mnu_MENU", "tab_AGB")
@@ -336,7 +277,75 @@ function(input, output, session) {
 
 
 
+  # Maps --------------------------------------------------------------------
+
+  observeEvent(input$sel_LONG, {
+    if (input$sel_LONG != "<unselected>") {
+      hideElement("box_long_lat")
+    } else {
+      showElement("box_long_lat")
+    }
+  })
+
+
+  observeEvent({
+    if (input$btn_HD_DONE >= 1) {
+      input$sel_LAT
+      input$sel_LONG
+      input$num_LAT
+      input$num_LONG
+    }
+  }, ignoreInit = T, {
+
+    # Create the table of coordinate
+    coord <- data.table(
+      longitude = if (input$sel_LONG != "<unselected>") inv()[, input$sel_LONG] else input$num_LONG,
+      latitude = if (input$sel_LAT != "<unselected>") inv()[, input$sel_LAT] else input$num_LAT
+    )
+
+    # if the user as made a mistake
+    if (all((sapply(coord, class) == "numeric"))) {
+
+      # if the plot are renseigned take the mean of each plot
+      if (nrow(coord) == nrow(inv()) && input$sel_PLOT != "<unselected>") {
+        coord = rbindlist(by(coord, inv()[, input$sel_PLOT],
+                             function(x) { data.frame(longitude = mean(x$longitude),
+                                                      latitude = mean(x$latitude)) }))
+      }
+
+      # remove all NA coordinate
+      coord <- unique(na.omit(coord))
+
+      # draw the coordinate if there is one remaining
+      if (nrow(coord) != 0) {
+        output$map <- renderLeaflet({
+          leaflet(coord) %>%
+            addTiles() %>%
+            addMarkers(lng = ~longitude, lat = ~latitude)
+        })
+      }
+    } else {
+      shinyalert("Oops", text = "Either the column longitude or latitude are not numeric")
+    }
+  })
+
+  # End of the map section
+  observeEvent(input$btn_MAP_END, {
+    showMenuItem("tab_AGB")
+    updateTabItems(session, "mnu_MENU", "tab_AGB")
+  })
+
+
+
+
+
+
+
+
+
   # AGB section -------------------------------------------------------------
+
+
   AGB_sum <- reactiveVal()
   observeEvent(input$btn_AGB_DONE, {
 

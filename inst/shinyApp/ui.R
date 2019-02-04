@@ -4,9 +4,9 @@ dashboardPage(
     sidebarMenu(
       id = "mnu_MENU",
       menuItem("Load dataset", tabName = "tab_LOAD"),
-      menuItem("Map", tabName = "tab_MAP"),
       menuItem("Taxonomy and Wood density", tabName = "tab_TAXO"),
       menuItem("Model HD", tabName = "tab_HEIGHT"),
+      menuItem("Map", tabName = "tab_MAP"),
       menuItem("AGB calculation", tabName = "tab_AGB")
     )
   ),
@@ -70,21 +70,6 @@ dashboardPage(
       ),
 
 
-      # Map ---------------------------------------------------------------------
-
-      tabItem(
-        "tab_MAP",
-        h1("Optional"),
-        hidden(boxWithId(
-          id = "box_long_lat", title = "Choose the Long Lat:", width = 6,
-          numericInput("num_LONG", "longitude", 3.8614, min = -180, max = 180, step = 0.01),
-          numericInput("num_LAT", "latitude", 43.652, min = -90, max = 90, step = 0.01)
-        )),
-        leafletOutput("map"),
-        actionButton("btn_MAP_END", "Continue")
-      ),
-
-
 
       # Taxonomy ----------------------------------------------------------------
 
@@ -142,11 +127,27 @@ dashboardPage(
           id = "box_RESULT_HDEND", title = NULL, width = 4,
           actionButton("btn_HD_DONE", "continue")
         ))
-      )
+      ),
+
+      # Map ---------------------------------------------------------------------
+
+      tabItem(
+        "tab_MAP",
+        h1("Optional"),
+        hidden(boxWithId(
+          id = "box_long_lat", title = "Choose the Long Lat:", width = 6,
+          numericInput("num_LONG", "longitude", 3.8614, min = -180, max = 180, step = 0.01),
+          numericInput("num_LAT", "latitude", 43.652, min = -90, max = 90, step = 0.01)
+        )),
+        leafletOutput("map"),
+        actionButton("btn_MAP_END", "Continue")
+      ),
+
+
 
 
       # AGB -----------------------------------------------------------------
-      , tabItem(
+      tabItem(
         "tab_AGB",
         fluidRow(
           box(
@@ -160,13 +161,6 @@ dashboardPage(
           ))
         )
       )
-      # ,tabItem("tab_MAP",
-      #   fluidRow(
-      #     box("Inventory plot map",width=12,
-      #       leafletOutput("map_PLOT")
-      #     )
-      #   )
-      # )
     )
   )
 )
