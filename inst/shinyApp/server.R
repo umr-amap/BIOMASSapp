@@ -500,5 +500,24 @@ function(input, output, session) {
     }
 
     showElement(id = "box_AGB_res")
+    showElement(id = "box_AGB_Report")
   })
+
+  ##### download the report
+  observeEvent(input$dwl_report, {
+    output$dwl_report = downloadHandler(
+      filename = function(){
+        paste("Report-", Sys.Date(), ".html", sep="")
+      }
+      content = function(file){
+        render(
+          input = system.file("Rmardown", "report_BIOMASS.Rmd", package = "BIOMASSapp"),
+          output_file = file
+        )
+      }
+
+    )
+  })
+
+
 }

@@ -158,6 +158,9 @@ dashboardPage(
           hidden(boxWithId(
             id = "box_AGB_res", title = "AGB result", width = 12,
             plotOutput("out_plot_AGB")
+          )),
+          hidden(boxWithId(
+            id = "box_AGB_Report", downloadButton("dwl_report", label = "Report")
           ))
         )
       )
