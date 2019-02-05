@@ -308,9 +308,15 @@ function(input, output, session) {
 
       # if the plot are renseigned take the mean of each plot
       if (nrow(coord) == nrow(inv()) && input$sel_PLOT != "<unselected>") {
-        coord = rbindlist(by(coord, inv()[, input$sel_PLOT],
-                             function(x) { data.frame(longitude = mean(x$longitude),
-                                                      latitude = mean(x$latitude)) }))
+        coord <- rbindlist(by(
+          coord, inv()[, input$sel_PLOT],
+          function(x) {
+            data.frame(
+              longitude = mean(x$longitude),
+              latitude = mean(x$latitude)
+            )
+          }
+        ))
       }
 
       # remove all NA coordinate
@@ -415,8 +421,8 @@ function(input, output, session) {
         if ("feld" %in% input$chkgrp_HEIGHT) {
           if (input$sel_FELD == "<automatic>") {
             region <- computeFeldRegion(coord)
-            if (anyNA(region)){
-              region[is.na(region)] = "Pantropical"
+            if (anyNA(region)) {
+              region[is.na(region)] <- "Pantropical"
             }
           } else {
             region <- input$sel_FELD
@@ -447,9 +453,7 @@ function(input, output, session) {
 
       # plot the output
       output$out_plot_AGB <- renderPlot({
-
         plot_list(AGB_sum(), color)
-
       })
     } else {
       AGB_sum(AGB_res)
@@ -460,25 +464,99 @@ function(input, output, session) {
   })
 
   ##### download the report
-  output$dwl_report = downloadHandler(
-      filename = function(){
-        paste0("Report-", Sys.Date(), ".html")
-      },
-      content = function(file){
+  output$dwl_report <- downloadHandler(
+    filename = function() {
+      paste0("Report_", Sys.Date(), ".html")
+    },
+    content = function(file) {
+      tempReport <- file.path(tempdir(), "report.Rmd")
+      file.copy(system.file("Rmardown", "report_BIOMASS.Rmd", package = "BIOMASSapp"),
+        tempReport,
+        overwrite = TRUE
+      )
 
-
-        tempReport <- file.path(tempdir(), "report.Rmd")
-        file.copy(system.file("Rmardown", "report_BIOMASS.Rmd", package = "BIOMASSapp"),
-                  tempReport, overwrite = TRUE)
-
-        if (file.exists(file))
-          file.remove(file)
-
-        rmarkdown::render(tempReport, output_file = file)
+      if (file.exists(file)) {
+        file.remove(file)
       }
 
-    )
+      rmarkdown::render(tempReport, output_file = file)
+    },
+    contentType = "text/html"
+  )
+
+
+  #### download the file FOS like
+  output$dwl_file <- downloadHandler(
+    filename = function() {
+      paste0("file_", Sys.Date(), ".csv")
+    },
+    content = function(file) {
+      if (file.exists(file)) {
+        file.remove(file)
+      }
+
+      tempFile <- tempfile(fileext = ".csv")
+
+
+      selectColumn <- c(
+        input$sel_PLOT, input$sel_DIAMETER,
+        input$sel_H, input$sel_LONG, input$sel_LAT
+      )
+      selectedColumn <- selectColumn != "<unselected>"
+
+      data <- setDT(inv()[, selectColumn[selectedColumn]])
+      setnames(data, names(data), c(
+        "plot", "D",
+        "H", "longitude", "latitude"
+      )[selectedColumn])
 
 
 
+      out <- data.table(
+        plot = if ("plot" %in% names(data)) data$plot else "plot",
+        longitude = if ("longitude" %in% names(data)) data$longitude else input$num_LONG,
+        latitude = if ("latitude" %in% names(data)) data$latitude else input$num_LAT
+      )
+
+
+
+      H <- if (is.null(input$chkgrp_HEIGHT)) {
+        data[, H]
+      } else if ("HDloc" %in% input$chkgrp_HEIGHT) {
+        retrieveH(data[, D], model = modelHD(data[, D], data[, H], method = input$rad_HDMOD))$H
+      } else if ("feld" %in% input$chkgrp_HEIGHT) {
+        retrieveH(data[, D], region = if (input$sel_FELD == "<automatic>") {
+          computeFeldRegion(cbind(out$longitude, out$latitude))
+        } else {
+          input$sel_FELD
+        })$H
+      } else if ("chave" %in% input$chkgrp_HEIGHT) {
+        retrieveH(data[, D], coord = cbind(out$longitude, out$latitude))
+      }
+
+
+
+      out[, H := H]
+
+      Lorey <- data.table(D = data$D, H = out$H, plot = out$plot)
+      Lorey[, BAm := (pi * (D / 2)^2) / 10000]
+      Lorey[, HBA := H * BAm]
+      Lorey <- Lorey[, .(LoreyH = sum(HBA, na.rm = T) / sum(BAm, na.rm = T)), by = plot]
+
+      out <- out[, .(
+        Long_cnt = mean(longitude),
+        Lat_cnt = mean(latitude),
+        H_max_Local = max(H)
+      ), by = plot]
+
+      out[setDT(AGB_sum()[[1]]), on = "plot", AGB_local := i.AGB]
+      out[Lorey, on = "plot", H_Lorey_local := LoreyH]
+
+      setnames(out, "plot", "Plot_ID")
+
+      fwrite(out, tempFile)
+      file.copy(tempFile, file, overwrite = T)
+    },
+    contentType = "text/csv"
+  )
 }

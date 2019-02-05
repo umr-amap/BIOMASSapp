@@ -160,7 +160,8 @@ dashboardPage(
             plotOutput("out_plot_AGB")
           )),
           hidden(boxWithId(
-            id = "box_AGB_Report", downloadButton("dwl_report", label = "Report")
+            id = "box_AGB_Report", downloadButton("dwl_report", label = "Report"),
+            downloadButton("dwl_file", label = "file FOS")
           ))
         )
       )
