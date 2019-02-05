@@ -495,15 +495,17 @@ function(input, output, session) {
         file.remove(file)
       }
 
+      # create a temporary file to use to copy the file
       tempFile <- tempfile(fileext = ".csv")
 
-
+      # select the column we need
       selectColumn <- c(
         input$sel_PLOT, input$sel_DIAMETER,
         input$sel_H, input$sel_LONG, input$sel_LAT
       )
       selectedColumn <- selectColumn != "<unselected>"
 
+      # create a database with those data
       data <- setDT(inv()[, selectColumn[selectedColumn]])
       setnames(data, names(data), c(
         "plot", "D",
@@ -511,7 +513,7 @@ function(input, output, session) {
       )[selectedColumn])
 
 
-
+      # create the output data
       out <- data.table(
         plot = if ("plot" %in% names(data)) data$plot else "plot",
         longitude = if ("longitude" %in% names(data)) data$longitude else input$num_LONG,
@@ -519,7 +521,7 @@ function(input, output, session) {
       )
 
 
-
+      # select the H we need
       H <- if (is.null(input$chkgrp_HEIGHT)) {
         data[, H]
       } else if ("HDloc" %in% input$chkgrp_HEIGHT) {
@@ -535,26 +537,32 @@ function(input, output, session) {
       }
 
 
-
+      # cbind
       out[, H := H]
 
+      # create the Lorey database whith the lorey heigth
       Lorey <- data.table(D = data$D, H = out$H, plot = out$plot)
       Lorey[, BAm := (pi * (D / 2)^2) / 10000]
       Lorey[, HBA := H * BAm]
       Lorey <- Lorey[, .(LoreyH = sum(HBA, na.rm = T) / sum(BAm, na.rm = T)), by = plot]
 
+      # take the data for reduction by plot
       out <- out[, .(
         Long_cnt = mean(longitude),
         Lat_cnt = mean(latitude),
         H_max_Local = max(H)
       ), by = plot]
 
+      # merge the AGB and the Lorey table
       out[setDT(AGB_sum()[[1]]), on = "plot", AGB_local := i.AGB]
       out[Lorey, on = "plot", H_Lorey_local := LoreyH]
 
       setnames(out, "plot", "Plot_ID")
 
+      # write the file
       fwrite(out, tempFile)
+
+      # copy the file in the file for this purpose
       file.copy(tempFile, file, overwrite = T)
     },
     contentType = "text/csv"
