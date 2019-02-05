@@ -391,6 +391,12 @@ function(input, output, session) {
 
 
 
+    # plain color
+    # use for names too
+    color <- c(HD_local = "blue", feldpausch = "red", chave = "green", heigth = "black")
+
+
+
     ####### calculation of the AGB
 
     if (length_progression != 0) { # if we have a model
@@ -401,7 +407,7 @@ function(input, output, session) {
         if ("HDloc" %in% input$chkgrp_HEIGHT) {
           HD_mod <- modelHD(D, H, method = input$rad_HDMOD) # compute the model
 
-          AGB_res$HDlocal <- AGB_predict(AGBmod, D, WD, errWD, HDmodel = HD_mod)
+          AGB_res[[names(color)[1]]] <- AGB_predict(AGBmod, D, WD, errWD, HDmodel = HD_mod)
           incProgress(1 / length_progression, detail = "AGB using HD local: Done")
         }
 
@@ -415,18 +421,18 @@ function(input, output, session) {
           } else {
             region <- input$sel_FELD
           }
-          AGB_res$feld <- AGB_predict(AGBmod, D, WD, errWD, region = region)
+          AGB_res[[names(color)[2]]] <- AGB_predict(AGBmod, D, WD, errWD, region = region)
           incProgress(1 / length_progression, detail = "AGB using feldpausch region: Done")
         }
 
         # if we want the chave model
         if ("chave" %in% input$chkgrp_HEIGHT) {
-          AGB_res$chave <- AGB_predict(AGBmod, D, WD, errWD, coord = coord)
+          AGB_res[[names(color)[3]]] <- AGB_predict(AGBmod, D, WD, errWD, coord = coord)
           incProgress(1 / length_progression, detail = "AGB using chave: Done")
         }
       })
     } else { # if we have not any model HD
-      AGB_res$heigth <- AGB_predict(AGBmod, D, WD, H = H)
+      AGB_res[[names(color)[4]]] <- AGB_predict(AGBmod, D, WD, H = H)
     }
 
 
@@ -442,58 +448,8 @@ function(input, output, session) {
       # plot the output
       output$out_plot_AGB <- renderPlot({
 
-        # take the order of the first result
-        plot_order <- order(AGB_sum()[[1]]$AGB)
+        plot_list(AGB_sum(), color)
 
-        # sekeleton of the plot
-        plot(plot_order,
-          main = "", type = "n",
-          ylim = range(sapply(AGB_sum(), function(x) {
-            range(x[, -1], na.rm = T)
-          })),
-          xlab = "", ylab = "AGB",
-          xaxt = "n"
-        )
-        axis(1, at = 1:length(plot_order), labels = AGB_sum()[[1]]$plot[plot_order], las = 2)
-
-        # plain color
-        color <- c(HDlocal = "blue", feld = "red", chave = "green", heigth = "black")
-
-        # if it's the AGB without the error propagtion
-        if (ncol(AGB_sum()[[1]]) == 2) {
-
-          # trace the points in the graph
-          lapply(names(AGB_sum()), function(x) {
-            points(1:length(plot_order), AGB_sum()[[x]][plot_order, "AGB"], col = color[x], pch = 20)
-          })
-        } else {
-          # transparent color expect the first which is HDlocal
-          color <- rgb(t(col2rgb(color[1:3])) / 255,
-            alpha = c(1, 0.5, 0.5),
-            names = names(color[1:3])
-          )
-
-          # trace the polygon expect for the first value
-          lapply(names(AGB_sum())[-1], function(x) {
-            with(AGB_sum()[[x]], {
-              polygon(
-                x = c(seq_along(plot_order), length(plot_order):1),
-                y = c(Cred_2.5[plot_order], rev(Cred_97.5[plot_order])),
-                col = color[x], border = NA
-              )
-            })
-          })
-
-          # trace the points + segments for the first HD model
-          with(AGB_sum()[[1]], {
-            points(seq_along(plot_order), AGB[plot_order], pch = 20, cex = 1.5, col = color[names(AGB_sum())[1]])
-            segments(seq_along(plot_order), Cred_2.5[plot_order], y1 = Cred_97.5[plot_order], col = color[names(AGB_sum())[1]])
-          })
-        }
-
-
-        # draw the legend
-        legend("bottomright", legend = names(AGB_sum()), col = color[names(AGB_sum())], pch = 20)
       })
     } else {
       AGB_sum(AGB_res)
@@ -514,6 +470,9 @@ function(input, output, session) {
         tempReport <- file.path(tempdir(), "report.Rmd")
         file.copy(system.file("Rmardown", "report_BIOMASS.Rmd", package = "BIOMASSapp"),
                   tempReport, overwrite = TRUE)
+
+        if (file.exists(file))
+          file.remove(file)
 
         rmarkdown::render(tempReport, output_file = file)
       }

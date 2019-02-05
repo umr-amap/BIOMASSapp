@@ -116,3 +116,79 @@ AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, c
 
   return(AGB)
 }
+
+
+
+
+
+
+plot_list <- function(list, color) {
+
+
+  # take the order of the first result
+  plot_order <- order(list[[1]]$AGB)
+
+  # sekeleton of the plot
+  plot(plot_order,
+       main = "", type = "n",
+       ylim = range(sapply(list, function(x) {
+         range(x[, -1], na.rm = T)
+       })),
+       xlab = "", ylab = "AGB",
+       xaxt = "n"
+  )
+  axis(1, at = 1:length(plot_order), labels = list[[1]]$plot[plot_order], las = 2)
+
+  # if it's the AGB without the error propagtion
+  if (ncol(list[[1]]) == 2) {
+
+    # trace the points in the graph
+    lapply(names(list), function(x) {
+      points(1:length(plot_order), list[[x]][plot_order, "AGB"], col = color[x], pch = 20)
+    })
+  } else {
+    # transparent color expect the first which is HDlocal
+    color <- rgb(t(col2rgb(color[1:3])) / 255,
+                 alpha = c(1, 0.5, 0.5),
+                 names = names(color[1:3])
+    )
+
+    # trace the polygon expect for the first value
+    lapply(names(list)[-1], function(x) {
+      with(list[[x]], {
+        polygon(
+          x = c(seq_along(plot_order), length(plot_order):1),
+          y = c(Cred_2.5[plot_order], rev(Cred_97.5[plot_order])),
+          col = color[x], border = NA
+        )
+      })
+    })
+
+    # trace the points + segments for the first HD model
+    with(list[[1]], {
+      points(seq_along(plot_order), AGB[plot_order], pch = 20, cex = 1.5, col = color[names(list)[1]])
+      segments(seq_along(plot_order), Cred_2.5[plot_order], y1 = Cred_97.5[plot_order], col = color[names(list)[1]])
+    })
+  }
+
+
+  # draw the legend
+  legend("bottomright", legend = names(list), col = color[names(list)], pch = 20)
+
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

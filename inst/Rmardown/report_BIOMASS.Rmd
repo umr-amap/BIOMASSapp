@@ -8,51 +8,293 @@ output:
     toc: yes
     toc_depth: 5
     toc_float: yes
+    self_contained: yes
 title: "Report BIOMASS"
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, comment = NA, fig.align = "center")
+RUN <- TRUE
+knitr::opts_chunk$set(echo = FALSE, comment = NA, fig.align = "center", include = RUN)
 library(knitr)
 ```
 
 
 
 # Load data
+
 ```{r load data, message=FALSE}
 
 # select the column we need
-selectColumn = c(input$sel_PLOT, input$sel_DIAMETER,
-                 input$sel_WD, input$sel_GENUS, input$sel_SPECIES, 
-                 input$sel_H, input$sel_LONG, input$sel_LAT)
-selectedColumn = selectColumn != "<unselected>"
+selectColumn <- c(
+  input$sel_PLOT, input$sel_DIAMETER,
+  input$sel_WD, input$sel_GENUS, input$sel_SPECIES,
+  input$sel_H, input$sel_LONG, input$sel_LAT
+)
+selectedColumn <- selectColumn != "<unselected>"
 
-data = setDT(inv()[, selectColumn[selectedColumn]])
-setnames(data, names(data), c("plotId", "D",
-                               "WD", "Genus", "Species",
-                               "H", "longitude", "latitude")[selectedColumn])
+data <- setDT(inv()[, selectColumn[selectedColumn]])
+setnames(data, names(data), c(
+  "plot", "D",
+  "WD", "genus", "species",
+  "H", "longitude", "latitude"
+)[selectedColumn])
 
 kable(head(data), digits = 3, caption = "The head of the table")
-
 ```
 
-You have selected `r ncol(data)` columns (renamed) and your data table have `r nrow(data)`.
+You have selected `r ncol(data)` columns (renamed) and your data table have `r nrow(data)` rows.
+
+
+
+
+
+
+
+
 
 ```{r}
 # boolean, T if we want to show
-map_or_not = all(c("longitude", "latitude") %in% names(data)) || "chave" %in% input$chkgrp_HEIGHT || ("feld" %in% input$chkgrp_HEIGHT && input$sel_FELD == "<unselected>")
+RUN <- all(c("longitude", "latitude") %in% names(data)) || "chave" %in% input$chkgrp_HEIGHT || ("feld" %in% input$chkgrp_HEIGHT && input$sel_FELD == "<unselected>")
 ```
 
-
-
-`r if (!(all(c("longitude", "latitude") %in% names(data)) || "chave" %in% input$chkgrp_HEIGHT || ("feld" %in% input$chkgrp_HEIGHT && input$sel_FELD == "<unselected>"))) {"<!--"}`
+`r if (!RUN) {"<!--"}`
 # Location of the plots
-```{r localisation}
 
-if (all(c("longitude", "latitude") %in% names(data)) || "chave" %in% input$chkgrp_HEIGHT || ("feld" %in% input$chkgrp_HEIGHT && input$sel_FELD == "<unselected>")) {
-  
-  
-  
+This is the localisation of the plots:
+
+```{r localisation}
+if (RUN) {
+  # Create the table of coordinate
+  coord <- data.table(
+    longitude = if ("longitude" %in% names(data)) data$longitude else input$num_LONG,
+    latitude = if ("latitude" %in% names(data)) data$latitude else input$num_LAT,
+    plot = if ("plot" %in% names(data)) data$plot else "plot"
+  )
+
+  # if the user as made a mistake
+  if (all((sapply(coord[, 1:2], class) == "numeric"))) {
+
+    # if the plot are renseigned take the mean of each plot
+    if (nrow(coord) == nrow(data)) {
+      coord <- coord[, .(longitude = mean(longitude), latitude = mean(latitude)), by = plot]
+    }
+
+    # remove all NA and unique coordinate
+    coord <- unique(na.omit(coord))
+
+    # draw the coordinate if there is one remaining
+    if (nrow(coord) != 0) {
+      leaflet(coord) %>%
+        addTiles() %>%
+        addMarkers(lng = ~longitude, lat = ~latitude, popup = ~plot)
+    }
+  }
 }
 ```
-`r if (!(all(c("longitude", "latitude") %in% names(data)) || "chave" %in% input$chkgrp_HEIGHT || ("feld" %in% input$chkgrp_HEIGHT && input$sel_FELD == "<unselected>"))) {"-->"}`
+`r if (!RUN) {"-->"}`
+
+
+
+
+
+
+
+```{r}
+RUN <- "genus" %in% names(data)
+```
+
+
+`r if (!RUN) {"<!--"}`
+# Retrieve wood density
+
+This is the result of correct taxonomy:
+
+```{r correctTaxo}
+
+if (RUN) {
+  correctTaxonomy <- NULL
+  if (input$rad_WD == "corr" && "genus" %in% names(data)) {
+    correctTaxonomy <- correctTaxo(
+      genus = data$genus,
+      species = if ("species" %in% names(data)) data$species
+    )
+  }
+}
+```
+
+
+This is the result of wood density:
+
+```{r wd}
+if (RUN) {
+  if (!is.null(correctTaxonomy)) {
+    genus <- correctTaxonomy$genusCorrected
+    species <- correctTaxonomy$speciesCorrected
+  } else {
+    genus <- data$genus
+    if (!"species" %in% names(data)) {
+      split <- tstrsplit_NA(genus)
+      genus <- split[, 1]
+      species <- split[, 2]
+      rm(split)
+    } else {
+      species <- data$species
+    }
+  }
+
+  wd <- getWoodDensity(genus, species)
+}
+```
+`r if (!RUN) {"-->"}`
+
+
+
+
+
+```{r, include=TRUE}
+RUN <- !is.null(input$chkgrp_HEIGHT)
+```
+
+`r if (!RUN) {"<!--"}`
+# HD model
+
+We decided to use an HD model, because we have not enought information to use an Heigth variable
+`r if (!RUN) {"-->"}`
+
+
+```{r}
+RUN_HD <- "HDloc" %in% input$chkgrp_HEIGHT && input$sel_H != "<unselected>"
+```
+
+`r if (!RUN_HD) {"<!--"}`
+## local HD model
+
+```{r local HD model, warning=FALSE, message=FALSE}
+method <- "unselected"
+if (RUN) {
+  method <- input$rad_HDMOD
+  model <- modelHD(data$D, data$H, method = method)
+  tab <- modelHD(data$D, data$H)
+  kable(tab, digits = 4, caption = "Model comparison")
+}
+```
+
+
+We implemented a `r method` model of the form:
+`r if (!RUN_HD) {"-->"}`
+
+`r if(method != "log1") {"<!--"}`
+$$ H = exp(a + b \cdot log(D)) $$
+
+`r if(method != "log1") {"-->"}`
+
+`r if(method != "log2") {"<!--"}`
+$$ H = exp(a + b \cdot log(D) + c \cdot log(D)^2) $$
+`r if(method != "log2") {"-->"}`
+
+`r if(method != "log3") {"<!--"}`
+$$ H = exp(a + b \cdot log(D) + c \cdot log(D)^2 + d \cdot log(D)^3) $$
+`r if(method != "log3") {"-->"}`
+
+`r if(method != "michaelis") {"<!--"}`
+$$ H= a \cdot \dfrac{D}{b+D} $$
+where *a* represents the asymptotic height of trees in the stand.
+`r if(method != "michaelis") {"-->"}`
+
+
+`r if(method != "weibull") {"<!--"}`
+$$H=a  \cdot (1-exp(-(D/b)^c))$$
+where *a* represents the asymptotic height of trees in the stand.
+`r if(method != "weibull") {"-->"}`
+
+
+
+
+```{r}
+RUN_HD <- "feld" %in% input$chkgrp_HEIGHT
+```
+
+`r if (!RUN_HD) {"<!--"}`
+## Feldpausch HD model
+
+We decided to use a feldpausch HD model, we are in this(those) region(s):
+```{r feldpausch region}
+if (RUN) {
+  feldRegion <- c(Africa = "Africa", CAfrica = "Central Africa", EAfrica = "Eastern Africa", WAfrica = "Western Africa", SAmerica = "South America", BrazilianShield = "Brazilian Shield", ECAmazonia = "Eastern-central Amazonia", GuianaShield = "Guiana Shield", WAmazonia = "Western Amazonia", SEAsia = "Southeast Asia", NAustralia = "Northern Australia", Pantropical = "Pantropical")
+
+
+
+  if (input$sel_FELD == "<automatic>") {
+    unique(feldRegion[computeFeldRegion(cbind(coord$longitude, coord$latitude))])
+  } else {
+    unique(feldRegion[input$sel_FELD])
+  }
+}
+```
+
+`r if (!RUN_HD) {"-->"}`
+
+
+
+
+```{r}
+RUN_HD <- "chave" %in% input$chkgrp_HEIGHT
+```
+
+
+`r if (!RUN_HD) {"<!--"}`
+## Chave HD model
+
+We decided to use a chave 2004 HD model.
+
+`r if (!RUN_HD) {"-->"}`
+
+
+
+
+
+
+
+
+
+
+# Biomass estimation
+
+This is the biomass estimation for all the plot(s) are:
+
+
+```{r}
+fig_width = 7
+# calculate the width of the figure
+# keep a 0.5 cm between each plot and 10 cm for the margin 
+# (all those things are translated in inch)
+if ("plot" %in% names(data))
+  fig_width = (length( unique(data$plot) ) - 1) * 0.19 + 3.9
+
+fig_width = max(fig_width, 7, na.rm = T)
+
+fig_height = 7
+if (fig_width > 7)
+  fig_height = 10
+```
+
+
+```{r plot biomass, fig.align='right', fig.width=fig_width, fig.height=fig_height}
+
+if ("plot" %in% names(data)) {
+  
+  color <- c(HD_local = "blue", feldpausch = "red", chave = "green", heigth = "black")
+
+  plot_list(AGB_sum(), color)
+}
+```
+
+
+
+
+
+
+
+
+
+
