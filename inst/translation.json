@@ -1,0 +1,19 @@
+{
+  "cultural_date_format": "%d-%m-%Y",
+  "languages": ["en", "fr"],
+  "translation": [
+      {
+        "en": "Load dataset",
+        "fr": "Charger le jeu de données"
+      },
+
+      {
+        "en": "Taxonomy and Wood density",
+        "fr": "Taxonomie et densité de bois"
+      },
+      {
+        "en": "Select data file",
+        "fr": "Sélectionnez le fichier de données"
+      }
+    ]
+}

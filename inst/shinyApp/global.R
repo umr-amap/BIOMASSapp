@@ -7,6 +7,7 @@ library(shinyalert)
 library(shinyFeedback)
 library(rmarkdown)
 library(BIOMASS)
+library(shiny.i18n)
 
 # set maximum input file size (here 30Mo)
 options(shiny.maxRequestSize = 30 * 1024^2)
@@ -184,6 +185,7 @@ plot_list <- function(list, color) {
 
 
 
+translator <- Translator$new(translation_json_path = system.file("translation.json", package = "BIOMASSapp"))
 
 
 

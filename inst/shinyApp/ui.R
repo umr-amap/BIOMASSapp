@@ -1,4 +1,5 @@
 dashboardPage(
+
   dashboardHeader(title = "BIOMASS application"),
   dashboardSidebar(
     sidebarMenu(
@@ -21,6 +22,7 @@ dashboardPage(
       tabItem(
         "tab_LOAD",
         fluidRow(
+              selectInput("selected_language", label = "Change language", choices = c("English" = "en", "Francais" = "fr")),
           box( # box with the file input
             title = "Inventory file", width = 6,
             fileInput("file_DATASET", "Select data file", accept = c(
