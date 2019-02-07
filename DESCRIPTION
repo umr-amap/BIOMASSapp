@@ -20,4 +20,6 @@ Imports:
 	shinyFeedback,
 	BIOMASS (>= 2.0),
 	rmarkdown,
-	knitr
+	knitr,
+	ggplot2,
+	maps
