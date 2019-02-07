@@ -84,9 +84,9 @@ if (RUN) {
 
     # draw the coordinate if there is one remaining
     if (nrow(coord) != 0) {
-      leaflet(coord) %>%
-        addTiles() %>%
-        addMarkers(lng = ~longitude, lat = ~latitude, popup = ~plot)
+      ggplot(coord) + 
+        borders("world", colour = "gray50", fill = "gray50") + 
+        geom_point(aes(x = longitude, y = latitude), color = "red", size = 2)
     }
   }
 }
@@ -171,7 +171,7 @@ RUN_HD <- "HDloc" %in% input$chkgrp_HEIGHT && input$sel_H != "<unselected>"
 
 ```{r local HD model, warning=FALSE, message=FALSE}
 method <- "unselected"
-if (RUN) {
+if (RUN_HD) {
   method <- input$rad_HDMOD
   model <- modelHD(data$D, data$H, method = method)
   tab <- modelHD(data$D, data$H)
@@ -219,15 +219,11 @@ RUN_HD <- "feld" %in% input$chkgrp_HEIGHT
 
 We decided to use a feldpausch HD model, we are in this(those) region(s):
 ```{r feldpausch region}
-if (RUN) {
-  feldRegion <- c(Africa = "Africa", CAfrica = "Central Africa", EAfrica = "Eastern Africa", WAfrica = "Western Africa", SAmerica = "South America", BrazilianShield = "Brazilian Shield", ECAmazonia = "Eastern-central Amazonia", GuianaShield = "Guiana Shield", WAmazonia = "Western Amazonia", SEAsia = "Southeast Asia", NAustralia = "Northern Australia", Pantropical = "Pantropical")
-
-
-
+if (RUN_HD) {
   if (input$sel_FELD == "<unselected>") {
-    unique(feldRegion[computeFeldRegion(cbind(coord$longitude, coord$latitude))])
+    unique(feldRegion()[computeFeldRegion(cbind(coord$longitude, coord$latitude))])
   } else {
-    unique(feldRegion[input$sel_FELD])
+    unique(feldRegion()[input$sel_FELD])
   }
 }
 ```
@@ -286,6 +282,8 @@ if ("plot" %in% names(data)) {
   color <- c(HD_local = "blue", feldpausch = "red", chave = "green", heigth = "black")
 
   plot_list(AGB_sum(), color)
+} else {
+  boxplot(AGB_sum(), main = "Boxplot of the biomass")
 }
 ```
 

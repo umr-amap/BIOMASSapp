@@ -458,11 +458,19 @@ function(input, output, session) {
       })
     } else {
       AGB_sum(AGB_res)
+      output$out_plot_AGB = renderPlot({
+        boxplot(AGB_sum(), main = "Boxplot of the biomass")
+      })
     }
 
     showElement(id = "box_AGB_res")
     showElement(id = "box_AGB_Report")
   })
+
+
+
+# download part -----------------------------------------------------------
+
 
   ##### download the report
   output$dwl_report <- downloadHandler(
