@@ -175,16 +175,25 @@ function(input, output, session) {
 
 
   # Heigth parameters -------------------------------------------------------
-  observeEvent(input$sel_H, {
-    if (input$sel_H != "<unselected>") {
-      showElement("box_RESULT_HDEND")
-    } else if (is.null(input$chkgrp_HEIGHT) && input$sel_H == "<unselected>") {
-      hideElement("box_RESULT_HDEND")
-    }
+  observe({
+    toggleElement("box_RESULT_HDEND", condition = !is.null(input$chkgrp_HEIGHT) || input$sel_H != "<unselected>")
   })
 
 
-
+  feldRegion <- reactiveVal(c(
+    Africa = "Africa",
+    CAfrica = "Central Africa",
+    EAfrica = "Eastern Africa",
+    WAfrica = "Western Africa",
+    SAmerica = "South America",
+    BrazilianShield = "Brazilian Shield",
+    ECAmazonia = "Eastern-central Amazonia",
+    GuianaShield = "Guiana Shield",
+    WAmazonia = "Western Amazonia",
+    SEAsia = "Southeast Asia",
+    NAustralia = "Northern Australia",
+    Pantropical = "Pantropical"
+  ))
 
 
 
@@ -232,43 +241,21 @@ function(input, output, session) {
       hideElement("box_RESULT_HDMOD")
     }
 
-    # if the user command a feldpausch region
-    if ("feld" %in% id) {
-      updateSelectInput(session, "sel_FELD",
-        choices = c(
-          "<automatic>",
-          "Africa",
-          "Central Africa" = "CAfrica",
-          "Eastern Africa" = "EAfrica",
-          "Western Africa" = "WAfrica",
-          "South America" = "SAmerica",
-          "Brazilian Shield" = "BrazilianShield",
-          "Eastern-central Amazonia" = "ECAmazonia",
-          "Guiana Shield" = "GuianaShield",
-          "Western Amazonia" = "WAmazonia",
-          "Southeast Asia" = "SEAsia",
-          "Northern Australia" = "NAustralia",
-          "Pantropical"
-        )
-      )
-      showElement("box_RESULT_FELD")
-    } else {
-      hideElement("box_RESULT_FELD")
-    }
 
-    if (is.null(id) && input$sel_H == "<unselected>") {
-      hideElement("box_RESULT_HDEND")
-    } else {
-      showElement("box_RESULT_HDEND")
-    }
+    long_lat <- input$sel_LONG != "<unselected>" && input$sel_LAT != "<unselected>"
+
+    toggleElement("box_MAP",
+      condition = (any(c("feld", "chave") %in% id) || long_lat)
+    )
+
+    # if the user command a feldpausch region
+    toggleElement("box_RESULT_FELD", condition = "feld" %in% id)
+    toggleElement("sel_FELD", condition = !long_lat && "feld" %in% id)
   })
 
   observeEvent(input$btn_HD_DONE, {
     if (is.null(input$chkgrp_HEIGHT) && input$sel_H == "<unselected>") {
       shinyalert("Oops", "There is no H and HD model", type = "error")
-    } else if (input$sel_LONG != "<unselected>" || "chave" %in% input$chkgrp_HEIGHT || ("feld" %in% input$chkgrp_HEIGHT && input$sel_FELD == "<unselected>")) {
-      showMenuItem("tab_MAP")
-      updateTabItems(session, "mnu_MENU", "tab_MAP")
     } else {
       showMenuItem("tab_AGB")
       updateTabItems(session, "mnu_MENU", "tab_AGB")
@@ -279,21 +266,32 @@ function(input, output, session) {
 
   # Maps --------------------------------------------------------------------
 
-  observeEvent(input$sel_LONG, {
-    if (input$sel_LONG != "<unselected>") {
-      hideElement("box_long_lat")
-    } else {
-      showElement("box_long_lat")
-    }
+  observe({
+    toggleElement("box_MAP",
+                  condition = any(c("chave", "feld") %in% input$chkgrp_HEIGHT) || (input$sel_LONG != "<unselected>" && input$sel_LAT != "<unselected>"))
   })
 
 
+  observe({
+    toggleElement("box_long_lat",
+      condition = (input$sel_LONG == "<unselected>" && input$sel_LAT == "<unselected>"))
+
+  })
+
+
+  # create a layer of borders
+  mapWorld <- reactiveVal(borders("world", colour = "gray50", fill = "gray50"))
+
+
   observeEvent({
-    if (input$btn_HD_DONE >= 1) {
+    if (input$btn_DATASET_LOADED >= 1) {
+      input$btn_DATASET_LOADED
       input$sel_LAT
       input$sel_LONG
       input$num_LAT
       input$num_LONG
+    } else if ("feld" %in% input$chkgrp_HEIGHT) {
+      input$chkgrp_HEIGHT
     }
   }, ignoreInit = T, {
 
@@ -304,7 +302,7 @@ function(input, output, session) {
     )
 
     # if the user as made a mistake
-    if (all((sapply(coord, class) == "numeric"))) {
+    if (all(sapply(coord, class) %in% c("numeric", "integer"))) {
 
       # if the plot are renseigned take the mean of each plot
       if (nrow(coord) == nrow(inv()) && input$sel_PLOT != "<unselected>") {
@@ -319,26 +317,29 @@ function(input, output, session) {
         ))
       }
 
-      # remove all NA coordinate
+      # remove all NA and take the unique coordinate
       coord <- unique(na.omit(coord))
-
       # draw the coordinate if there is one remaining
       if (nrow(coord) != 0) {
-        output$map <- renderLeaflet({
-          leaflet(coord) %>%
-            addTiles() %>%
-            addMarkers(lng = ~longitude, lat = ~latitude)
+        output$plot_MAP <- renderPlot({
+          ggplot(coord) + xlab("longitude") + ylab("latitude") +
+            mapWorld() +
+            geom_point(aes(x = longitude, y = latitude), color = "red", size = 2)
         })
       }
+
+      if ("feld" %in% input$chkgrp_HEIGHT) {
+        region = unique(computeFeldRegion(coord[, cbind(longitude, latitude)]))
+        output$txt_feld <- renderText({
+          paste("Your feldpausch region is:", paste(unique(feldRegion()[region]), collapse = ", "))
+        })
+        region = region[!is.na(region)]
+        if (length(region) != 0)
+          updateSelectInput(session, "sel_FELD", selected = region[1])
+        }
     } else {
       shinyalert("Oops", text = "Either the column longitude or latitude are not numeric")
     }
-  })
-
-  # End of the map section
-  observeEvent(input$btn_MAP_END, {
-    showMenuItem("tab_AGB")
-    updateTabItems(session, "mnu_MENU", "tab_AGB")
   })
 
 
@@ -419,7 +420,7 @@ function(input, output, session) {
 
         # if we want the feldpausch region
         if ("feld" %in% input$chkgrp_HEIGHT) {
-          if (input$sel_FELD == "<automatic>") {
+          if (input$sel_FELD == "<unselected>") {
             region <- computeFeldRegion(coord)
             if (anyNA(region)) {
               region[is.na(region)] <- "Pantropical"
@@ -527,7 +528,7 @@ function(input, output, session) {
       } else if ("HDloc" %in% input$chkgrp_HEIGHT) {
         retrieveH(data[, D], model = modelHD(data[, D], data[, H], method = input$rad_HDMOD))$H
       } else if ("feld" %in% input$chkgrp_HEIGHT) {
-        retrieveH(data[, D], region = if (input$sel_FELD == "<automatic>") {
+        retrieveH(data[, D], region = if (input$sel_FELD == "<unselected>") {
           computeFeldRegion(cbind(out$longitude, out$latitude))
         } else {
           input$sel_FELD

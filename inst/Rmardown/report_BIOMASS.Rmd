@@ -224,7 +224,7 @@ if (RUN) {
 
 
 
-  if (input$sel_FELD == "<automatic>") {
+  if (input$sel_FELD == "<unselected>") {
     unique(feldRegion[computeFeldRegion(cbind(coord$longitude, coord$latitude))])
   } else {
     unique(feldRegion[input$sel_FELD])

@@ -114,36 +114,45 @@ dashboardPage(
           )
         ),
         hidden(boxWithId(
-          id = "box_RESULT_HDMOD", title = "HD local model", width = 8,
+          id = "box_RESULT_HDMOD", title = "HD local model", width = 6,
           plotOutput("out_plot_HD"),
           tableOutput("out_tab_HD"),
           radioButtons("rad_HDMOD", "Choose your HD model:", choices = "NULL")
         )),
+        ## Map
         hidden(boxWithId(
-          id = "box_RESULT_FELD", title = "Feldpausch", width = 4,
-          selectInput("sel_FELD", "Choose your Feldpausch region:", choices = NULL)
+          id = "box_MAP", title = "Map", width = 6,
+          hidden(boxWithId(
+            id = "box_long_lat", title = "Choose the Long Lat:", width = 12,
+            numericInput("num_LONG", "longitude", 3.8614, min = -180, max = 180, step = 0.01),
+            numericInput("num_LAT", "latitude", 43.652, min = -90, max = 90, step = 0.01)
+          )),
+          plotOutput("plot_MAP")
         )),
         hidden(boxWithId(
-          id = "box_RESULT_HDEND", title = NULL, width = 4,
+          id = "box_RESULT_FELD", title = "Feldpausch", width = 6,
+          selectInput("sel_FELD", "Choose your Feldpausch region:",
+            choices = c("<unselected>", "Africa",
+              "Central Africa" = "CAfrica",
+              "Eastern Africa" = "EAfrica",
+              "Western Africa" = "WAfrica",
+              "South America" = "SAmerica",
+              "Brazilian Shield" = "BrazilianShield",
+              "Eastern-central Amazonia" = "ECAmazonia",
+              "Guiana Shield" = "GuianaShield",
+              "Western Amazonia" = "WAmazonia",
+              "Southeast Asia" = "SEAsia",
+              "Northern Australia" = "NAustralia",
+              "Pantropical"
+            )
+          ),
+          textOutput("txt_feld")
+        )),
+        hidden(boxWithId(
+          id = "box_RESULT_HDEND", title = NULL, width = 6,
           actionButton("btn_HD_DONE", "continue")
         ))
       ),
-
-      # Map ---------------------------------------------------------------------
-
-      tabItem(
-        "tab_MAP",
-        h1("Optional"),
-        hidden(boxWithId(
-          id = "box_long_lat", title = "Choose the Long Lat:", width = 6,
-          numericInput("num_LONG", "longitude", 3.8614, min = -180, max = 180, step = 0.01),
-          numericInput("num_LAT", "latitude", 43.652, min = -90, max = 90, step = 0.01)
-        )),
-        leafletOutput("map"),
-        actionButton("btn_MAP_END", "Continue")
-      ),
-
-
 
 
       # AGB -----------------------------------------------------------------
