@@ -251,6 +251,10 @@ function(input, output, session) {
     # if the user command a feldpausch region
     toggleElement("box_RESULT_FELD", condition = "feld" %in% id)
     toggleElement("sel_FELD", condition = !long_lat && "feld" %in% id)
+
+
+    # if the user command a chave
+    toggleElement("box_result_chave", condition = "chave" %in% id)
   })
 
   observeEvent(input$btn_HD_DONE, {
@@ -268,14 +272,15 @@ function(input, output, session) {
 
   observe({
     toggleElement("box_MAP",
-                  condition = any(c("chave", "feld") %in% input$chkgrp_HEIGHT) || (input$sel_LONG != "<unselected>" && input$sel_LAT != "<unselected>"))
+      condition = any(c("chave", "feld") %in% input$chkgrp_HEIGHT) || (input$sel_LONG != "<unselected>" && input$sel_LAT != "<unselected>")
+    )
   })
 
 
   observe({
     toggleElement("box_long_lat",
-      condition = (input$sel_LONG == "<unselected>" && input$sel_LAT == "<unselected>"))
-
+      condition = (input$sel_LONG == "<unselected>" && input$sel_LAT == "<unselected>")
+    )
   })
 
 
@@ -290,7 +295,6 @@ function(input, output, session) {
       input$sel_LONG
       input$num_LAT
       input$num_LONG
-    } else if ("feld" %in% input$chkgrp_HEIGHT) {
       input$chkgrp_HEIGHT
     }
   }, ignoreInit = T, {
@@ -329,14 +333,26 @@ function(input, output, session) {
       }
 
       if ("feld" %in% input$chkgrp_HEIGHT) {
-        region = unique(computeFeldRegion(coord[, cbind(longitude, latitude)]))
+        region <- unique(computeFeldRegion(coord[, cbind(longitude, latitude)]))
         output$txt_feld <- renderText({
           paste("Your feldpausch region is:", paste(unique(feldRegion()[region]), collapse = ", "))
         })
-        region = region[!is.na(region)]
-        if (length(region) != 0)
+        region <- region[!is.na(region)]
+        if (length(region) != 0) {
           updateSelectInput(session, "sel_FELD", selected = region[1])
+        } else {
+          updateSelectInput(session, "sel_FELD", selected = "<unselected>")
         }
+      }
+
+      if ("chave" %in% input$chkgrp_HEIGHT) {
+        output$txt_chave <- renderText({
+          paste(
+            "The E is activate and the local range is:",
+            paste(round(range(computeE(coord)), digits = 3), collapse = " ")
+          )
+        })
+      }
     } else {
       shinyalert("Oops", text = "Either the column longitude or latitude are not numeric")
     }
@@ -458,7 +474,7 @@ function(input, output, session) {
       })
     } else {
       AGB_sum(AGB_res)
-      output$out_plot_AGB = renderPlot({
+      output$out_plot_AGB <- renderPlot({
         boxplot(AGB_sum(), main = "Boxplot of the biomass")
       })
     }
@@ -469,7 +485,7 @@ function(input, output, session) {
 
 
 
-# download part -----------------------------------------------------------
+  # download part -----------------------------------------------------------
 
 
   ##### download the report
@@ -515,12 +531,11 @@ function(input, output, session) {
       selectedColumn <- selectColumn != "<unselected>"
 
       # create a database with those data
-      data <- setDT(inv()[, selectColumn[selectedColumn]])
+      data <- as.data.table(inv()[, selectColumn[selectedColumn]])
       setnames(data, names(data), c(
         "plot", "D",
         "H", "longitude", "latitude"
       )[selectedColumn])
-
 
       # create the output data
       out <- data.table(
@@ -531,42 +546,66 @@ function(input, output, session) {
 
 
       # select the H we need
-      H <- if (is.null(input$chkgrp_HEIGHT)) {
-        data[, H]
-      } else if ("HDloc" %in% input$chkgrp_HEIGHT) {
-        retrieveH(data[, D], model = modelHD(data[, D], data[, H], method = input$rad_HDMOD))$H
-      } else if ("feld" %in% input$chkgrp_HEIGHT) {
-        retrieveH(data[, D], region = if (input$sel_FELD == "<unselected>") {
-          computeFeldRegion(cbind(out$longitude, out$latitude))
+      if (is.null(input$chkgrp_HEIGHT)) {
+        out[, H := data$H]
+      }
+
+      if ("HDloc" %in% input$chkgrp_HEIGHT) {
+        out[, H_local := retrieveH(data$D,
+          model = modelHD(data$D, data$H, method = input$rad_HDMOD)
+        )$H]
+      }
+
+      if ("feld" %in% input$chkgrp_HEIGHT) {
+        out[, H_feld := retrieveH(data$D, region = if (input$sel_FELD == "<unselected>") {
+          computeFeldRegion(cbind(longitude, latitude))
         } else {
           input$sel_FELD
-        })$H
-      } else if ("chave" %in% input$chkgrp_HEIGHT) {
-        retrieveH(data[, D], coord = cbind(out$longitude, out$latitude))
+        })$H]
+      }
+
+      if ("chave" %in% input$chkgrp_HEIGHT) {
+        out[, H_chave := retrieveH(data$D, coord = cbind(longitude, latitude))$H ]
+      }
+
+      # create the Lorey database whith the lorey heigth
+      Lorey <- out[, c(1, grep("^H", names(out))), with = F][, ":="(D = data$D, plot = data$plot)]
+      Lorey[, BAm := (pi * (D / 2)^2) / 10000]
+      Lorey <- Lorey[, lapply(.SD, function(x) {
+        sum(x * BAm, na.rm = T) / sum(BAm, na.rm = T)
+      }), .SDcols = patterns("^H"), by = plot]
+      setnames(Lorey, names(Lorey), gsub("^H", "LoreyH", names(Lorey)))
+
+      # take the data for reduction by plot
+      out <- out[, lapply(.SD, max, na.rm = T), .SDcols = patterns("^H"), by = plot][
+        out[, .(
+          Long_cnt = mean(longitude),
+          Lat_cnt = mean(latitude)
+        ), by = plot],
+        on = "plot"
+      ]
+      setnames(out, names(out), gsub("^H", "H_max", names(out)))
+
+      # merge the AGB
+      for (i in names(AGB_sum())) {
+        a <- ncol(out)
+        out <- out[setDT(AGB_sum()[[i]]), on = "plot"]
+        name <- names(out)[(a + 1):ncol(out)]
+        if (i == "HD_local") {
+          i <- "local"
+        }
+        if (i != "heigth") {
+          setnames(out, name, paste(name, i, sep = "_"))
+        }
       }
 
 
-      # cbind
-      out[, H := H]
+      # Merge the Lorey table
+      out <- out[Lorey, on = "plot"]
 
-      # create the Lorey database whith the lorey heigth
-      Lorey <- data.table(D = data$D, H = out$H, plot = out$plot)
-      Lorey[, BAm := (pi * (D / 2)^2) / 10000]
-      Lorey[, HBA := H * BAm]
-      Lorey <- Lorey[, .(LoreyH = sum(HBA, na.rm = T) / sum(BAm, na.rm = T)), by = plot]
-
-      # take the data for reduction by plot
-      out <- out[, .(
-        Long_cnt = mean(longitude),
-        Lat_cnt = mean(latitude),
-        H_max_Local = max(H)
-      ), by = plot]
-
-      # merge the AGB and the Lorey table
-      out[setDT(AGB_sum()[[1]]), on = "plot", AGB_local := i.AGB]
-      out[Lorey, on = "plot", H_Lorey_local := LoreyH]
-
+      # Few manipulation on the dataset
       setnames(out, "plot", "Plot_ID")
+      setcolorder(out, c("Plot_ID", "Long_cnt", "Lat_cnt"))
 
       # write the file
       fwrite(out, tempFile)
