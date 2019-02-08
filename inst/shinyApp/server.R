@@ -289,15 +289,15 @@ function(input, output, session) {
 
 
   observeEvent({
+    input$btn_DATASET_LOADED
     if (input$btn_DATASET_LOADED >= 1) {
-      input$btn_DATASET_LOADED
       input$sel_LAT
       input$sel_LONG
       input$num_LAT
       input$num_LONG
-      input$chkgrp_HEIGHT
     }
-  }, ignoreInit = T, {
+    input$chkgrp_HEIGHT
+  }, ignoreNULL = F, ignoreInit = T, {
 
     # Create the table of coordinate
     coord <- data.table(
@@ -323,6 +323,7 @@ function(input, output, session) {
 
       # remove all NA and take the unique coordinate
       coord <- unique(na.omit(coord))
+
       # draw the coordinate if there is one remaining
       if (nrow(coord) != 0) {
         output$plot_MAP <- renderPlot({
