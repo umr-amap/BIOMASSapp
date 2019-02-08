@@ -72,7 +72,7 @@ if (RUN) {
   )
 
   # if the user as made a mistake
-  if (all((sapply(coord[, 1:2], class) == "numeric"))) {
+  if (all((sapply(coord[, 1:2], class) %in% c("numeric", "integer")))) {
 
     # if the plot are renseigned take the mean of each plot
     if (nrow(coord) == nrow(data)) {
@@ -84,8 +84,8 @@ if (RUN) {
 
     # draw the coordinate if there is one remaining
     if (nrow(coord) != 0) {
-      ggplot(coord) + 
-        borders("world", colour = "gray50", fill = "gray50") + 
+      ggplot(coord) +
+        borders("world", colour = "gray50", fill = "gray50") +
         geom_point(aes(x = longitude, y = latitude), color = "red", size = 2)
     }
   }
@@ -260,30 +260,32 @@ This is the biomass estimation for all the plot(s) are:
 
 
 ```{r}
-fig_width = 7
+fig_width <- 7
 # calculate the width of the figure
-# keep a 0.5 cm between each plot and 10 cm for the margin 
+# keep a 0.5 cm between each plot and 10 cm for the margin
 # (all those things are translated in inch)
-if ("plot" %in% names(data))
-  fig_width = (length( unique(data$plot) ) - 1) * 0.19 + 3.9
+if ("plot" %in% names(data)) {
+  fig_width <- (length(unique(data$plot)) - 1) * 0.19 + 3.9
+}
 
-fig_width = max(fig_width, 7, na.rm = T)
+fig_width <- max(fig_width, 7, na.rm = T)
 
-fig_height = 7
-if (fig_width > 7)
-  fig_height = 10
+fig_height <- 7
+if (fig_width > 7) {
+  fig_height <- 10
+}
 ```
 
 
 ```{r plot biomass, fig.align='right', fig.width=fig_width, fig.height=fig_height}
 
 if ("plot" %in% names(data)) {
-  
   color <- c(HD_local = "blue", feldpausch = "red", chave = "green", heigth = "black")
 
   plot_list(AGB_sum(), color)
 } else {
-  boxplot(AGB_sum(), main = "Boxplot of the biomass")
+  AGB <- lapply(AGB_sum(), summaryByPlot, rep("plot", nrow(inv())))
+  plot_list(AGB, color)
 }
 ```
 

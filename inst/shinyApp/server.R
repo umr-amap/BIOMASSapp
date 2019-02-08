@@ -475,8 +475,9 @@ function(input, output, session) {
       })
     } else {
       AGB_sum(AGB_res)
+      AGB <- lapply(AGB_res, summaryByPlot, rep("plot", nrow(inv())))
       output$out_plot_AGB <- renderPlot({
-        boxplot(AGB_sum(), main = "Boxplot of the biomass")
+        plot_list(AGB, color)
       })
     }
 
@@ -590,9 +591,10 @@ function(input, output, session) {
       # merge the AGB
       for (i in names(AGB_sum())) {
         a <- ncol(out)
-        tab = AGB_sum()[[i]]
-        if (is.vector(tab))
-          tab = summaryByPlot(tab, rep("plot", length(tab)))
+        tab <- AGB_sum()[[i]]
+        if (is.vector(tab)) {
+          tab <- summaryByPlot(tab, rep("plot", length(tab)))
+        }
         out <- out[setDT(tab), on = "plot"]
         name <- names(out)[(a + 1):ncol(out)]
         if (i == "HD_local") {

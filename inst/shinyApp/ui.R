@@ -148,8 +148,10 @@ dashboardPage(
           ),
           textOutput("txt_feld")
         )),
-        hidden(boxWithId(id = "box_result_chave", title = "Chave", width = 6,
-                         textOutput("txt_chave"))),
+        hidden(boxWithId(
+          id = "box_result_chave", title = "Chave", width = 6,
+          textOutput("txt_chave")
+        )),
         hidden(boxWithId(
           id = "box_RESULT_HDEND", title = NULL, width = 6,
           actionButton("btn_HD_DONE", "continue")
