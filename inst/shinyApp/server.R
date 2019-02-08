@@ -250,7 +250,6 @@ function(input, output, session) {
 
     # if the user command a feldpausch region
     toggleElement("box_RESULT_FELD", condition = "feld" %in% id)
-    toggleElement("sel_FELD", condition = !long_lat && "feld" %in% id)
 
 
     # if the user command a chave
@@ -335,15 +334,10 @@ function(input, output, session) {
 
       if ("feld" %in% input$chkgrp_HEIGHT) {
         region <- unique(computeFeldRegion(coord[, cbind(longitude, latitude)]))
+        region[is.na(region)] <- "Pantropical"
         output$txt_feld <- renderText({
           paste("Your feldpausch region is:", paste(unique(feldRegion()[region]), collapse = ", "))
         })
-        region <- region[!is.na(region)]
-        if (length(region) != 0) {
-          updateSelectInput(session, "sel_FELD", selected = region[1])
-        } else {
-          updateSelectInput(session, "sel_FELD", selected = "<unselected>")
-        }
       }
 
       if ("chave" %in% input$chkgrp_HEIGHT) {
@@ -437,14 +431,8 @@ function(input, output, session) {
 
         # if we want the feldpausch region
         if ("feld" %in% input$chkgrp_HEIGHT) {
-          if (input$sel_FELD == "<unselected>") {
-            region <- computeFeldRegion(coord)
-            if (anyNA(region)) {
-              region[is.na(region)] <- "Pantropical"
-            }
-          } else {
-            region <- input$sel_FELD
-          }
+          region <- computeFeldRegion(coord)
+          region[is.na(region)] <- "Pantropical"
           AGB_res[[names(color)[2]]] <- AGB_predict(AGBmod, D, WD, errWD, region = region)
           incProgress(1 / length_progression, detail = "AGB using feldpausch region: Done")
         }
@@ -558,11 +546,7 @@ function(input, output, session) {
       }
 
       if ("feld" %in% input$chkgrp_HEIGHT) {
-        out[, H_feld := retrieveH(data$D, region = if (input$sel_FELD == "<unselected>") {
-          computeFeldRegion(cbind(longitude, latitude))
-        } else {
-          input$sel_FELD
-        })$H]
+        out[, H_feld := retrieveH(data$D, region = computeFeldRegion(cbind(longitude, latitude)))$H]
       }
 
       if ("chave" %in% input$chkgrp_HEIGHT) {

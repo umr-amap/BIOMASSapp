@@ -131,21 +131,6 @@ dashboardPage(
         )),
         hidden(boxWithId(
           id = "box_RESULT_FELD", title = "Feldpausch", width = 6,
-          selectInput("sel_FELD", "Choose your Feldpausch region:",
-            choices = c("<unselected>", "Africa",
-              "Central Africa" = "CAfrica",
-              "Eastern Africa" = "EAfrica",
-              "Western Africa" = "WAfrica",
-              "South America" = "SAmerica",
-              "Brazilian Shield" = "BrazilianShield",
-              "Eastern-central Amazonia" = "ECAmazonia",
-              "Guiana Shield" = "GuianaShield",
-              "Western Amazonia" = "WAmazonia",
-              "Southeast Asia" = "SEAsia",
-              "Northern Australia" = "NAustralia",
-              "Pantropical"
-            )
-          ),
           textOutput("txt_feld")
         )),
         hidden(boxWithId(

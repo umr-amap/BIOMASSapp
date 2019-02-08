@@ -54,7 +54,7 @@ You have selected `r ncol(data)` columns (renamed) and your data table have `r n
 
 ```{r}
 # boolean, T if we want to show
-RUN <- all(c("longitude", "latitude") %in% names(data)) || "chave" %in% input$chkgrp_HEIGHT || ("feld" %in% input$chkgrp_HEIGHT && input$sel_FELD == "<unselected>")
+RUN <- all(c("longitude", "latitude") %in% names(data)) || "chave" %in% input$chkgrp_HEIGHT || ("feld" %in% input$chkgrp_HEIGHT)
 ```
 
 `r if (!RUN) {"<!--"}`
@@ -66,9 +66,9 @@ This is the localisation of the plots:
 if (RUN) {
   # Create the table of coordinate
   coord <- data.table(
-    longitude = if ("longitude" %in% names(data)) data$longitude else input$num_LONG,
-    latitude = if ("latitude" %in% names(data)) data$latitude else input$num_LAT,
-    plot = if ("plot" %in% names(data)) data$plot else "plot"
+    longitude = if ("longitude" %in% names(data)) data$longitude else rep(input$num_LONG, nrow(data)),
+    latitude = if ("latitude" %in% names(data)) data$latitude else rep(input$num_LAT, nrow(data)),
+    plot = if ("plot" %in% names(data)) data$plot else rep(input$num_LONG, "plot")
   )
 
   # if the user as made a mistake
@@ -220,11 +220,7 @@ RUN_HD <- "feld" %in% input$chkgrp_HEIGHT
 We decided to use a feldpausch HD model, we are in this(those) region(s):
 ```{r feldpausch region}
 if (RUN_HD) {
-  if (input$sel_FELD == "<unselected>") {
     unique(feldRegion()[computeFeldRegion(cbind(coord$longitude, coord$latitude))])
-  } else {
-    unique(feldRegion()[input$sel_FELD])
-  }
 }
 ```
 
