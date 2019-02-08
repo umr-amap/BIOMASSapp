@@ -540,11 +540,10 @@ function(input, output, session) {
 
       # create the output data
       out <- data.table(
-        plot = if ("plot" %in% names(data)) data$plot else "plot",
-        longitude = if ("longitude" %in% names(data)) data$longitude else input$num_LONG,
-        latitude = if ("latitude" %in% names(data)) data$latitude else input$num_LAT
+        plot = if ("plot" %in% names(data)) data$plot else rep("plot", nrow(data)),
+        longitude = if ("longitude" %in% names(data)) data$longitude else rep(input$num_LONG, nrow(data)),
+        latitude = if ("latitude" %in% names(data)) data$latitude else rep(input$num_LAT, nrow(data))
       )
-
 
       # select the H we need
       if (is.null(input$chkgrp_HEIGHT)) {
@@ -566,11 +565,12 @@ function(input, output, session) {
       }
 
       if ("chave" %in% input$chkgrp_HEIGHT) {
-        out[, H_chave := retrieveH(data$D, coord = cbind(longitude, latitude))$H ]
+        out[, H_chave := retrieveH(data$D, coord = if (.N != 1) cbind(longitude, latitude) else c(longitude, latitude))$H ]
       }
 
+
       # create the Lorey database whith the lorey heigth
-      Lorey <- out[, c(1, grep("^H", names(out))), with = F][, ":="(D = data$D, plot = data$plot)]
+      Lorey <- out[, c(1, grep("^H", names(out))), with = F][, ":="(D = data$D, plot = out$plot)]
       Lorey[, BAm := (pi * (D / 2)^2) / 10000]
       Lorey <- Lorey[, lapply(.SD, function(x) {
         sum(x * BAm, na.rm = T) / sum(BAm, na.rm = T)
@@ -590,7 +590,10 @@ function(input, output, session) {
       # merge the AGB
       for (i in names(AGB_sum())) {
         a <- ncol(out)
-        out <- out[setDT(AGB_sum()[[i]]), on = "plot"]
+        tab = AGB_sum()[[i]]
+        if (is.vector(tab))
+          tab = summaryByPlot(tab, rep("plot", length(tab)))
+        out <- out[setDT(tab), on = "plot"]
         name <- names(out)[(a + 1):ncol(out)]
         if (i == "HD_local") {
           i <- "local"
