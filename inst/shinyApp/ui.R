@@ -34,7 +34,8 @@ dashboardPage(
             id = "box_FIELDS", title = "Column selection", width = 6,
 
             # obligatory argument
-            selectInput("sel_DIAMETER", "Diameter", choices = NULL),
+            column(9, selectInput("sel_DIAMETER", "Diameter", choices = NULL)),
+            column(3, radioButtons("rad_units_diameter", "Unit:", choices = c("mm", "cm", "m"), selected = "cm")),
 
             # wood density argument
             hr(),
@@ -47,7 +48,8 @@ dashboardPage(
             # Heigth argument
             hr(),
             h4("Optional"),
-            selectInput("sel_H", "Height", choices = NULL),
+            column(9, selectInput("sel_H", "Height", choices = NULL)),
+            column(3, radioButtons("rad_units_height", "Unit:", choices = c("cm", "m"), selected = "m")),
             selectInput("sel_LONG", "Coordinate longitude", choices = NULL),
             selectInput("sel_LAT", "Coordinate latitude", choices = NULL),
             hidden(div("Imposible combinaison", id = "msg_h", style = "color:red;")),
@@ -112,9 +114,10 @@ dashboardPage(
             )
           )
         ),
+        hidden(boxWithId(id = "box_plot_comparison", title = "Model Comparison", width = 6,
+                         plotOutput("out_plot_comp"))),
         hidden(boxWithId(
           id = "box_RESULT_HDMOD", title = "HD local model", width = 6,
-          plotOutput("out_plot_HD"),
           tableOutput("out_tab_HD"),
           radioButtons("rad_HDMOD", "Choose your HD model:", choices = "NULL")
         )),

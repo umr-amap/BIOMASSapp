@@ -8,6 +8,7 @@ library(shinyalert)
 library(shinyFeedback)
 library(rmarkdown)
 library(BIOMASS)
+library(measurements)
 
 # set maximum input file size (here 30Mo)
 options(shiny.maxRequestSize = 30 * 1024^2)
@@ -58,10 +59,10 @@ AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, c
   #### parameters verification
 
   if (is.null(errWD) && AGBmod != "agb") {
-    shinyalert("oops", "You did attribute the WD vector,\n you can not do the propagation error",
+    shinyalert("oops", "You did attribute the WD vector,\n the propagation error for the wood dentity will be 0",
       type = "warning"
     )
-    AGBmod <- "agb"
+    errWD = 0
   }
 
   if (!is.null(H) && AGBmod != "agb") {

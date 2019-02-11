@@ -35,11 +35,21 @@ function(input, output, session) {
       # show the content
       output$table_DATASET <- renderDataTable(inv())
 
-      selectionField <- c("sel_DIAMETER", "sel_PLOT", "sel_WD", "sel_GENUS", "sel_SPECIES", "sel_H", "sel_LONG", "sel_LAT")
+      int_num_col <- names(inv())[ sapply(inv(), class) %in% c("integer", "numeric") ]
+
       # fill the selector with the column name
-      for (id in selectionField) {
-        updateSelectInput(session, id, choices = c("<unselected>", names(inv())))
+      for (id in c("sel_DIAMETER", "sel_WD", "sel_H", "sel_LONG", "sel_LAT")) {
+        updateSelectInput(session, id, choices = c("<unselected>", int_num_col))
       }
+
+      char_col <- names(inv())[ sapply(inv(), class) %in% "character" ]
+
+      for (id in c("sel_GENUS", "sel_SPECIES")) {
+        updateSelectInput(session, id, choices = c("<unselected>", char_col))
+      }
+
+      name <- names(inv())
+      updateSelectInput(session, "sel_PLOT", choices = c("<unselected>", name))
     }
   })
 
@@ -59,15 +69,20 @@ function(input, output, session) {
     )
   })
 
+
   # error when the user click on the button on the first page
   observeEvent(input$btn_DATASET_LOADED, {
+    error <- F
     if (input$sel_DIAMETER == "<unselected>") { # if diameter is not selected
+      error <- T
       shinyalert("Oops!", "D is unselected", type = "error")
     } else if (!xor(input$sel_WD == "<unselected>", input$sel_GENUS == "<unselected>")) {
       # if the wd is not selected or genus not selected but not the two
+      error <- T
       shinyalert("Oops!", "Either select the wood density or genus and species or genus", type = "error")
     } else if (xor(input$sel_LONG == "<unselected>", input$sel_LAT == "<unselected>")) {
       # if the H is not selected and one of the two (long or lat) is not selected
+      error <- T
       shinyalert("Oops!", "Please either select or deselect the longitude and latitude", type = "error")
     } else if (input$sel_WD == "<unselected>") {
       # if the WD is not selected then show the tab TAXO
@@ -77,6 +92,17 @@ function(input, output, session) {
       # else show the heigth tab
       showMenuItem("tab_HEIGHT")
       updateTabItems(session, "mnu_MENU", "tab_HEIGHT")
+    }
+
+    if (!error) {
+      newData <- inv()
+      if (input$sel_DIAMETER != "<unselected>") {
+        newData[, input$sel_DIAMETER] <- conv_unit(newData[, input$sel_DIAMETER], input$rad_units_diameter, "cm")
+      }
+      if (input$sel_H != "<unselected>") {
+        newData[, input$sel_H] <- conv_unit(newData[, input$sel_H], input$rad_units_height, "m")
+      }
+      inv(newData)
     }
   })
 
@@ -202,9 +228,6 @@ function(input, output, session) {
     ## If they want to construct an HD model
     if ("HDloc" %in% id) {
       if (input$sel_H != "<unselected>") { # if there is H selected
-        # command a new plot for the render plot
-        plot.new()
-        dev.control(displaylist = "enable")
 
         # Do the HD model
         tab_modelHD <- modelHD(
@@ -212,12 +235,6 @@ function(input, output, session) {
           H = inv()[, input$sel_H]
         )
 
-        # record the plot
-        plotHD <- recordPlot()
-        dev.off()
-
-        # render the plot
-        output$out_plot_HD <- renderPlot(replayPlot(plotHD))
         # render the table
         output$out_tab_HD <- renderTable(tab_modelHD[, -2], digits = 4)
         # update the radio button with the method and choose the minimun of the RSE
@@ -255,6 +272,7 @@ function(input, output, session) {
     toggleElement("box_result_chave", condition = "chave" %in% id)
   })
 
+
   observeEvent(input$btn_HD_DONE, {
     if (is.null(input$chkgrp_HEIGHT) && input$sel_H == "<unselected>") {
       shinyalert("Oops", "There is no H and HD model", type = "error")
@@ -276,11 +294,12 @@ function(input, output, session) {
 
 
   observe({
+    # show the elements when the condition are complete
     toggleElement("num_LONG",
       condition = (input$sel_LONG == "<unselected>" && input$sel_LAT == "<unselected>")
     )
     toggleElement("num_LAT",
-                  condition = (input$sel_LONG == "<unselected>" && input$sel_LAT == "<unselected>")
+      condition = (input$sel_LONG == "<unselected>" && input$sel_LAT == "<unselected>")
     )
   })
 
@@ -298,7 +317,29 @@ function(input, output, session) {
       input$num_LONG
     }
     input$chkgrp_HEIGHT
+    input$rad_HDMOD
   }, ignoreNULL = F, ignoreInit = T, {
+    toggleElement("box_plot_comparison", condition = !is.null(input$chkgrp_HEIGHT))
+
+    D <- seq(0, 5000)
+
+
+    # Plot with the comparison of the method with ggplot
+    plot <- ggplot(data = NULL, aes(x = D)) + xlab("Diameter (cm)") + ylab("Predicted Height (m)")
+
+
+    # comparison of the method: comparison with the HD local
+    if ("HDloc" %in% input$chkgrp_HEIGHT && input$rad_HDMOD != "NULL") {
+      plot <- plot + geom_line(aes(
+        y = retrieveH(D,
+          model = modelHD(inv()[, input$sel_DIAMETER],
+            inv()[, input$sel_H],
+            method = input$rad_HDMOD
+          )
+        )$H,
+        colour = "HD local"
+      ))
+    }
 
     # Create the table of coordinate
     coord <- data.table(
@@ -340,6 +381,8 @@ function(input, output, session) {
         output$txt_feld <- renderText({
           paste("Your feldpausch region is:", paste(unique(feldRegion()[region]), collapse = ", "))
         })
+        # continuation with the plot whith feld
+        plot <- plot + geom_line(aes(y = retrieveH(D, region = region[1])$H, colour = "Feldpausch"))
       }
 
       if ("chave" %in% input$chkgrp_HEIGHT) {
@@ -349,6 +392,13 @@ function(input, output, session) {
             paste(round(range(computeE(coord)), digits = 3), collapse = " ")
           )
         })
+        # continuation with the plot whith chave
+        plot <- plot + geom_line(aes(y = retrieveH(D, coord = c(mean(coord$longitude), mean(coord$latitude)))$H, colour = "Chave"))
+      }
+
+      if (!is.null(input$chkgrp_HEIGHT)) {
+        # show the plot of the comparison of the methods
+        output$out_plot_comp <- renderPlot(plot)
       }
     } else {
       shinyalert("Oops", text = "Either the column longitude or latitude are not numeric")

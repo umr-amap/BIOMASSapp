@@ -22,4 +22,5 @@ Imports:
 	rmarkdown,
 	knitr,
 	ggplot2,
-	maps
+	maps,
+	measurements
