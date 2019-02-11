@@ -6,7 +6,6 @@ dashboardPage(
       menuItem("Load dataset", tabName = "tab_LOAD"),
       menuItem("Taxonomy and Wood density", tabName = "tab_TAXO"),
       menuItem("Model HD", tabName = "tab_HEIGHT"),
-      menuItem("Map", tabName = "tab_MAP"),
       menuItem("AGB calculation", tabName = "tab_AGB")
     )
   ),
@@ -122,11 +121,8 @@ dashboardPage(
         ## Map
         hidden(boxWithId(
           id = "box_MAP", title = "Map", width = 6,
-          hidden(boxWithId(
-            id = "box_long_lat", title = "Choose the Long Lat:", width = 12,
-            numericInput("num_LONG", "longitude", 3.8614, min = -180, max = 180, step = 0.01),
-            numericInput("num_LAT", "latitude", 43.652, min = -90, max = 90, step = 0.01)
-          )),
+          numericInput("num_LONG", "longitude", 3.8614, min = -180, max = 180, step = 0.01),
+          numericInput("num_LAT", "latitude", 43.652, min = -90, max = 90, step = 0.01),
           plotOutput("plot_MAP")
         )),
         hidden(boxWithId(

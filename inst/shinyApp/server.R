@@ -9,7 +9,6 @@ function(input, output, session) {
     # hide few menu at the begining
     hideMenuItem("tab_TAXO")
     hideMenuItem("tab_HEIGHT")
-    hideMenuItem("tab_MAP")
     hideMenuItem("tab_AGB")
   })
 
@@ -277,8 +276,11 @@ function(input, output, session) {
 
 
   observe({
-    toggleElement("box_long_lat",
+    toggleElement("num_LONG",
       condition = (input$sel_LONG == "<unselected>" && input$sel_LAT == "<unselected>")
+    )
+    toggleElement("num_LAT",
+                  condition = (input$sel_LONG == "<unselected>" && input$sel_LAT == "<unselected>")
     )
   })
 
