@@ -1,5 +1,4 @@
 ---
-author: "Arthur Pere"
 date: '`r invisible( Sys.setlocale("LC_TIME", "C") ); format(Sys.Date(), "%B %d, %Y")`'
 output:
   html_document:
@@ -86,7 +85,8 @@ if (RUN) {
     if (nrow(coord) != 0) {
       ggplot(coord) +
         borders("world", colour = "gray50", fill = "gray50") +
-        geom_point(aes(x = longitude, y = latitude), color = "red", size = 2)
+        geom_point(aes(x = longitude, y = latitude), color = "red", size = 2) + 
+        xlab("longitude") + ylab("latitude")
     }
   }
 }
