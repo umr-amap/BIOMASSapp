@@ -62,7 +62,7 @@ AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, c
     shinyalert("oops", "You did attribute the WD vector,\n the propagation error for the wood dentity will be 0",
       type = "warning"
     )
-    errWD = 0
+    errWD <- rep(0, length(WD))
   }
 
   if (!is.null(H) && AGBmod != "agb") {

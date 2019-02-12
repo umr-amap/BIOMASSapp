@@ -321,11 +321,14 @@ function(input, output, session) {
   }, ignoreNULL = F, ignoreInit = T, {
     toggleElement("box_plot_comparison", condition = !is.null(input$chkgrp_HEIGHT))
 
-    D <- seq(0, 5000)
+    D <- seq(0, 250)
 
 
     # Plot with the comparison of the method with ggplot
-    plot <- ggplot(data = NULL, aes(x = D)) + xlab("Diameter (cm)") + ylab("Predicted Height (m)")
+    plot <- ggplot(data = NULL, aes(x = D)) +
+      xlab("Diameter (cm)") +
+      ylab("Predicted Height (m)") +
+      theme(legend.position = "top", legend.title = element_blank())
 
 
     # comparison of the method: comparison with the HD local
