@@ -125,68 +125,60 @@ AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, c
 
 
 plot_list <- function(list, color) {
-  is_vector <- nrow(list[[1]]) == 1
+  nr <- nrow(list[[1]])
+
+  is_vector <- nr == 1
 
   # take the order of the first result
   if (!is_vector) {
-    plot_order <- order(list[[1]]$AGB)
+    plot_order <- with(list[[1]], match(AGB, sort(AGB)))
+    list <- lapply(list, function(x) {
+      x$plot_order <- plot_order
+      x
+    })
+  } else {
+    list <- rbindlist(lapply(names(list), function(i) {
+      c(plot = i, list[[i]][1, -1])
+    }))
+
+    list[, plot_order := seq(.N)]
+    nr <- list[, .N]
+    list <- list(comp = list)
   }
 
-  # sekeleton of the plot
-  plot(if (!is_vector) plot_order else 1:length(list),
-    main = "", type = "n",
-    ylim = range(sapply(list, function(x) {
-      range(x[, -1], na.rm = T)
-    })),
-    xlab = "", ylab = "AGB",
-    xaxt = "n"
-  )
+  plot <- ggplot(cbind(name = names(list[1]), list[[1]]), aes(x = plot_order)) + xlab(NULL) + ylab("AGB (T)")
+
+  if (ncol(list[[1]]) > 3) {
+    plot <- plot + geom_pointrange(aes(y = AGB, ymin = Cred_2.5, ymax = Cred_97.5, colour = name, na.rm = T))
+    for (i in names(list)[-1]) {
+      plot <- plot + geom_ribbon(data = cbind(name = i, list[[i]]),
+                                 aes(ymin = Cred_2.5, ymax = Cred_97.5, fill = name),
+                                 alpha = 0.3, na.rm = T)
+    }
+  } else {
+    for (i in names(list)) {
+      plot <- plot + geom_point(data = cbind(name = i, list[[i]]),
+                                aes(y = AGB, colour = name),
+                                na.rm = T)
+    }
+  }
+
+
   if (!is_vector) {
-    axis(1, at = 1:length(plot_order), labels = list[[1]]$plot[plot_order], las = 2)
+    plot <- plot +
+      theme(
+        legend.position = "bottom",
+        legend.title = element_blank(),
+        axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)
+      ) +
+      with(list[[1]], scale_x_continuous(breaks = 1:nr, labels = plot[order(AGB)])) +
+      scale_fill_manual(values = color) + scale_color_manual(values = color)
   } else {
-    axis(1, at = 1:length(list), labels = names(list))
+    plot <- plot + theme(legend.position = "none") +
+      scale_colour_manual(values = "black") +
+      scale_x_continuous(breaks = 1:nr, labels = list[[1]]$plot)
   }
 
-  if (is_vector) {
-    points(1:length(list), sapply(list, function(x) x[, "AGB"]), pch = 20)
-    if (ncol(list[[1]]) > 2) {
-      segments(1:length(list), sapply(list, function(x) x[, "Cred_2.5"]), y1 = sapply(list, function(x) x[, "Cred_97.5"]))
-    }
-  } else {
-    # if it's the AGB without the error propagtion
-    if (ncol(list[[1]]) == 2) {
 
-      # trace the points in the graph
-      lapply(names(list), function(x) {
-        points(1:length(plot_order), list[[x]][plot_order, "AGB"], col = color[x], pch = 20)
-      })
-    } else {
-      # transparent color expect the first which is HDlocal
-      color <- rgb(t(col2rgb(color[1:3])) / 255,
-        alpha = c(1, 0.5, 0.5),
-        names = names(color[1:3])
-      )
-
-      # trace the polygon expect for the first value
-      lapply(names(list)[-1], function(x) {
-        with(list[[x]], {
-          polygon(
-            x = c(seq_along(plot_order), length(plot_order):1),
-            y = c(Cred_2.5[plot_order], rev(Cred_97.5[plot_order])),
-            col = color[x], border = NA
-          )
-        })
-      })
-
-      # trace the points + segments for the first HD model
-      with(list[[1]], {
-        points(seq_along(plot_order), AGB[plot_order], pch = 20, cex = 1.5, col = color[names(list)[1]])
-        segments(seq_along(plot_order), Cred_2.5[plot_order], y1 = Cred_97.5[plot_order], col = color[names(list)[1]])
-      })
-    }
-
-
-    # draw the legend
-    legend("bottomright", legend = names(list), col = color[names(list)], pch = 20)
-  }
+  return(plot)
 }
