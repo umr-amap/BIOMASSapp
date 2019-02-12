@@ -237,7 +237,11 @@ RUN_HD <- "chave" %in% input$chkgrp_HEIGHT
 `r if (!RUN_HD) {"<!--"}`
 ## Chave HD model
 
-We decided to use a chave 2004 HD model.
+We decided to use a chave 2004 HD model. The range of E is: 
+```{r}
+round(range(computeE(cbind(coord$longitude, coord$latitude))), digits = 3)
+```
+
 
 `r if (!RUN_HD) {"-->"}`
 
@@ -251,6 +255,15 @@ We decided to use a chave 2004 HD model.
 
 
 # Biomass estimation
+
+```{r}
+RUN = "WD" %in% names(data) && input$rad_AGB_MOD == "agbe"
+```
+
+
+`r if (!RUN) {"<!--"}`
+The error for the wood density is 0.
+`r if (!RUN) {"-->"}`
 
 This is the biomass estimation for all the plot(s) are:
 
@@ -273,7 +286,7 @@ if (fig_width > 7) {
 ```
 
 
-```{r plot biomass, fig.align='right', fig.width=fig_width, fig.height=fig_height}
+```{r plot biomass, fig.align='center', fig.width=fig_width, fig.height=fig_height, warning=FALSE}
 
 if ("plot" %in% names(data)) {
   color <- c(HD_local = "blue", feldpausch = "red", chave = "green", heigth = "black")
