@@ -56,28 +56,7 @@ tstrsplit_NA <- function(x, pattern = " ", count = 2) {
 # for the AGB predict
 AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, coord = NULL, region = NULL) {
 
-  #### parameters verification
-
-  if (is.null(errWD) && AGBmod != "agb") {
-    shinyalert("oops", "You did attribute the WD vector,\n the propagation error for the wood dentity will be 0",
-      type = "warning"
-    )
-    errWD <- rep(0, length(WD))
-  }
-
-  if (!is.null(H) && AGBmod != "agb") {
-    shinyalert("oops", paste0(
-      "You did attribute the H vector,\n",
-      "you can not do the propagation error,\n",
-      "whithout an HD model"
-    ),
-    type = "warning"
-    )
-    AGBmod <- "agb"
-  }
-
   ##### calcul of the AGB
-
 
   # if there is the coordinate
   if (!is.null(coord)) {
@@ -151,15 +130,19 @@ plot_list <- function(list, color) {
   if (ncol(list[[1]]) > 3) {
     plot <- plot + geom_pointrange(aes(y = AGB, ymin = Cred_2.5, ymax = Cred_97.5, colour = name, na.rm = T))
     for (i in names(list)[-1]) {
-      plot <- plot + geom_ribbon(data = cbind(name = i, list[[i]]),
-                                 aes(ymin = Cred_2.5, ymax = Cred_97.5, fill = name),
-                                 alpha = 0.3, na.rm = T)
+      plot <- plot + geom_ribbon(
+        data = cbind(name = i, list[[i]]),
+        aes(ymin = Cred_2.5, ymax = Cred_97.5, fill = name),
+        alpha = 0.3, na.rm = T
+      )
     }
   } else {
     for (i in names(list)) {
-      plot <- plot + geom_point(data = cbind(name = i, list[[i]]),
-                                aes(y = AGB, colour = name),
-                                na.rm = T)
+      plot <- plot + geom_point(
+        data = cbind(name = i, list[[i]]),
+        aes(y = AGB, colour = name),
+        na.rm = T
+      )
     }
   }
 

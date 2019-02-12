@@ -389,14 +389,21 @@ function(input, output, session) {
       }
 
       if ("chave" %in% input$chkgrp_HEIGHT) {
+        E <- tryCatch(computeE(coord), error = function(e) e)
         output$txt_chave <- renderText({
-          paste(
-            "The E is activate and the local range is:",
-            paste(round(range(computeE(coord)), digits = 3), collapse = " ")
-          )
+          if (!is.list(E)) {
+            paste(
+              "The E is activate and the local range is:",
+              paste(round(range(E), digits = 3), collapse = " ")
+            )
+          } else {
+            paste("There is an error:", E$message)
+          }
         })
         # continuation with the plot whith chave
-        plot <- plot + geom_line(aes(y = retrieveH(D, coord = c(mean(coord$longitude), mean(coord$latitude)))$H, colour = "Chave"))
+        if (!is.list(E)) {
+          plot <- plot + geom_line(aes(y = retrieveH(D, coord = c(mean(coord$longitude), mean(coord$latitude)))$H, colour = "Chave"))
+        }
       }
 
       if (!is.null(input$chkgrp_HEIGHT)) {
@@ -447,6 +454,18 @@ function(input, output, session) {
       WD <- inv()[, input$sel_WD]
       errWD <- NULL
     }
+
+
+    #### parameters verification
+    if (is.null(errWD) && AGBmod != "agb") {
+      shinyalert("oops", "You did attribute the WD vector,\n the propagation error for the wood dentity will be 0",
+        type = "warning"
+      )
+      errWD <- rep(0, length(WD))
+    }
+
+
+
 
     # coord treatement
     coord <- data.table(
@@ -499,6 +518,19 @@ function(input, output, session) {
         }
       })
     } else { # if we have not any model HD
+
+      if (!is.null(H) && AGBmod != "agb") {
+        shinyalert("oops", paste0(
+          "You did attribute the H vector,\n",
+          "you can not do the propagation error,\n",
+          "whithout an HD model"
+        ),
+        type = "warning"
+        )
+        updateRadioButtons(session, "rad_AGB_MOD", selected = "agb")
+        AGBmod <- "agb"
+      }
+
       AGB_res[[names(color)[4]]] <- AGB_predict(AGBmod, D, WD, H = H)
     }
 
