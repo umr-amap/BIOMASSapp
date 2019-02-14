@@ -117,10 +117,10 @@ plot_list <- function(list, color) {
     })
   } else {
     list <- rbindlist(lapply(names(list), function(i) {
-      x = list[[i]][1, -1]
-      names(x) = names(list[[i]])[-1]
-      x = as.list(x)
-      x$plot = i
+      x <- list[[i]][1, -1]
+      names(x) <- names(list[[i]])[-1]
+      x <- as.list(x)
+      x$plot <- i
       x
     }))
 
