@@ -114,32 +114,44 @@ dashboardPage(
             )
           )
         ),
-        hidden(boxWithId(id = "box_plot_comparison", title = "Model Comparison", width = 6,
-                         plotOutput("out_plot_comp"))),
+        column(6,
+        ## HD model
         hidden(boxWithId(
-          id = "box_RESULT_HDMOD", title = "HD local model", width = 6,
+          id = "box_RESULT_HDMOD", title = "HD local model", width = 12,
           tableOutput("out_tab_HD"),
           radioButtons("rad_HDMOD", "Choose your HD model:", choices = "NULL")
         )),
+
         ## Map
         hidden(boxWithId(
-          id = "box_MAP", title = "Map", width = 6,
+          id = "box_MAP", title = "Map", width = 12,
           numericInput("num_LONG", "longitude", 3.8614, min = -180, max = 180, step = 0.01),
           numericInput("num_LAT", "latitude", 43.652, min = -90, max = 90, step = 0.01),
           plotOutput("plot_MAP")
-        )),
+        ))
+        ),
+
+        column(6,
+        ## Feldpauch
         hidden(boxWithId(
-          id = "box_RESULT_FELD", title = "Feldpausch", width = 6,
+          id = "box_RESULT_FELD", title = "Feldpausch", width = 12,
           textOutput("txt_feld")
         )),
+
+        ## chave
         hidden(boxWithId(
-          id = "box_result_chave", title = "Chave", width = 6,
+          id = "box_result_chave", title = "Chave", width = 12,
           textOutput("txt_chave")
         )),
+
+        ## comparison of the methods
+        hidden(boxWithId(id = "box_plot_comparison", title = "Model Comparison", width = 12,
+                         plotOutput("out_plot_comp"))),
+
         hidden(boxWithId(
-          id = "box_RESULT_HDEND", title = NULL, width = 6,
+          id = "box_RESULT_HDEND", title = NULL, width = 12,
           actionButton("btn_HD_DONE", "continue")
-        ))
+        )))
       ),
 
 
