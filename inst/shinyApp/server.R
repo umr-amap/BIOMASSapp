@@ -328,7 +328,8 @@ function(input, output, session) {
     plot <- ggplot(data = NULL, aes(x = D)) +
       xlab("Diameter (cm)") +
       ylab("Predicted Height (m)") +
-      theme(legend.position = "top", legend.title = element_blank())
+      theme(legend.position = "top", legend.title = element_blank()) +
+      scale_fill_manual(values = c("blue", "green"))
 
 
     # comparison of the method: comparison with the HD local
@@ -385,7 +386,18 @@ function(input, output, session) {
           paste("Your feldpausch region is:", paste(unique(feldRegion()[region]), collapse = ", "))
         })
         # continuation with the plot whith feld
-        plot <- plot + geom_line(aes(y = retrieveH(D, region = region[1])$H, colour = "Feldpausch"))
+        plot <- plot + if (length(region) >= 2) {
+          H <- sapply(region, function(x) {
+            retrieveH(D, region = x)$H
+          })
+          geom_ribbon(aes(
+            ymin = apply(H, 1, min, na.rm = T),
+            ymax = apply(H, 1, max, na.rm = T),
+            fill = "Feldpausch"
+          ), alpha = 0.3)
+        } else {
+          geom_line(aes(y = retrieveH(D, region = region)$H, colour = "Feldpausch"))
+        }
       }
 
       if ("chave" %in% input$chkgrp_HEIGHT) {
@@ -402,7 +414,15 @@ function(input, output, session) {
         })
         # continuation with the plot whith chave
         if (!is.list(E)) {
-          plot <- plot + geom_line(aes(y = retrieveH(D, coord = c(mean(coord$longitude), mean(coord$latitude)))$H, colour = "Chave"))
+          plot <- plot + if (length(unique(E)) >= 2) {
+            geom_ribbon(aes(
+              ymax = retrieveH(D, coord = coord[which.min(E), c(longitude, latitude)])$H,
+              ymin = retrieveH(D, coord = coord[which.max(E), c(longitude, latitude)])$H,
+              fill = "Chave"
+            ), alpha = 0.3)
+          } else {
+            geom_line(aes(y = retrieveH(D, coord = c(mean(coord$longitude), mean(coord$latitude)))$H, colour = "Chave"))
+          }
         }
       }
 
