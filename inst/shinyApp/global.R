@@ -156,12 +156,13 @@ plot_list <- function(list, color) {
       theme(
         legend.position = "bottom",
         legend.title = element_blank(),
-        axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)
+        axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+        legend.text = element_text(size = rel(1.5))
       ) +
       with(list[[1]], scale_x_continuous(breaks = 1:nr, labels = plot[order(AGB)])) +
       scale_fill_manual(values = color) + scale_color_manual(values = color)
   } else {
-    plot <- plot + theme(legend.position = "none") +
+    plot <- plot + theme(legend.position = "none", axis.text.x = element_text(size = rel(1.5))) +
       scale_colour_manual(values = "black") +
       scale_x_continuous(breaks = 1:nr, labels = list[[1]]$plot)
   }

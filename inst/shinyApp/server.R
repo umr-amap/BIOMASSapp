@@ -328,7 +328,7 @@ function(input, output, session) {
     plot <- ggplot(data = NULL, aes(x = D)) +
       xlab("Diameter (cm)") +
       ylab("Predicted Height (m)") +
-      theme(legend.position = "top", legend.title = element_blank()) +
+      theme(legend.position = "top", legend.title = element_blank(), legend.text = element_text(size = rel(1.5))) +
       scale_fill_manual(values = c("blue", "green"))
 
 
