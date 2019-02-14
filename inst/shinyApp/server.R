@@ -238,11 +238,14 @@ function(input, output, session) {
         # render the table
         output$out_tab_HD <- renderTable(tab_modelHD[, -2], digits = 4)
         # update the radio button with the method and choose the minimun of the RSE
-        updateRadioButtons(session,
-          inputId = "rad_HDMOD",
-          choices = tab_modelHD[, "method"],
-          selected = tab_modelHD$method[which.min(tab_modelHD$RSE)],
-          inline = T
+        with(
+          tab_modelHD,
+          updateRadioButtons(session,
+            inputId = "rad_HDMOD",
+            choices = method,
+            selected = method[which.min(RSE)],
+            inline = T
+          )
         )
 
         # show the box for the result of HDmod
@@ -284,9 +287,61 @@ function(input, output, session) {
 
 
 
-  # HD model ----------------------------------------------------------------
 
 
+  # HD model local ----------------------------------------------------------------
+
+  model <- reactiveVal()
+
+  observeEvent({
+    input$btn_DATASET_LOADED
+    if (input$btn_DATASET_LOADED >= 1) {
+      input$sel_PLOT
+      input$sel_H
+      input$sel_DIAMETER
+    }
+    input$rad_HDMOD
+    input$chkgrp_HEIGHT
+  }, {
+    if (!"HDloc" %in% input$chkgrp_HEIGHT || input$sel_H == "<unselected>" || input$rad_HDMOD == "NULL") {
+      model(NULL)
+    } else {
+
+      # take the data D, H, plot
+      data <- setDT(inv()[, c(input$sel_DIAMETER, input$sel_H)])
+      setnames(data, names(data), c("D", "H"))
+      data[, plot := if (input$sel_PLOT == "<unselected>") "plot" else inv()[, input$sel_PLOT]]
+
+      # remove all the plots with 15 non NA value
+      removedPlot <- unique(data[, .(nbNonNA = sum(!is.na(H))), by = plot][nbNonNA < 15, plot])
+      data <- data[!plot %in% removedPlot]
+
+      # remove the plots where there the plot is not really distributed
+      data[, quantile := findInterval(D, c(-1, quantile(D, probs = c(0.5, 0.75)), max(D) + 1)), by = plot]
+      removedPlot <- c(removedPlot, unique(data[, .N, by = .(plot, quantile)][N < 3, plot]))
+      data <- data[!plot %in% removedPlot]
+
+      # do the model
+      model(modelHD(
+        D = data$D,
+        H = data$H,
+        method = input$rad_HDMOD,
+        plot = data$plot
+      ))
+
+      # if there is a least one plot in the removed plot -> warning message
+      if (length(removedPlot) != 0) {
+        shinyalert("Oops", paste(
+          "The plot(s):",
+          paste(removedPlot, collapse = ", "),
+          "\n have been removed because either:",
+          "\n\t - there is not enough value of H",
+          "\n\t - the values of H are not distributed enough",
+          "\n At the end those plot will be removed if you persever to use the HD model local"
+        ), type = "warning")
+      }
+    }
+  })
 
 
 
@@ -339,20 +394,23 @@ function(input, output, session) {
       xlab("Diameter (cm)") +
       ylab("Predicted Height (m)") +
       theme(legend.position = "top", legend.title = element_blank(), legend.text = element_text(size = rel(1.5))) +
-      scale_fill_manual(values = c("blue", "green"))
+      scale_fill_manual(values = c("blue", "green", "red"))
 
 
     # comparison of the method: comparison with the HD local
     if ("HDloc" %in% input$chkgrp_HEIGHT && input$rad_HDMOD != "NULL") {
-      plot <- plot + geom_line(aes(
-        y = retrieveH(D,
-          model = modelHD(inv()[, input$sel_DIAMETER],
-            inv()[, input$sel_H],
-            method = input$rad_HDMOD
-          )
-        )$H,
-        colour = "HD local"
-      ))
+      plot <- plot + if (length(model()[[1]]) == 2) {
+        geom_line(aes(y = retrieveH(D, model = model())$H, colour = "HD local"))
+      } else {
+        H <- sapply(model(), function(x) {
+          retrieveH(D, model = x)$H
+        })
+        geom_ribbon(aes(
+          ymin = apply(H, 1, min, na.rm = T),
+          ymax = apply(H, 1, max, na.rm = T),
+          fill = "HD local"
+        ), alpha = 0.3)
+      }
     }
 
     # Create the table of coordinate
@@ -424,13 +482,13 @@ function(input, output, session) {
         })
         # continuation with the plot whith chave
         if (!is.list(E)) {
-          plot <- plot + if (length(unique(E)) >= 2) {
+          plot <- plot + if (length(unique(E)) >= 2) { # if there is multiple E
             geom_ribbon(aes(
               ymax = retrieveH(D, coord = coord[which.min(E), c(longitude, latitude)])$H,
               ymin = retrieveH(D, coord = coord[which.max(E), c(longitude, latitude)])$H,
               fill = "Chave"
             ), alpha = 0.3)
-          } else {
+          } else { # if there is just one E
             geom_line(aes(y = retrieveH(D, coord = c(mean(coord$longitude), mean(coord$latitude)))$H, colour = "Chave"))
           }
         }
@@ -466,15 +524,25 @@ function(input, output, session) {
     # take the mode of AGB
     AGBmod <- input$rad_AGB_MOD
 
-    # take the diameter
-    D <- inv()[, input$sel_DIAMETER]
-
     # take the plot ID
-    if (input$sel_PLOT != "<unselected>") {
+    if (input$sel_PLOT != "<unselected>" && "HDloc" %in% input$chkgrp_HEIGHT) {
       plot_id <- inv()[, input$sel_PLOT]
     } else {
       plot_id <- NULL
     }
+
+
+    multiple_model_loc <- F
+    # if there is plot to remove from the dataset
+    if (length(model()[[1]]) != 2) {
+      inv(inv()[ plot_id %in% names(model()), ])
+      multiple_model_loc <- T
+    }
+
+    # take the diameter
+    D <- inv()[, input$sel_DIAMETER]
+
+
 
     # WD treatement
     if (all(c("meanWD", "sdWD", "levelWD", "nInd") %in% names(inv()))) {
@@ -529,7 +597,7 @@ function(input, output, session) {
         if ("HDloc" %in% input$chkgrp_HEIGHT) {
           HD_mod <- modelHD(D, H, method = input$rad_HDMOD) # compute the model
 
-          AGB_res[[names(color)[1]]] <- AGB_predict(AGBmod, D, WD, errWD, HDmodel = HD_mod)
+          AGB_res[[names(color)[1]]] <- AGB_predict(AGBmod, D, WD, errWD, HDmodel = HD_mod, plot = if (multiple_model_loc) plot_id)
           incProgress(1 / length_progression, detail = "AGB using HD local: Done")
         }
 
@@ -658,7 +726,8 @@ function(input, output, session) {
 
       if ("HDloc" %in% input$chkgrp_HEIGHT) {
         out[, H_local := retrieveH(data$D,
-          model = modelHD(data$D, data$H, method = input$rad_HDMOD)
+          model = model(),
+          plot = if (length(model()[[1]]) != 2) data$plot
         )$H]
       }
 

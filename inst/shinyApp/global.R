@@ -54,7 +54,7 @@ tstrsplit_NA <- function(x, pattern = " ", count = 2) {
 
 
 # for the AGB predict
-AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, coord = NULL, region = NULL) {
+AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, coord = NULL, region = NULL, plot = NULL) {
 
   ##### calcul of the AGB
 
@@ -91,6 +91,7 @@ AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, c
       H = if (!is.null(H)) H,
       errH = if (!is.null(H)) errH,
       HDmodel = if (!is.null(HDmodel)) HDmodel,
+      plot = if (!is.null(plot)) plot,
       Dpropag = "chave2004"
     )
   }

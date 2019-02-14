@@ -173,7 +173,7 @@ RUN_HD <- "HDloc" %in% input$chkgrp_HEIGHT && input$sel_H != "<unselected>"
 method <- "unselected"
 if (RUN_HD) {
   method <- input$rad_HDMOD
-  model <- modelHD(data$D, data$H, method = method)
+  model <- model()
   tab <- modelHD(data$D, data$H)
   kable(tab, digits = 4, caption = "Model comparison")
 }
