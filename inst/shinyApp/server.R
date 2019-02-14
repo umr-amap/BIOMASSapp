@@ -284,7 +284,7 @@ function(input, output, session) {
 
 
 
-  # Maps --------------------------------------------------------------------
+  # Maps + comparison of methods --------------------------------------------------------------------
 
   observe({
     toggleElement("box_MAP",
