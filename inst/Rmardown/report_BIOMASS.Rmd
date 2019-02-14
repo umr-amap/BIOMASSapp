@@ -67,7 +67,7 @@ if (RUN) {
   coord <- data.table(
     longitude = if ("longitude" %in% names(data)) data$longitude else rep(input$num_LONG, nrow(data)),
     latitude = if ("latitude" %in% names(data)) data$latitude else rep(input$num_LAT, nrow(data)),
-    plot = if ("plot" %in% names(data)) data$plot else rep(input$num_LONG, "plot")
+    plot = if ("plot" %in% names(data)) data$plot else rep("plot", nrow(data))
   )
 
   # if the user as made a mistake
@@ -286,7 +286,7 @@ if (fig_width > 7) {
 ```
 
 
-```{r plot biomass, fig.align='center', fig.width=fig_width, fig.height=fig_height, warning=FALSE}
+```{r plot biomass, echo=FALSE, fig.align='center', fig.height=fig_height, fig.width=fig_width, message=FALSE, warning=FALSE}
 
 if ("plot" %in% names(data)) {
   color <- c(HD_local = "blue", feldpausch = "red", chave = "green", heigth = "black")

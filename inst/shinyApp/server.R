@@ -664,7 +664,7 @@ function(input, output, session) {
         a <- ncol(out)
         tab <- AGB_sum()[[i]]
         if (is.vector(tab)) {
-          tab <- summaryByPlot(tab, rep("plot", length(tab)))
+          tab <- summaryByPlot(tab, rep("plot", if (is.list(tab)) nrow(tab$AGB_simu) else length(tab)))
         }
         out <- out[setDT(tab), on = "plot"]
         name <- names(out)[(a + 1):ncol(out)]

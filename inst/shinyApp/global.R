@@ -117,7 +117,11 @@ plot_list <- function(list, color) {
     })
   } else {
     list <- rbindlist(lapply(names(list), function(i) {
-      c(plot = i, list[[i]][1, -1])
+      x = list[[i]][1, -1]
+      names(x) = names(list[[i]])[-1]
+      x = as.list(x)
+      x$plot = i
+      x
     }))
 
     list[, plot_order := seq(.N)]
@@ -125,7 +129,7 @@ plot_list <- function(list, color) {
     list <- list(comp = list)
   }
 
-  plot <- ggplot(cbind(name = names(list[1]), list[[1]]), aes(x = plot_order)) + xlab(NULL) + ylab("AGB (T)")
+  plot <- ggplot(cbind(name = names(list[1]), list[[1]]), aes(x = plot_order)) + xlab(NULL) + ylab("AGB (Mg)")
 
   if (ncol(list[[1]]) > 3) {
     plot <- plot + geom_pointrange(aes(y = AGB, ymin = Cred_2.5, ymax = Cred_97.5, colour = name, na.rm = T))
