@@ -57,7 +57,7 @@ function(input, output, session) {
   observeEvent(input$sel_DIAMETER, {
     feedbackDanger("sel_DIAMETER",
       condition = input$sel_DIAMETER == "<unselected>",
-      text = "argument obligatory"
+      text = "Compulsory argument"
     )
   })
 
@@ -65,7 +65,7 @@ function(input, output, session) {
   observeEvent(input$sel_PLOT, {
     feedbackWarning("sel_PLOT",
       condition = input$sel_PLOT == "<unselected>",
-      text = "Optional (use if you want to compute AGB per plot)"
+      text = "Optional (if you want to get AGB estimates per plot)"
     )
   })
 
@@ -79,17 +79,17 @@ function(input, output, session) {
     } else if (!xor(input$sel_WD == "<unselected>", input$sel_GENUS == "<unselected>")) {
       # if the wd is not selected or genus not selected but not the two
       error <- T
-      shinyalert("Oops!", "Either select the wood density or genus and species or genus", type = "error")
+      shinyalert("Oops!", "Please either select the wood density or genus and species or genus", type = "error")
     } else if (xor(input$sel_LONG == "<unselected>", input$sel_LAT == "<unselected>")) {
       # if the H is not selected and one of the two (long or lat) is not selected
       error <- T
-      shinyalert("Oops!", "Please either select or deselect the longitude and latitude", type = "error")
+      shinyalert("Oops!", "Please either select or deselect both the longitude and latitude", type = "error")
     } else if (input$sel_WD == "<unselected>") {
       # if the WD is not selected then show the tab TAXO
       showMenuItem("tab_TAXO")
       updateTabItems(session, "mnu_MENU", "tab_TAXO")
     } else {
-      # else show the heigth tab
+      # else show the height tab
       showMenuItem("tab_HEIGHT")
       updateTabItems(session, "mnu_MENU", "tab_HEIGHT")
     }
@@ -114,7 +114,7 @@ function(input, output, session) {
     )
   })
 
-  # for the Heigth long lat
+  # for the height long lat
   observe({
     toggleElement("msg_h",
       condition = xor(input$sel_LONG == "<unselected>", input$sel_LAT == "<unselected>")
@@ -130,7 +130,7 @@ function(input, output, session) {
   observeEvent(input$btn_TAXO_RESULT, {
     showElement("box_RESULT_TAXO")
     # show a progress bar
-    withProgress(message = "Searching the wood density", value = 0, {
+    withProgress(message = "Extracting wood density values", value = 0, {
       # if the users have selected the correct taxo + get wd
       if (input$rad_WD == "corr") {
         # correct the taxo and catch the error if there is error
@@ -148,12 +148,12 @@ function(input, output, session) {
           })
         } else { # if not a message will appear
           output$out_taxo_error <- renderPrint({
-            print("How much name has been modified:")
+            print("Number of modified taxa names:")
             table(taxo$nameModified)
           })
         }
         # update the progression
-        incProgress(1 / 2, detail = "Correct the taxonomy completed")
+        incProgress(1 / 2, detail = "Taxonomy correction completed")
         genus <- taxo$genusCorrected
         species <- taxo$speciesCorrected
       } else {
@@ -178,11 +178,11 @@ function(input, output, session) {
       } else { # if not a message will appear
         inv(cbind(inv(), wd[, -(1:3)])) # bind + remove family genus and species columns
         output$out_wd_error <- renderPrint({
-          print("How much tree level at which wood density has been calculated:")
+          print("Taxonomic levels at which wood density was attributed to trees:")
           table(wd$levelWD)
         })
       }
-      incProgress(1, detail = "Get the wood density completed")
+      incProgress(1, detail = "Wood density extraction completed")
     })
 
     showElement(id = "box_TAXO_DONE")
@@ -191,7 +191,7 @@ function(input, output, session) {
   # when the taxo is done
   observeEvent(input$btn_TAXO_DONE, {
     if (any(!c("meanWD", "sdWD", "levelWD", "nInd") %in% names(inv()))) { # verify if there is all the column present
-      shinyalert("Oops", "Somethings went wrong with the function, please check this", type = "error")
+      shinyalert("Oops", "Somethings went wrong, please check this", type = "error")
     } else {
       showMenuItem("tab_HEIGHT")
       updateTabItems(session, "mnu_MENU", "tab_HEIGHT")
@@ -199,7 +199,7 @@ function(input, output, session) {
   })
 
 
-  # Heigth parameters -------------------------------------------------------
+  # height parameters -------------------------------------------------------
   observe({
     toggleElement("box_RESULT_HDEND", condition = !is.null(input$chkgrp_HEIGHT) || input$sel_H != "<unselected>")
   })
@@ -251,7 +251,7 @@ function(input, output, session) {
         # show the box for the result of HDmod
         showElement("box_RESULT_HDMOD")
       } else {
-        shinyalert(title = "Oops", text = "You do not have H selected", type = "error")
+        shinyalert(title = "Oops", text = "Local height measurements have not been provided", type = "error")
         updateCheckboxGroupInput(session, "chkgrp_HEIGHT",
           selected = input$chkgrp_HEIGHT[!input$chkgrp_HEIGHT %in% "HDloc"]
         )
@@ -277,8 +277,8 @@ function(input, output, session) {
 
 
   observeEvent(input$btn_HD_DONE, {
-    if (is.null(input$chkgrp_HEIGHT) && input$sel_H == "<unselected>") {
-      shinyalert("Oops", "There is no H and HD model", type = "error")
+    if (is.null(input$chkgrp_HEIGHT)) {
+      shinyalert("Oops", "Select at least one HD model", type = "error")
     } else {
       showMenuItem("tab_AGB")
       updateTabItems(session, "mnu_MENU", "tab_AGB")
@@ -332,21 +332,15 @@ function(input, output, session) {
       # if there is a least one plot in the removed plot -> warning message
       if (length(removedPlot) != 0) {
         shinyalert("Oops", paste(
-          "The plot(s):",
+          "Local HD model cannot be built for plot(s):",
           paste(removedPlot, collapse = ", "),
-          "\n have been removed because either:",
-          "\n\t - there is not enough value of H",
-          "\n\t - the values of H are not distributed enough",
-          "\n At the end those plot will be removed if you persever to use the HD model local"
+          "\n either:",
+          "\n\t - there are not enough local height measurements",
+          "\n\t - height measurements are likely not representative of tree size distribution"
         ), type = "warning")
       }
     }
   })
-
-
-
-
-
 
 
   # Maps + comparison of methods --------------------------------------------------------------------
@@ -457,7 +451,7 @@ function(input, output, session) {
         region <- unique(computeFeldRegion(coord[, cbind(longitude, latitude)]))
         region[is.na(region)] <- "Pantropical"
         output$txt_feld <- renderText({
-          paste("Your feldpausch region is:", paste(unique(feldRegion()[region]), collapse = ", "))
+          paste("Feldpausch region(s):", paste(unique(feldRegion()[region]), collapse = ", "))
         })
         # continuation with the plot whith feld
         plot <- plot + if (length(region) >= 2) {
@@ -478,12 +472,18 @@ function(input, output, session) {
         E <- tryCatch(computeE(coord), error = function(e) e)
         output$txt_chave <- renderText({
           if (!is.list(E)) {
-            paste(
-              "The E is activate and the local range is:",
-              paste(round(range(E), digits = 3), collapse = " ")
-            )
+            if(length(E)>1){
+              paste(
+              "E parameter of Chave et al. (2014):",
+              paste(round(range(E), digits = 3), collapse = " to ")
+              )}else{
+                paste(
+                  "E parameter of Chave et al. (2014):",
+                  paste(round(E, digits = 3), collapse = " ")
+                )
+            }
           } else {
-            paste("There is an error:", E$message)
+            "E cannot be retrieved for those coordinates"
           }
         })
         # continuation with the plot whith chave
@@ -505,7 +505,7 @@ function(input, output, session) {
         output$out_plot_comp <- renderPlot(plot)
       }
     } else {
-      shinyalert("Oops", text = "Either the column longitude or latitude are not numeric")
+      shinyalert("Oops", text = "Longitude and latitude must be numeric")
     }
   })
 
@@ -561,14 +561,11 @@ function(input, output, session) {
 
     #### parameters verification
     if (is.null(errWD) && AGBmod != "agb") {
-      shinyalert("oops", "You did attribute the WD vector,\n the propagation error for the wood dentity will be 0",
+      shinyalert("WARNING", "Error associated with wood dentity estimates will not be accounted for \n (if you want to, please provide the genus or species at the beginning)",
         type = "warning"
       )
       errWD <- rep(0, length(WD))
     }
-
-
-
 
     # coord treatement
     coord <- data.table(
@@ -576,25 +573,23 @@ function(input, output, session) {
       latitude = if (input$sel_LAT != "<unselected>") inv()[, input$sel_LAT] else input$num_LAT
     )
 
-    # Heigth treatement
+    # height treatement
     if (input$sel_H != "<unselected>") {
       H <- inv()[, input$sel_H]
     } # if H is unselected
 
-    # take the length of the input of check box for the heigth
+    # take the length of the input of check box for the height
     length_progression <- length(input$chkgrp_HEIGHT)
 
 
 
     # plain color
     # use for names too
-    color <- c(HD_local = "blue", feldpausch = "red", chave = "green", heigth = "black")
+    color <- c(HD_local = "blue", feldpausch = "red", chave = "green", height = "black")
 
 
 
     ####### calculation of the AGB
-
-    if (length_progression != 0) { # if we have a model
 
       withProgress(message = "AGB build", value = 0, {
 
@@ -609,34 +604,15 @@ function(input, output, session) {
           region <- computeFeldRegion(coord)
           region[is.na(region)] <- "Pantropical"
           AGB_res[[names(color)[2]]] <- AGB_predict(AGBmod, D, WD, errWD, region = region)
-          incProgress(1 / length_progression, detail = "AGB using feldpausch region: Done")
+          incProgress(1 / length_progression, detail = "AGB using Feldpausch region: Done")
         }
 
         # if we want the chave model
         if ("chave" %in% input$chkgrp_HEIGHT) {
           AGB_res[[names(color)[3]]] <- AGB_predict(AGBmod, D, WD, errWD, coord = coord)
-          incProgress(1 / length_progression, detail = "AGB using chave: Done")
+          incProgress(1 / length_progression, detail = "AGB using Chave E: Done")
         }
       })
-    } else { # if we have not any model HD
-
-      if (!is.null(H) && AGBmod != "agb") {
-        shinyalert("oops", paste0(
-          "You did attribute the H vector,\n",
-          "you can not do the propagation error,\n",
-          "whithout an HD model"
-        ),
-        type = "warning"
-        )
-        updateRadioButtons(session, "rad_AGB_MOD", selected = "agb")
-        AGBmod <- "agb"
-      }
-
-      AGB_res[[names(color)[4]]] <- AGB_predict(AGBmod, D, WD, H = H)
-    }
-
-
-
 
     ###### After the calculation of the AGB
 
@@ -743,7 +719,7 @@ function(input, output, session) {
       }
 
 
-      # create the Lorey database whith the lorey heigth
+      # create the Lorey database whith the lorey height
       Lorey <- out[, c(1, grep("^H", names(out))), with = F][, ":="(D = data$D, plot = out$plot)]
       Lorey[, BAm := (pi * (D / 2)^2) / 10000]
       Lorey <- Lorey[, lapply(.SD, function(x) {
@@ -773,7 +749,7 @@ function(input, output, session) {
         if (i == "HD_local") {
           i <- "local"
         }
-        if (i != "heigth") {
+        if (i != "height") {
           setnames(out, name, paste(name, i, sep = "_"))
         }
       }
@@ -784,6 +760,8 @@ function(input, output, session) {
 
       # Few manipulation on the dataset
       setnames(out, "plot", "Plot_ID")
+      names_cred = grepl("^Cred", names(out))
+      setnames(out, names(out)[names_cred], sub("^Cred", "AGB_Cred", names(out)[names_cred]))
       setcolorder(out, c("Plot_ID", "Long_cnt", "Lat_cnt"))
 
       # write the file

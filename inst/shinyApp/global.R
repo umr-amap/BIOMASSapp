@@ -138,6 +138,7 @@ plot_list <- function(list, color) {
     list <- list(comp = list)
   }
 
+
   plot <- ggplot(cbind(name = names(list[1]), list[[1]]), aes(x = plot_order)) + xlab(NULL) + ylab("AGB (Mg)")
 
   if (ncol(list[[1]]) > 3) {
