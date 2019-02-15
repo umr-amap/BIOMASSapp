@@ -165,9 +165,8 @@ plot_list <- function(list, color) {
       theme(
         legend.position = "bottom",
         legend.title = element_blank(),
-        axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+        axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5, size = rel(1.2)),
         legend.text = element_text(size = rel(1.5)),
-        axis.text.x = element_text(size = rel(1.2)),
         axis.title = element_text(size = rel(1.2))
       ) +
       with(list[[1]], scale_x_continuous(breaks = 1:nr, labels = plot[order(AGB)])) +

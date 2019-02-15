@@ -600,9 +600,7 @@ function(input, output, session) {
 
         # if we have an HD local
         if ("HDloc" %in% input$chkgrp_HEIGHT) {
-          HD_mod <- modelHD(D, H, method = input$rad_HDMOD) # compute the model
-
-          AGB_res[[names(color)[1]]] <- AGB_predict(AGBmod, D, WD, errWD, HDmodel = HD_mod, plot = if (multiple_model_loc) plot_id)
+          AGB_res[[names(color)[1]]] <- AGB_predict(AGBmod, D, WD, errWD, HDmodel = model(), plot = if (multiple_model_loc) plot_id)
           incProgress(1 / length_progression, detail = "AGB using HD local: Done")
         }
 
