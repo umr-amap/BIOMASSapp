@@ -5,7 +5,7 @@ dashboardPage(
       id = "mnu_MENU",
       menuItem("Load dataset", tabName = "tab_LOAD"),
       menuItem("Taxonomy and Wood density", tabName = "tab_TAXO"),
-      menuItem("Model HD", tabName = "tab_HEIGHT"),
+      menuItem("Height-diameter model", tabName = "tab_HEIGHT"),
       menuItem("AGB calculation", tabName = "tab_AGB")
     )
   ),
@@ -21,7 +21,7 @@ dashboardPage(
         "tab_LOAD",
         fluidRow(
           box( # box with the file input
-            title = "Inventory file", width = 6,
+            title = "Forest inventory file", width = 6,
             fileInput("file_DATASET", "Select data file", accept = c(
               "text/csv",
               "text/comma-separated-values,text/plain",
@@ -39,20 +39,20 @@ dashboardPage(
 
             # wood density argument
             hr(),
-            h4("Choose either the WD or genus species"),
+            h4("Provide either wood density values or the taxonomy"),
             selectInput("sel_WD", "Wood density", choices = NULL),
-            selectInput("sel_GENUS", "Genus (if unspecified), species is assumed to be 'genus species'", choices = NULL),
-            selectInput("sel_SPECIES", "Species", choices = NULL),
-            hidden(div("Imposible combinaison", id = "msg_wd", style = "color:red;")),
+            selectInput("sel_GENUS", "Genus (e.g. Terminalia) or scientific name (e.g. Terminalia superba or Terminalia superba Engl. & Diels)", choices = NULL),
+            selectInput("sel_SPECIES", "Species (e.g. superba)", choices = NULL),
+            hidden(div("Impossible combination", id = "msg_wd", style = "color:red;")),
 
-            # Heigth argument
+            # Height argument
             hr(),
             h4("Optional"),
             column(9, selectInput("sel_H", "Height", choices = NULL)),
             column(3, radioButtons("rad_units_height", "Unit:", choices = c("cm", "m"), selected = "m")),
             selectInput("sel_LONG", "Coordinate longitude", choices = NULL),
             selectInput("sel_LAT", "Coordinate latitude", choices = NULL),
-            hidden(div("Imposible combinaison", id = "msg_h", style = "color:red;")),
+            hidden(div("Impossible combination", id = "msg_h", style = "color:red;")),
 
             # plot id
             hr(),
@@ -77,12 +77,12 @@ dashboardPage(
       tabItem(
         "tab_TAXO",
         box(
-          title = "Choose the action", width = 12,
+          title = "Wood density (WD) extraction", width = 12,
           radioButtons(
-            "rad_WD", "Choose the things you want to do to calculate the wood density",
+            "rad_WD", "Correct the taxonomy (mispelling) before wood density extraction?",
             c(
-              "correct the taxonomy + get the WD" = "corr",
-              "get the WD" = "WD"
+              "Correct taxonomy and extract WD" = "corr",
+              "Extract WD without taxonomic correction" = "WD"
             )
           ),
           actionButton("btn_TAXO_RESULT", "Go on")
@@ -108,7 +108,7 @@ dashboardPage(
             "chkgrp_HEIGHT", "Choose the HD model:",
             inline = T,
             c(
-              "HD local model" = "HDloc",
+              "Local HD model" = "HDloc",
               "Feldpausch" = "feld",
               "Chave" = "chave"
             )
@@ -118,7 +118,7 @@ dashboardPage(
           6,
           ## HD model
           hidden(boxWithId(
-            id = "box_RESULT_HDMOD", title = "HD local model", width = 12,
+            id = "box_RESULT_HDMOD", title = "Local HD model (model accuracy is estimated on all HD data)", width = 12,
             tableOutput("out_tab_HD"),
             radioButtons("rad_HDMOD", "Choose your HD model:", choices = "NULL")
           )),
@@ -136,19 +136,19 @@ dashboardPage(
           6,
           ## Feldpauch
           hidden(boxWithId(
-            id = "box_RESULT_FELD", title = "Feldpausch", width = 12,
+            id = "box_RESULT_FELD", title = "Feldpausch et al. (2012)", width = 12,
             textOutput("txt_feld")
           )),
 
           ## chave
           hidden(boxWithId(
-            id = "box_result_chave", title = "Chave", width = 12,
+            id = "box_result_chave", title = "Chave et al. (2014)", width = 12,
             textOutput("txt_chave")
           )),
 
           ## comparison of the methods
           hidden(boxWithId(
-            id = "box_plot_comparison", title = "Model Comparison", width = 12,
+            id = "box_plot_comparison", title = "Model comparison", width = 12,
             plotOutput("out_plot_comp")
           )),
 
@@ -165,7 +165,7 @@ dashboardPage(
         "tab_AGB",
         fluidRow(
           box(
-            title = "AGB mode",
+            title = "AGB estimation",
             radioButtons("rad_AGB_MOD", NULL, choices = c("AGB" = "agb", "AGB + error" = "agbe"), inline = T),
             actionButton("btn_AGB_DONE", "Go on")
           ),
