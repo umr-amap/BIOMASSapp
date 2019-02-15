@@ -113,37 +113,14 @@ if (RUN) {
 
 <font size="4.5">
 The procedure corrected `r if (RUN) sum(correctTaxonomy$nameModified=="TRUE")` taxa names over `r if (RUN) nrow(unique(correctTaxonomy))`.
-</font>
 
-```{r wd, message=FALSE}
-if (RUN) {
-  if (!is.null(correctTaxonomy)) {
-    genus <- correctTaxonomy$genusCorrected
-    species <- correctTaxonomy$speciesCorrected
-  } else {
-    genus <- data$genus
-    if (!"species" %in% names(data)) {
-      split <- tstrsplit_NA(genus)
-      genus <- split[, 1]
-      species <- split[, 2]
-      rm(split)
-    } else {
-      species <- data$species
-    }
-  }
-
-  wd <- getWoodDensity(genus, species)
-}
-```
-
-<font size="4.5">
 Taxonomic levels at which wood density was attributed to trees: 
 </font>
 
 
 ```{r, message=FALSE}
 if (RUN) {
-  table(wd$levelWD)
+  table(wd()$levelWD)
 }
 ```
 

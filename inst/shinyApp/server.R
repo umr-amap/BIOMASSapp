@@ -15,7 +15,7 @@ function(input, output, session) {
 
   # load dataset ------------------------------------------------------------
 
-  inv <- reactiveVal()
+  inv <- reactiveVal(label = "data frame")
   observeEvent(ignoreInit = T, {
     input$file_DATASET
     input$num_skip_line
@@ -129,6 +129,8 @@ function(input, output, session) {
 
   # taxonomy ----------------------------------------------------------------
 
+  wd = reactiveVal(NULL, label = "wood density")
+
   observeEvent(input$btn_TAXO_RESULT, {
     showElement("box_RESULT_TAXO")
     # show a progress bar
@@ -164,24 +166,24 @@ function(input, output, session) {
         genus <- inv()[, input$sel_GENUS]
         if (input$sel_SPECIES == "<unselected>") {
           split <- tstrsplit_NA(genus)
-          genus <- split[, 1]
-          species <- split[, 2]
+          genus <- split[[1]]
+          species <- split[[2]]
         } else {
           species <- inv()[, input$sel_SPECIES]
         }
       }
-      wd <- tryCatch(getWoodDensity(genus, species), error = function(e) e, warning = function(e) e)
+      wd( tryCatch(getWoodDensity(genus, species), error = function(e) e, warning = function(e) e) )
 
       # if there is an error display it
-      if (!is.data.frame(wd)) {
+      if (!is.data.frame(wd())) {
         output$out_wd_error <- renderPrint({
           taxo$message
         })
       } else { # if not a message will appear
-        inv(cbind(inv(), wd[, -(1:3)])) # bind + remove family genus and species columns
+
         output$out_wd_error <- renderPrint({
           print("Taxonomic levels at which wood density was attributed to trees:")
-          table(wd$levelWD)
+          table(wd()$levelWD)
         })
       }
       incProgress(1, detail = "Wood density extraction completed")
@@ -192,7 +194,7 @@ function(input, output, session) {
 
   # when the taxo is done
   observeEvent(input$btn_TAXO_DONE, {
-    if (any(!c("meanWD", "sdWD", "levelWD", "nInd") %in% names(inv()))) { # verify if there is all the column present
+    if (!is.data.frame(wd())) { # verify if there is all the column present
       shinyalert("Oops", "Somethings went wrong, please check this", type = "error")
     } else {
       showMenuItem("tab_HEIGHT")
@@ -293,7 +295,7 @@ function(input, output, session) {
 
   # HD model local ----------------------------------------------------------------
 
-  model <- reactiveVal()
+  model <- reactiveVal(label = "model HD local")
 
   observeEvent({
     input$btn_DATASET_LOADED
@@ -522,7 +524,7 @@ function(input, output, session) {
   # AGB section -------------------------------------------------------------
 
 
-  AGB_sum <- reactiveVal(list())
+  AGB_sum <- reactiveVal(list(), label = "summary by plot")
   observeEvent(input$btn_AGB_DONE, {
 
 
@@ -552,9 +554,9 @@ function(input, output, session) {
 
 
     # WD treatement
-    if (all(c("meanWD", "sdWD", "levelWD", "nInd") %in% names(inv()))) {
-      WD <- inv()[, "meanWD"]
-      errWD <- inv()[, "sdWD"]
+    if (is.data.frame(wd())) {
+      WD <- wd()[, "meanWD"]
+      errWD <- wd()[, "sdWD"]
     } else {
       WD <- inv()[, input$sel_WD]
       errWD <- NULL
