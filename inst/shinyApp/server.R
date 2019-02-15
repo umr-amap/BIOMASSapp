@@ -699,13 +699,11 @@ function(input, output, session) {
         out[, H := data$H]
       }
 
-
-      browser()
       if ("HDloc" %in% input$chkgrp_HEIGHT) {
         model_multi = length(model()[[1]]) != 2
 
         if (model_multi){
-          H = rep(0, nrow(data))
+          H = rep(NA_real_, nrow(data))
           index_plot_model = data[plot %in% names(model()), .I]
           H[index_plot_model] = data[index_plot_model, retrieveH(D, model = model(), plot = plot)$H]
         } else {
@@ -723,23 +721,23 @@ function(input, output, session) {
         out[, H_chave := retrieveH(data$D, coord = if (.N != 1) cbind(longitude, latitude) else c(longitude, latitude))$H ]
       }
 
-
       # create the Lorey database whith the lorey height
-      Lorey <- out[, c(1, grep("^H", names(out))), with = F][, ":="(D = data$D, plot = out$plot)]
+      Lorey <- suppressWarnings(out[, c(1, grep("^H", names(out))), with = F][, ":="(D = data$D, plot = out$plot)])
       Lorey[, BAm := (pi * (D / 2)^2) / 10000]
       Lorey <- Lorey[, lapply(.SD, function(x) {
         sum(x * BAm, na.rm = T) / sum(BAm, na.rm = T)
       }), .SDcols = patterns("^H"), by = plot]
+      Lorey[Lorey == 0] = NA
       setnames(Lorey, names(Lorey), gsub("^H", "LoreyH", names(Lorey)))
 
       # take the data for reduction by plot
-      out <- out[, lapply(.SD, max, na.rm = T), .SDcols = patterns("^H"), by = plot][
+      out <- suppressWarnings(out[, lapply(.SD, max, na.rm = T), .SDcols = patterns("^H"), by = plot][
         out[, .(
           Long_cnt = mean(longitude),
           Lat_cnt = mean(latitude)
         ), by = plot],
         on = "plot"
-      ]
+      ])
       setnames(out, names(out), gsub("^H", "H_max", names(out)))
 
       # merge the AGB
@@ -765,6 +763,8 @@ function(input, output, session) {
       setnames(out, "plot", "Plot_ID")
       setnames(out, names(out), sub("^Cred", "AGB_Cred", names(out)))
       setcolorder(out, c("Plot_ID", "Long_cnt", "Lat_cnt"))
+      out[out == -Inf] = NA
+      out[out == Inf] = NA
 
       # write the file
       fwrite(out, tempFile)
