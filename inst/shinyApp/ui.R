@@ -27,7 +27,9 @@ dashboardPage(
               "text/comma-separated-values,text/plain",
               ".csv"
             )),
-            numericInput("num_skip_line", "Skip lines", value = 0, min = 0)
+            numericInput("num_skip_line", "Skip lines", value = 0, min = 0),
+            radioButtons("rad_decimal", "Decimal:", choices = c(Dot = ".",
+                                                                Comma = ","))
           ),
 
           hidden(boxWithId( # box for the input

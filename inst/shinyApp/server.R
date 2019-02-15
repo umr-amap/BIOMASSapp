@@ -19,13 +19,15 @@ function(input, output, session) {
   observeEvent(ignoreInit = T, {
     input$file_DATASET
     input$num_skip_line
+    input$rad_decimal
   }, {
     # file importation
     if (!is.null(input$file_DATASET)) {
       inv(fread(
         file = input$file_DATASET$datapath,
         skip = ifelse(is.na(input$num_skip_line) || input$num_skip_line == 0, "__auto__", input$num_skip_line),
-        data.table = F
+        data.table = F,
+        dec = input$rad_decimal
       ))
 
       # show the box
