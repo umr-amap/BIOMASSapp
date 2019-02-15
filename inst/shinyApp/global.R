@@ -74,8 +74,8 @@ AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, c
     D <- D[sorting]
     WD <- WD[sorting]
     errWD <- if (!is.null(errWD)) errWD[sorting]
+    plot <- plot[sorting]
   }
-
 
   # if the user want the AGB without error
   if (AGBmod == "agb") {
@@ -112,10 +112,17 @@ AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, c
 
 
 
-plot_list <- function(list, color) {
+plot_list <- function(list, color, plot = NULL) {
   nr <- nrow(list[[1]])
 
   is_vector <- nr == 1
+
+  if (!is.null(plot)){
+    list = lapply(list, function(x){
+      x[x$plot %in% plot, ]
+    })
+  }
+
 
   # take the order of the first result
   if (!is_vector) {
@@ -137,7 +144,6 @@ plot_list <- function(list, color) {
     nr <- list[, .N]
     list <- list(comp = list)
   }
-
 
   plot <- ggplot(cbind(name = names(list[1]), list[[1]]), aes(x = plot_order)) + xlab(NULL) + ylab("AGB (Mg)")
 

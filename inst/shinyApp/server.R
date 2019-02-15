@@ -520,7 +520,7 @@ function(input, output, session) {
   # AGB section -------------------------------------------------------------
 
 
-  AGB_sum <- reactiveVal()
+  AGB_sum <- reactiveVal(list())
   observeEvent(input$btn_AGB_DONE, {
 
 
@@ -534,7 +534,7 @@ function(input, output, session) {
     if (input$sel_PLOT != "<unselected>" && "HDloc" %in% input$chkgrp_HEIGHT) {
       plot_id <- inv()[, input$sel_PLOT]
     } else {
-      plot_id <- NULL
+      plot_id <- rep("plot", nrow(inv()))
     }
 
 
@@ -592,10 +592,11 @@ function(input, output, session) {
     ####### calculation of the AGB
 
       withProgress(message = "AGB build", value = 0, {
-
+        newValue = AGB_sum()
         # if we have an HD local
         if ("HDloc" %in% input$chkgrp_HEIGHT) {
-          AGB_res[[names(color)[1]]] <- AGB_predict(AGBmod, D, WD, errWD, HDmodel = model(), plot = if (multiple_model_loc) plot_id)
+          AGB_res <- AGB_predict(AGBmod, D, WD, errWD, HDmodel = model(), plot = if (multiple_model_loc) plot_id)
+          newValue[[names(color)[1]]] = summaryByPlot(AGB_res, if (!multiple_model_loc) plot_id else plot_id[plot_id %in% names(model())])
           incProgress(1 / length_progression, detail = "AGB using HD local: Done")
         }
 
@@ -603,35 +604,26 @@ function(input, output, session) {
         if ("feld" %in% input$chkgrp_HEIGHT) {
           region <- computeFeldRegion(coord)
           region[is.na(region)] <- "Pantropical"
-          AGB_res[[names(color)[2]]] <- AGB_predict(AGBmod, D, WD, errWD, region = region)
+          AGB_res <- AGB_predict(AGBmod, D, WD, errWD, region = region)
+          newValue[[names(color)[2]]] = summaryByPlot(AGB_res, plot_id)
           incProgress(1 / length_progression, detail = "AGB using Feldpausch region: Done")
         }
 
         # if we want the chave model
         if ("chave" %in% input$chkgrp_HEIGHT) {
-          AGB_res[[names(color)[3]]] <- AGB_predict(AGBmod, D, WD, errWD, coord = coord)
+          AGB_res <- AGB_predict(AGBmod, D, WD, errWD, coord = coord)
+          newValue[[names(color)[3]]] = summaryByPlot(AGB_res, plot_id)
           incProgress(1 / length_progression, detail = "AGB using Chave E: Done")
         }
+
+        AGB_sum(newValue)
       })
 
     ###### After the calculation of the AGB
-
-    # if the plot id is not null
-    if (!is.null(plot_id)) {
-      # list that use to stock the result
-      AGB_sum(lapply(AGB_res, summaryByPlot, plot_id))
-
       # plot the output
       output$out_plot_AGB <- renderPlot({
-        plot_list(AGB_sum(), color)
+        plot_list(AGB_sum(), color, if (multiple_model_loc) names(model()))
       })
-    } else {
-      AGB_sum(AGB_res)
-      AGB <- lapply(AGB_res, summaryByPlot, rep("plot", nrow(inv())))
-      output$out_plot_AGB <- renderPlot({
-        plot_list(AGB, color)
-      })
-    }
 
     showElement(id = "box_AGB_res")
     showElement(id = "box_AGB_Report")
@@ -703,11 +695,20 @@ function(input, output, session) {
         out[, H := data$H]
       }
 
+
+      browser()
       if ("HDloc" %in% input$chkgrp_HEIGHT) {
-        out[, H_local := retrieveH(data$D,
-          model = model(),
-          plot = if (length(model()[[1]]) != 2) data$plot
-        )$H]
+        model_multi = length(model()[[1]]) != 2
+
+        if (model_multi){
+          H = rep(0, nrow(data))
+          index_plot_model = data[plot %in% names(model()), .I]
+          H[index_plot_model] = data[index_plot_model, retrieveH(D, model = model(), plot = plot)$H]
+        } else {
+          H = data[, retrieveH(D, model = model())$H]
+        }
+
+        out[, H_local := H]
       }
 
       if ("feld" %in% input$chkgrp_HEIGHT) {
@@ -741,10 +742,7 @@ function(input, output, session) {
       for (i in names(AGB_sum())) {
         a <- ncol(out)
         tab <- AGB_sum()[[i]]
-        if (is.vector(tab)) {
-          tab <- summaryByPlot(tab, rep("plot", if (is.list(tab)) nrow(tab$AGB_simu) else length(tab)))
-        }
-        out <- out[setDT(tab), on = "plot"]
+        out <- merge(out, setDT(tab), by = "plot", all.x = T)
         name <- names(out)[(a + 1):ncol(out)]
         if (i == "HD_local") {
           i <- "local"
@@ -758,10 +756,10 @@ function(input, output, session) {
       # Merge the Lorey table
       out <- out[Lorey, on = "plot"]
 
+
       # Few manipulation on the dataset
       setnames(out, "plot", "Plot_ID")
-      names_cred = grepl("^Cred", names(out))
-      setnames(out, names(out)[names_cred], sub("^Cred", "AGB_Cred", names(out)[names_cred]))
+      setnames(out, names(out), sub("^Cred", "AGB_Cred", names(out)))
       setcolorder(out, c("Plot_ID", "Long_cnt", "Lat_cnt"))
 
       # write the file

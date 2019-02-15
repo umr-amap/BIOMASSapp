@@ -284,15 +284,8 @@ if (fig_width > 7) {
 
 
 ```{r plot biomass, echo=FALSE, fig.align='center', fig.height=fig_height, fig.width=fig_width, message=FALSE, warning=FALSE}
-
-if ("plot" %in% names(data)) {
-  color <- c(HD_local = "blue", feldpausch = "red", chave = "green", heigth = "black")
-
-  plot_list(AGB_sum(), color)
-} else {
-  AGB <- lapply(AGB_sum(), summaryByPlot, rep("plot", nrow(inv())))
-  plot_list(AGB, color)
-}
+color <- c(HD_local = "blue", feldpausch = "red", chave = "green", heigth = "black")
+plot_list(AGB_sum(), color, if (!is.null(model()) && length(model()[[1]]) != 2) names(model))
 ```
 
 
