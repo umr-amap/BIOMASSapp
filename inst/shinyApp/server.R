@@ -393,14 +393,20 @@ function(input, output, session) {
     plot <- ggplot(data = NULL, aes(x = D)) +
       xlab("Diameter (cm)") +
       ylab("Predicted Height (m)") +
-      theme(legend.position = "top", legend.title = element_blank(), legend.text = element_text(size = rel(1.5))) +
-      scale_fill_manual(values = c("blue", "green", "red"))
+      theme(
+        legend.position = "top",
+        legend.title = element_blank(),
+        legend.text = element_text(size = rel(1.5)),
+        axis.title = element_text(size = rel(1.3))
+      ) +
+      scale_fill_manual(values = c(HD_local = "blue", Feldpausch = "green", Chave = "red")) +
+      scale_colour_manual(values = c(HD_local = "blue", Feldpausch = "green", Chave = "red"))
 
 
     # comparison of the method: comparison with the HD local
     if ("HDloc" %in% input$chkgrp_HEIGHT && input$rad_HDMOD != "NULL") {
       plot <- plot + if (length(model()[[1]]) == 2) {
-        geom_line(aes(y = retrieveH(D, model = model())$H, colour = "HD local"))
+        geom_line(aes(y = retrieveH(D, model = model())$H, colour = "HD_local"))
       } else {
         H <- sapply(model(), function(x) {
           retrieveH(D, model = x)$H
@@ -408,7 +414,7 @@ function(input, output, session) {
         geom_ribbon(aes(
           ymin = apply(H, 1, min, na.rm = T),
           ymax = apply(H, 1, max, na.rm = T),
-          fill = "HD local"
+          fill = "HD_local"
         ), alpha = 0.3)
       }
     }
@@ -534,8 +540,7 @@ function(input, output, session) {
 
     multiple_model_loc <- F
     # if there is plot to remove from the dataset
-    if (length(model()[[1]]) != 2) {
-      inv(inv()[ plot_id %in% names(model()), ])
+    if (!is.null(model()) && length(model()[[1]]) != 2) {
       multiple_model_loc <- T
     }
 

@@ -68,11 +68,19 @@ AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, c
     return(AGB)
   }
 
+  if (!is.null(HDmodel) && !is.null(plot)) {
+    sorting <- plot %in% names(HDmodel)
+
+    D <- D[sorting]
+    WD <- WD[sorting]
+    errWD <- if (!is.null(errWD)) errWD[sorting]
+  }
+
 
   # if the user want the AGB without error
   if (AGBmod == "agb") {
     if (!is.null(HDmodel)) { # HD model
-      H <- retrieveH(D, model = HDmodel)$H
+      H <- retrieveH(D, model = HDmodel, plot = plot)$H
     }
     if (!is.null(region)) { # feld region
       H <- retrieveH(D, region = region)$H
@@ -88,10 +96,10 @@ AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, c
     }
 
     AGB <- AGBmonteCarlo(D, WD, errWD,
-      H = if (!is.null(H)) H,
-      errH = if (!is.null(H)) errH,
-      HDmodel = if (!is.null(HDmodel)) HDmodel,
-      plot = if (!is.null(plot)) plot,
+      H = H,
+      errH = errH,
+      HDmodel = HDmodel,
+      plot = plot,
       Dpropag = "chave2004"
     )
   }
@@ -158,7 +166,9 @@ plot_list <- function(list, color) {
         legend.position = "bottom",
         legend.title = element_blank(),
         axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
-        legend.text = element_text(size = rel(1.5))
+        legend.text = element_text(size = rel(1.5)),
+        axis.text.x = element_text(size = rel(1.2)),
+        axis.title = element_text(size = rel(1.2))
       ) +
       with(list[[1]], scale_x_continuous(breaks = 1:nr, labels = plot[order(AGB)])) +
       scale_fill_manual(values = color) + scale_color_manual(values = color)
