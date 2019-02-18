@@ -337,9 +337,10 @@ function(input, output, session) {
           D = data$D,
           H = data$H,
           method = input$rad_HDMOD,
-          plot = data$plot
+          plot = data$plot,
+          useWeight = T
         )
-      }, error = function(e) NULL, warning = function(e) NULL))
+      }, error = function(e) NULL, warning = function(e) NULL, message = function(e) NULL))
 
       # if there is a least one plot in the removed plot -> warning message
       if (length(removedPlot) != 0) {
