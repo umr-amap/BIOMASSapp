@@ -57,31 +57,21 @@ RUN <- all(c("longitude", "latitude") %in% names(data)) || "chave" %in% input$ch
 ```{r localisation}
 if (RUN) {
   # Create the table of coordinate
-  coord <- data.table(
-    longitude = if ("longitude" %in% names(data)) data$longitude else rep(input$num_LONG, nrow(data)),
-    latitude = if ("latitude" %in% names(data)) data$latitude else rep(input$num_LAT, nrow(data)),
-    plot = if ("plot" %in% names(data)) data$plot else rep("plot", nrow(data))
-  )
+    coordinate <- coord()[, .(longitude = mean(longitude, na.rm = T),
+                              latitude = mean(latitude, na.rm = T)),
+                          by = plot]
 
-  # if the user as made a mistake
-  if (all((sapply(coord[, 1:2], class) %in% c("numeric", "integer")))) {
-
-    # if the plot are renseigned take the mean of each plot
-    if (nrow(coord) == nrow(data)) {
-      coord <- coord[, .(longitude = mean(longitude), latitude = mean(latitude)), by = plot]
-    }
-
-    # remove all NA and unique coordinate
-    coord <- unique(na.omit(coord))
+    # remove all NA and take the unique coordinate
+    coordinate <- unique(na.omit(coordinate))
 
     # draw the coordinate if there is one remaining
-    if (nrow(coord) != 0) {
-      ggplot(coord) +
+    if (nrow(coordinate) != 0) {
+      ggplot(coordinate) +
         borders("world", colour = "gray50", fill = "gray50") +
         geom_point(aes(x = longitude, y = latitude), color = "red", size = 2) + 
         xlab("longitude") + ylab("latitude")
     }
-  }
+  
 }
 ```
 `r if (!RUN) {"-->"}`
@@ -202,7 +192,7 @@ Feldpausch HD model(s) was(were) built using the following region(s):
 </font>
 ```{r feldpausch region}
 if (RUN_HD) {
-    unique(feldRegion()[computeFeldRegion(cbind(coord$longitude, coord$latitude))])
+    unique(feldRegion()[computeFeldRegion(coord()[, cbind(longitude, latitude)])])
 }
 ```
 
@@ -222,7 +212,7 @@ RUN_HD <- "chave" %in% input$chkgrp_HEIGHT
 <font size="4.5">
 The value or range of Chave E is: 
 ```{r}
-round(range(computeE(cbind(coord$longitude, coord$latitude))), digits = 3)
+round(range(computeE(coord()[, cbind(longitude, latitude)])), digits = 3)
 ```
 </font>
 Reference:  

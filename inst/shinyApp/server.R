@@ -63,7 +63,7 @@ function(input, output, session) {
     )
   })
 
-  # If the diameter is unselected => red box
+  # If the diameter is unselected => yellow box
   observeEvent(input$sel_PLOT, {
     feedbackWarning("sel_PLOT",
       condition = input$sel_PLOT == "<unselected>",
@@ -129,7 +129,7 @@ function(input, output, session) {
 
   # taxonomy ----------------------------------------------------------------
 
-  wd = reactiveVal(NULL, label = "wood density")
+  wd <- reactiveVal(NULL, label = "wood density")
 
   observeEvent(input$btn_TAXO_RESULT, {
     showElement("box_RESULT_TAXO")
@@ -172,7 +172,7 @@ function(input, output, session) {
           species <- inv()[, input$sel_SPECIES]
         }
       }
-      wd( tryCatch(getWoodDensity(genus, species), error = function(e) e, warning = function(e) e) )
+      wd(tryCatch(getWoodDensity(genus, species), error = function(e) e, warning = function(e) e))
 
       # if there is an error display it
       if (!is.data.frame(wd())) {
@@ -295,10 +295,17 @@ function(input, output, session) {
 
   # HD model local ----------------------------------------------------------------
 
+  observe({
+    if ("HDloc" %in% input$chkgrp_HEIGHT & input$sel_H == "<unselected>") {
+      updateCheckboxGroupInput(session, "chkgrp_HEIGHT",
+        selected = input$chkgrp_HEIGHT[!input$chkgrp_HEIGHT %in% "HDloc"]
+      )
+    }
+  })
+
   model <- reactiveVal(label = "model HD local")
 
   observeEvent({
-    input$btn_DATASET_LOADED
     if (input$btn_DATASET_LOADED >= 1) {
       input$sel_PLOT
       input$sel_H
@@ -306,11 +313,10 @@ function(input, output, session) {
     }
     input$rad_HDMOD
     input$chkgrp_HEIGHT
-  }, {
-    if (!"HDloc" %in% input$chkgrp_HEIGHT || input$sel_H == "<unselected>" || input$rad_HDMOD == "NULL") {
+  }, ignoreNULL = F, ignoreInit = T, {
+    if (!("HDloc" %in% input$chkgrp_HEIGHT & input$sel_H != "<unselected>" & input$rad_HDMOD != "NULL")) {
       model(NULL)
     } else {
-
       # take the data D, H, plot
       data <- setDT(inv()[, c(input$sel_DIAMETER, input$sel_H)])
       setnames(data, names(data), c("D", "H"))
@@ -326,12 +332,14 @@ function(input, output, session) {
       data <- data[!plot %in% removedPlot]
 
       # do the model
-      model(modelHD(
-        D = data$D,
-        H = data$H,
-        method = input$rad_HDMOD,
-        plot = data$plot
-      ))
+      model(tryCatch({
+        modelHD(
+          D = data$D,
+          H = data$H,
+          method = input$rad_HDMOD,
+          plot = data$plot
+        )
+      }, error = function(e) NULL, warning = function(e) NULL))
 
       # if there is a least one plot in the removed plot -> warning message
       if (length(removedPlot) != 0) {
@@ -371,14 +379,24 @@ function(input, output, session) {
   mapWorld <- reactiveVal(borders("world", colour = "gray50", fill = "gray50"))
 
 
-  observeEvent({
-    input$btn_DATASET_LOADED
-    if (input$btn_DATASET_LOADED >= 1) {
-      input$sel_LAT
-      input$sel_LONG
-      input$num_LAT
-      input$num_LONG
+  # create the table of coordinate and update it when NULL
+  coord <- reactiveVal()
+  observe({
+    # if the err is F the value coord will be updated
+    err <- (input$sel_LONG == "<unselected>" && is.na(input$num_LONG)) || (input$sel_LAT == "<unselected>" && is.na(input$num_LAT))
+
+    if (input$btn_DATASET_LOADED >= 1 && !err) {
+      coord(data.table(
+        plot = if (input$sel_PLOT != "<unselected>") inv()[, input$sel_PLOT] else "plot",
+        longitude = if (input$sel_LONG != "<unselected>") inv()[, input$sel_LONG] else input$num_LONG,
+        latitude = if (input$sel_LAT != "<unselected>") inv()[, input$sel_LAT] else input$num_LAT
+      ))
     }
+  })
+
+  observeEvent({
+    coord()
+    model()
     input$chkgrp_HEIGHT
     input$rad_HDMOD
   }, ignoreNULL = F, ignoreInit = T, {
@@ -402,114 +420,98 @@ function(input, output, session) {
 
 
     # comparison of the method: comparison with the HD local
-    if ("HDloc" %in% input$chkgrp_HEIGHT && input$rad_HDMOD != "NULL") {
-      plot <- plot + if (length(model()[[1]]) == 2) {
+    if (!is.null(model())) {
+      plot <- plot + if (length(model()[[1]]) == 2) { # if we haven't plot HD model
         geom_line(aes(y = retrieveH(D, model = model())$H, colour = "HD_local"))
-      } else {
+      } else { # if we have plot HD model
         H <- sapply(model(), function(x) {
           retrieveH(D, model = x)$H
-        })
+        }) # retrive all the data of H for the D value for each models
         geom_ribbon(aes(
           ymin = apply(H, 1, min, na.rm = T),
           ymax = apply(H, 1, max, na.rm = T),
           fill = "HD_local"
-        ), alpha = 0.3)
+        ), alpha = 0.3) # take all the H min and max for each line (each different D)
       }
     }
 
     # Create the table of coordinate
-    coord <- data.table(
-      longitude = if (input$sel_LONG != "<unselected>") inv()[, input$sel_LONG] else input$num_LONG,
-      latitude = if (input$sel_LAT != "<unselected>") inv()[, input$sel_LAT] else input$num_LAT
-    )
+    coordinate <- coord()[, .(
+      longitude = mean(longitude, na.rm = T),
+      latitude = mean(latitude, na.rm = T)
+    ),
+    by = plot
+    ]
 
-    # if the user as made a mistake
-    if (all(sapply(coord, class) %in% c("numeric", "integer"))) {
+    # remove all NA and take the unique coordinate
+    coordinate <- unique(na.omit(coordinate))
 
-      # if the plot are renseigned take the mean of each plot
-      if (nrow(coord) == nrow(inv()) && input$sel_PLOT != "<unselected>") {
-        coord <- rbindlist(by(
-          coord, inv()[, input$sel_PLOT],
-          function(x) {
-            data.frame(
-              longitude = mean(x$longitude),
-              latitude = mean(x$latitude)
-            )
-          }
-        ))
-      }
+    # draw the coordinate if there is one remaining
+    if (nrow(coordinate) != 0) {
+      output$plot_MAP <- renderPlot({
+        ggplot(coordinate) + xlab("longitude") + ylab("latitude") +
+          mapWorld() +
+          geom_point(aes(x = longitude, y = latitude), color = "red", size = 2)
+      })
+    }
 
-      # remove all NA and take the unique coordinate
-      coord <- unique(na.omit(coord))
-
-      # draw the coordinate if there is one remaining
-      if (nrow(coord) != 0) {
-        output$plot_MAP <- renderPlot({
-          ggplot(coord) + xlab("longitude") + ylab("latitude") +
-            mapWorld() +
-            geom_point(aes(x = longitude, y = latitude), color = "red", size = 2)
+    if ("feld" %in% input$chkgrp_HEIGHT) {
+      region <- computeFeldRegion(coord()[, cbind(longitude, latitude)])
+      region[is.na(region)] <- "Pantropical"
+      output$txt_feld <- renderText({
+        paste("Feldpausch region(s):", paste(unique(feldRegion()[region]), collapse = ", "))
+      })
+      # continuation with the plot whith feld
+      plot <- plot + if (length(unique(region)) >= 2) {
+        H <- sapply(region, function(x) {
+          retrieveH(D, region = x)$H
         })
+        geom_ribbon(aes(
+          ymin = apply(H, 1, min, na.rm = T),
+          ymax = apply(H, 1, max, na.rm = T),
+          fill = "Feldpausch"
+        ), alpha = 0.3)
+      } else {
+        geom_line(aes(y = retrieveH(D, region = unique(region))$H, colour = "Feldpausch"))
       }
+    }
 
-      if ("feld" %in% input$chkgrp_HEIGHT) {
-        region <- unique(computeFeldRegion(coord[, cbind(longitude, latitude)]))
-        region[is.na(region)] <- "Pantropical"
-        output$txt_feld <- renderText({
-          paste("Feldpausch region(s):", paste(unique(feldRegion()[region]), collapse = ", "))
-        })
-        # continuation with the plot whith feld
-        plot <- plot + if (length(region) >= 2) {
-          H <- sapply(region, function(x) {
-            retrieveH(D, region = x)$H
-          })
-          geom_ribbon(aes(
-            ymin = apply(H, 1, min, na.rm = T),
-            ymax = apply(H, 1, max, na.rm = T),
-            fill = "Feldpausch"
-          ), alpha = 0.3)
-        } else {
-          geom_line(aes(y = retrieveH(D, region = region)$H, colour = "Feldpausch"))
-        }
-      }
-
-      if ("chave" %in% input$chkgrp_HEIGHT) {
-        E <- tryCatch(computeE(coord), error = function(e) e)
-        output$txt_chave <- renderText({
-          if (!is.list(E)) {
-            if(length(E)>1){
-              paste(
+    if ("chave" %in% input$chkgrp_HEIGHT) {
+      E <- tryCatch(computeE(coord()[, cbind(longitude, latitude)]), error = function(e) e)
+      output$txt_chave <- renderText({
+        if (!is.list(E)) {
+          if (length(unique(E)) > 1) {
+            paste(
               "E parameter of Chave et al. (2014):",
               paste(round(range(E), digits = 3), collapse = " to ")
-              )}else{
-                paste(
-                  "E parameter of Chave et al. (2014):",
-                  paste(round(E, digits = 3), collapse = " ")
-                )
-            }
+            )
           } else {
-            "E cannot be retrieved for those coordinates"
+            paste(
+              "E parameter of Chave et al. (2014):",
+              round(unique(E), digits = 3)
+            )
           }
-        })
-        # continuation with the plot whith chave
-        if (!is.list(E)) {
-          plot <- plot + if (length(unique(E)) >= 2) { # if there is multiple E
-            geom_ribbon(aes(
-              ymax = retrieveH(D, coord = coord[which.min(E), c(longitude, latitude)])$H,
-              ymin = retrieveH(D, coord = coord[which.max(E), c(longitude, latitude)])$H,
-              fill = "Chave"
-            ), alpha = 0.3)
-          } else { # if there is just one E
-            geom_line(aes(y = retrieveH(D, coord = c(mean(coord$longitude), mean(coord$latitude)))$H, colour = "Chave"))
-          }
+        } else {
+          "E cannot be retrieved for those coordinates"
+        }
+      })
+      # continuation with the plot whith chave
+      if (!is.list(E)) {
+        plot <- plot + if (length(unique(E)) >= 2) { # if there is multiple E
+          geom_ribbon(aes(
+            ymax = retrieveH(D, coord = coord()[which.min(E), c(longitude, latitude)])$H,
+            ymin = retrieveH(D, coord = coord()[which.max(E), c(longitude, latitude)])$H,
+            fill = "Chave"
+          ), alpha = 0.3)
+        } else { # if there is just one E
+          geom_line(aes(y = retrieveH(D, coord = coord()[, c(mean(longitude), mean(latitude))])$H, colour = "Chave"))
         }
       }
+    }
 
-      if (!is.null(input$chkgrp_HEIGHT)) {
-        # show the plot of the comparison of the methods
-        output$out_plot_comp <- renderPlot(plot)
-      }
-    } else {
-      shinyalert("Oops", text = "Longitude and latitude must be numeric")
+    if (!is.null(input$chkgrp_HEIGHT)) {
+      # show the plot of the comparison of the methods
+      output$out_plot_comp <- renderPlot(plot)
     }
   })
 
@@ -535,7 +537,7 @@ function(input, output, session) {
     AGBmod <- input$rad_AGB_MOD
 
     # take the plot ID
-    if (input$sel_PLOT != "<unselected>" && "HDloc" %in% input$chkgrp_HEIGHT) {
+    if (input$sel_PLOT != "<unselected>") {
       plot_id <- inv()[, input$sel_PLOT]
     } else {
       plot_id <- rep("plot", nrow(inv()))
@@ -571,12 +573,6 @@ function(input, output, session) {
       errWD <- rep(0, length(WD))
     }
 
-    # coord treatement
-    coord <- data.table(
-      longitude = if (input$sel_LONG != "<unselected>") inv()[, input$sel_LONG] else input$num_LONG,
-      latitude = if (input$sel_LAT != "<unselected>") inv()[, input$sel_LAT] else input$num_LAT
-    )
-
     # height treatement
     if (input$sel_H != "<unselected>") {
       H <- inv()[, input$sel_H]
@@ -595,39 +591,39 @@ function(input, output, session) {
 
     ####### calculation of the AGB
 
-      withProgress(message = "AGB build", value = 0, {
-        newValue = AGB_sum()
-        # if we have an HD local
-        if ("HDloc" %in% input$chkgrp_HEIGHT) {
-          AGB_res <- AGB_predict(AGBmod, D, WD, errWD, HDmodel = model(), plot = if (multiple_model_loc) plot_id)
-          newValue[[names(color)[1]]] = summaryByPlot(AGB_res, if (!multiple_model_loc) plot_id else plot_id[plot_id %in% names(model())])
-          incProgress(1 / length_progression, detail = "AGB using HD local: Done")
-        }
+    withProgress(message = "AGB build", value = 0, {
+      newValue <- AGB_sum()
+      # if we have an HD local
+      if ("HDloc" %in% input$chkgrp_HEIGHT) {
+        AGB_res <- AGB_predict(AGBmod, D, WD, errWD, HDmodel = model(), plot = if (multiple_model_loc) plot_id)
+        newValue[[names(color)[1]]] <- summaryByPlot(AGB_res, if (!multiple_model_loc) plot_id else plot_id[plot_id %in% names(model())])
+        incProgress(1 / length_progression, detail = "AGB using HD local: Done")
+      }
 
-        # if we want the feldpausch region
-        if ("feld" %in% input$chkgrp_HEIGHT) {
-          region <- computeFeldRegion(coord)
-          region[is.na(region)] <- "Pantropical"
-          AGB_res <- AGB_predict(AGBmod, D, WD, errWD, region = region)
-          newValue[[names(color)[2]]] = summaryByPlot(AGB_res, plot_id)
-          incProgress(1 / length_progression, detail = "AGB using Feldpausch region: Done")
-        }
+      # if we want the feldpausch region
+      if ("feld" %in% input$chkgrp_HEIGHT) {
+        region <- computeFeldRegion(coord()[, cbind(longitude, latitude)])
+        region[is.na(region)] <- "Pantropical"
+        AGB_res <- AGB_predict(AGBmod, D, WD, errWD, region = region)
+        newValue[[names(color)[2]]] <- summaryByPlot(AGB_res, plot_id)
+        incProgress(1 / length_progression, detail = "AGB using Feldpausch region: Done")
+      }
 
-        # if we want the chave model
-        if ("chave" %in% input$chkgrp_HEIGHT) {
-          AGB_res <- AGB_predict(AGBmod, D, WD, errWD, coord = coord)
-          newValue[[names(color)[3]]] = summaryByPlot(AGB_res, plot_id)
-          incProgress(1 / length_progression, detail = "AGB using Chave E: Done")
-        }
+      # if we want the chave model
+      if ("chave" %in% input$chkgrp_HEIGHT) {
+        AGB_res <- AGB_predict(AGBmod, D, WD, errWD, coord = coord()[, cbind(longitude, latitude)])
+        newValue[[names(color)[3]]] <- summaryByPlot(AGB_res, plot_id)
+        incProgress(1 / length_progression, detail = "AGB using Chave E: Done")
+      }
 
-        AGB_sum(newValue)
-      })
+      AGB_sum(newValue)
+    })
 
     ###### After the calculation of the AGB
-      # plot the output
-      output$out_plot_AGB <- renderPlot({
-        plot_list(AGB_sum(), color, if (multiple_model_loc) names(model()))
-      })
+    # plot the output
+    output$out_plot_AGB <- renderPlot({
+      plot_list(AGB_sum(), color, if (multiple_model_loc) names(model()))
+    })
 
     showElement(id = "box_AGB_res")
     showElement(id = "box_AGB_Report")
@@ -700,14 +696,14 @@ function(input, output, session) {
       }
 
       if ("HDloc" %in% input$chkgrp_HEIGHT) {
-        model_multi = length(model()[[1]]) != 2
+        model_multi <- length(model()[[1]]) != 2
 
-        if (model_multi){
-          H = rep(NA_real_, nrow(data))
-          index_plot_model = data[plot %in% names(model()), .I]
-          H[index_plot_model] = data[index_plot_model, retrieveH(D, model = model(), plot = plot)$H]
+        if (model_multi) {
+          H <- rep(NA_real_, nrow(data))
+          index_plot_model <- data[plot %in% names(model()), .I]
+          H[index_plot_model] <- data[index_plot_model, retrieveH(D, model = model(), plot = plot)$H]
         } else {
-          H = data[, retrieveH(D, model = model())$H]
+          H <- data[, retrieveH(D, model = model())$H]
         }
 
         out[, H_local := H]
@@ -727,7 +723,7 @@ function(input, output, session) {
       Lorey <- Lorey[, lapply(.SD, function(x) {
         sum(x * BAm, na.rm = T) / sum(BAm, na.rm = T)
       }), .SDcols = patterns("^H"), by = plot]
-      Lorey[Lorey == 0] = NA
+      Lorey[Lorey == 0] <- NA
       setnames(Lorey, names(Lorey), gsub("^H", "LoreyH", names(Lorey)))
 
       # take the data for reduction by plot
@@ -763,8 +759,8 @@ function(input, output, session) {
       setnames(out, "plot", "Plot_ID")
       setnames(out, names(out), sub("^Cred", "AGB_Cred", names(out)))
       setcolorder(out, c("Plot_ID", "Long_cnt", "Lat_cnt"))
-      out[out == -Inf] = NA
-      out[out == Inf] = NA
+      out[out == -Inf] <- NA
+      out[out == Inf] <- NA
 
       # write the file
       fwrite(out, tempFile)
