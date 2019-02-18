@@ -1,7 +1,7 @@
 Package: BIOMASSapp
 Type: Package
 Title: The shiny application of BIOMASS
-Version: 0.1.0
+Version: 1.0
 Authors@R: c(
 	person("Maxime", "Réjou-Méchain", email = "maxime.rejou@gmail.com", role = c("aut", "cre", "dtc")),
 	person("Arthur", "Pere", email = "arthur.pere@cirad.fr", role = c("aut")),
@@ -18,9 +18,10 @@ Imports:
 	shinyjs,
 	shinyalert,
 	shinyFeedback,
-	BIOMASS (>= 2.0),
+	BIOMASS (>= 2.1),
 	rmarkdown,
 	knitr,
 	ggplot2,
 	maps,
-	measurements
+	measurements,
+	httr
