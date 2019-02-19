@@ -60,6 +60,9 @@ AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, c
 
   # if there is the coordinate
   if (!is.null(coord)) {
+    if (nrow(coord) == 1) {
+      coord <- c(coord[1, 1], coord[1, 2])
+    }
     AGB <- if (AGBmod == "agb") {
       computeAGB(D, WD, coord = coord)
     } else {
@@ -117,8 +120,8 @@ plot_list <- function(list, color, plot = NULL) {
 
   is_vector <- nr == 1
 
-  if (!is.null(plot)){
-    list = lapply(list, function(x){
+  if (!is.null(plot)) {
+    list <- lapply(list, function(x) {
       x[x$plot %in% plot, ]
     })
   }
