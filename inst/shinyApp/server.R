@@ -172,18 +172,36 @@ function(input, output, session) {
           species <- inv()[, input$sel_SPECIES]
         }
       }
-      wd(tryCatch(getWoodDensity(genus, species), error = function(e) e, warning = function(e) e))
+      wd(tryCatch(getWoodDensity(genus, species, stand = if (input$sel_PLOT != "<unselected>") inv()[, input$sel_PLOT]),
+        error = function(e) e,
+        warning = function(e) e
+      ))
 
       # if there is an error display it
       if (!is.data.frame(wd())) {
         output$out_wd_error <- renderPrint({
           taxo$message
         })
+        wd(NULL)
       } else { # if not a message will appear
 
         output$out_wd_error <- renderPrint({
-          print("Taxonomic levels at which wood density was attributed to trees:")
-          table(wd()$levelWD)
+          print("Taxonomic levels at which wood density was attributed to trees (in %):")
+          levelswd <- 100 * table(wd()$levelWD) / nrow(wd())
+          if (input$sel_PLOT != "<unselected>") {
+            data.frame(
+              species = round(levelswd["species"], 1),
+              genus = round(levelswd["genus"], 1),
+              plot_level = round(sum(levelswd[!names(levelswd) %in% c("dataset", "genus", "species")]), 1),
+              dataset = round(levelswd["dataset"], 1)
+            )
+          } else {
+            data.frame(
+              species = round(levelswd["species"], 1),
+              genus = round(levelswd["genus"], 1),
+              dataset = round(levelswd["dataset"], 1)
+            )
+          }
         })
       }
       incProgress(1, detail = "Wood density extraction completed")
