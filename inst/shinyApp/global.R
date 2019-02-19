@@ -124,6 +124,7 @@ plot_list <- function(list, color, plot = NULL) {
     list <- lapply(list, function(x) {
       x[x$plot %in% plot, ]
     })
+    nr <- nrow(list[[1]])
   }
 
 
@@ -151,13 +152,17 @@ plot_list <- function(list, color, plot = NULL) {
   plot <- ggplot(cbind(name = names(list[1]), list[[1]]), aes(x = plot_order)) + xlab(NULL) + ylab("AGB (Mg)")
 
   if (ncol(list[[1]]) > 3) {
-    plot <- plot + geom_pointrange(aes(y = AGB, ymin = Cred_2.5, ymax = Cred_97.5, colour = name, na.rm = T))
-    for (i in names(list)[-1]) {
-      plot <- plot + geom_ribbon(
-        data = cbind(name = i, list[[i]]),
-        aes(ymin = Cred_2.5, ymax = Cred_97.5, fill = name),
-        alpha = 0.3, na.rm = T
-      )
+    if (is_vector || "HD_local" %in% names(list)) {
+      plot <- plot + geom_pointrange(aes(y = AGB, ymin = Cred_2.5, ymax = Cred_97.5, colour = name, na.rm = T))
+    }
+    if (!is_vector) {
+      for (i in names(list)[names(list) != "HD_local"]) {
+        plot <- plot + geom_ribbon(
+          data = cbind(name = i, list[[i]]),
+          aes(ymin = Cred_2.5, ymax = Cred_97.5, fill = name),
+          alpha = 0.3, na.rm = T
+        )
+      }
     }
   } else {
     for (i in names(list)) {
@@ -169,7 +174,7 @@ plot_list <- function(list, color, plot = NULL) {
     }
   }
 
-
+  # legend + size of text + color
   if (!is_vector) {
     plot <- plot +
       theme(
