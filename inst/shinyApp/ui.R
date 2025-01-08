@@ -10,7 +10,6 @@ dashboardPage(
     )
   ),
   dashboardBody(
-    useShinyalert(),
     useShinyFeedback(),
     useShinyjs(),
     tabItems(
@@ -67,7 +66,7 @@ dashboardPage(
 
           hidden(boxWithId(
             id = "box_DATASET", title = "Inventory file preview content", width = 12,
-            dataTableOutput("table_DATASET")
+            DT::DTOutput("table_DATASET")
           ))
         )
       ),

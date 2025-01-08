@@ -9,6 +9,7 @@ library(shinyFeedback)
 library(rmarkdown)
 library(BIOMASS)
 library(measurements)
+library(DT)
 
 # set maximum input file size (here 30Mo)
 options(shiny.maxRequestSize = 30 * 1024^2)
