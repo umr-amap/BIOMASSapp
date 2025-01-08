@@ -58,7 +58,7 @@ function(input, output, session) {
   # If the diameter is unselected => red box
   observeEvent(input$sel_DIAMETER, {
     feedbackDanger("sel_DIAMETER",
-      condition = input$sel_DIAMETER == "<unselected>",
+      show = input$sel_DIAMETER == "<unselected>",
       text = "Compulsory argument"
     )
   })
@@ -66,7 +66,7 @@ function(input, output, session) {
   # If the diameter is unselected => yellow box
   observeEvent(input$sel_PLOT, {
     feedbackWarning("sel_PLOT",
-      condition = input$sel_PLOT == "<unselected>",
+      show = input$sel_PLOT == "<unselected>",
       text = "Optional (if you want to get AGB estimates per plot)"
     )
   })
@@ -162,7 +162,7 @@ function(input, output, session) {
         species <- taxo$speciesCorrected
       } else {
 
-        # if the users do not choose the coorect taxo
+        # if the users do not choose the correct taxo
         genus <- inv()[, input$sel_GENUS]
         if (input$sel_SPECIES == "<unselected>") {
           split <- tstrsplit_NA(genus)

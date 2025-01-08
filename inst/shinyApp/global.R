@@ -7,13 +7,14 @@ library(shinyjs)
 library(shinyalert)
 library(shinyFeedback)
 library(rmarkdown)
-library(BIOMASS)
 library(measurements)
+library(DT)
+library(BIOMASS)
 
 # set maximum input file size (here 30Mo)
 options(shiny.maxRequestSize = 30 * 1024^2)
 
-# ajoute un id a un box de maniere a pouvoir le montrer/cacher
+# add an id to a box so that it can be shown/hidden
 boxWithId <- function(..., title = NULL, footer = NULL, status = NULL,
                       solidHeader = FALSE, background = NULL, width = 6, height = NULL,
                       collapsible = FALSE, collapsed = FALSE, id = NULL) {
@@ -35,16 +36,11 @@ showMenuItem <- function(tabName) {
 }
 
 
-
-
-
-
-# split the genus in multiple columns
+# split the genus in multiple columns (genus species)
 tstrsplit_NA <- function(x, pattern = " ", count = 2) {
-  # NOTE extraneous columns ignored maybe better paste them together
+
   split <- utils::head(tstrsplit(x, pattern), count)
 
-  # pad with NA
   if (length(split) < count) {
     split <- c(split, rep(NA_character_, count - length(split)))
   }
@@ -52,13 +48,12 @@ tstrsplit_NA <- function(x, pattern = " ", count = 2) {
 }
 
 
-
-# for the AGB predict
+# AGB predictions
 AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, coord = NULL, region = NULL, plot = NULL) {
 
-  ##### calcul of the AGB
+  ##### AGB calculation
 
-  # if there is the coordinate
+  # if coordinates are given
   if (!is.null(coord)) {
     if (nrow(coord) == 1) {
       coord <- c(coord[1, 1], coord[1, 2])
@@ -80,7 +75,7 @@ AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, c
     plot <- plot[sorting]
   }
 
-  # if the user want the AGB without error
+  # AGB without error
   if (AGBmod == "agb") {
     if (!is.null(HDmodel)) { # HD model
       H <- retrieveH(D, model = HDmodel, plot = plot)$H
@@ -91,6 +86,7 @@ AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, c
     AGB <- computeAGB(D, WD, H = H)
   }
 
+  # AGB with error
   if (AGBmod == "agbe") {
     if (!is.null(region)) { # feld region
       H <- retrieveH(D, region = region)
@@ -110,11 +106,7 @@ AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, c
   return(AGB)
 }
 
-
-
-
-
-
+# AGB plots
 plot_list <- function(list, color, plot = NULL) {
   nr <- nrow(list[[1]])
 
@@ -126,7 +118,6 @@ plot_list <- function(list, color, plot = NULL) {
     })
     nr <- nrow(list[[1]])
   }
-
 
   # take the order of the first result
   if (!is_vector) {

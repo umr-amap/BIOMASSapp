@@ -5,12 +5,14 @@ Version: 1.0
 Authors@R: c(
 	person("Maxime", "Réjou-Méchain", email = "maxime.rejou@gmail.com", role = c("aut", "cre", "dtc")),
 	person("Arthur", "Pere", email = "arthur.pere@cirad.fr", role = c("aut")),
-	person("Guillaume","Cornu", email = "gcornu@cirad.fr", role = c("aut"), comment = c(ORCID="0000-0002-7523-5176"))
+	person("Guillaume","Cornu", email = "gcornu@cirad.fr", role = c("aut"), comment = c(ORCID="0000-0002-7523-5176")),
+	person("Arthur", "Bailly", email = "arthur.bailly@ird.fr ", role = c("aut"))
   )
-Description: It does things like BIOMASS package but with a shiny application
+Description: BIOMASSapp is the Shiny version of the R BIOMASS package.
 License: GPL-2
 Encoding: UTF-8
 LazyData: true
+BugReports: https://github.com/umr-amap/BIOMASSapp/issues
 Imports:
 	shiny,
 	shinydashboard,
