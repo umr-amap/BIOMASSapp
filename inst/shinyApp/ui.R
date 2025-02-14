@@ -1,4 +1,5 @@
 dashboardPage(
+  skin="green",
   dashboardHeader(title = "BIOMASS application"),
   dashboardSidebar(
     sidebarMenu(
@@ -21,11 +22,9 @@ dashboardPage(
         fluidRow(
           box( # box with the file input
             title = "Forest inventory file", width = 6,
-            fileInput("file_DATASET", "Select data file", accept = c(
-              "text/csv",
-              "text/comma-separated-values,text/plain",
-              ".csv"
-            )),
+            fileInput("file_DATASET", "Select data file",
+                      accept = c("text/csv", "text/comma-separated-values,text/plain",".csv")
+            ),
             numericInput("num_skip_line", "Skip lines", value = 0, min = 0),
             radioButtons("rad_decimal", "Decimal:", choices = c(Dot = ".",
                                                                 Comma = ","))
@@ -90,7 +89,9 @@ dashboardPage(
         ),
         hidden(boxWithId(
           id = "box_RESULT_TAXO", title = "Result", width = 12,
-          verbatimTextOutput("out_taxo_error"),
+          withSpinner(verbatimTextOutput("out_taxo_error"),
+                      type = getOption("spinner.type", default = 5),
+                      color = getOption("spinner.color", default = "#158A0C")),
           hr(),
           verbatimTextOutput("out_wd_error")
         )),

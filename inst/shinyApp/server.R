@@ -31,11 +31,12 @@ function(input, output, session) {
       ))
 
       # show the box
-      showElement("box_DATASET")
       showElement("box_FIELDS")
+      showElement("box_DATASET")
 
       # show the content
-      output$table_DATASET <- renderDataTable(inv())
+      output$table_DATASET <- renderDT(inv(),
+                                       options = list(scrollX = TRUE))
 
       int_num_col <- names(inv())[ sapply(inv(), class) %in% c("integer", "numeric") ]
 
@@ -134,7 +135,7 @@ function(input, output, session) {
   observeEvent(input$btn_TAXO_RESULT, {
     showElement("box_RESULT_TAXO")
     # show a progress bar
-    withProgress(message = "Extracting wood density values", value = 0, {
+    withProgress(message = "Correcting the taxonomy", value = 0, {
       # if the users have selected the correct taxo + get wd
       if (input$rad_WD == "corr") {
         # correct the taxo and catch the error if there is error
@@ -152,12 +153,13 @@ function(input, output, session) {
           })
         } else { # if not a message will appear
           output$out_taxo_error <- renderPrint({
-            print("Number of modified taxa names:")
-            table(taxo$nameModified)
+            cat("Summary of taxonomy corrections (in number of trees):\n")
+            taxo_display <- factor(taxo$nameModified, labels = c("Correct spelling of taxa (unmodified)","Species not found (unmodified)","Taxa not found (unmodified)","Taxa found and corrected (modified)"))
+            print(table(taxo_display, dnn = ""))
           })
         }
         # update the progression
-        incProgress(1 / 2, detail = "Taxonomy correction completed")
+        incProgress(1 / 2, detail = "Taxonomy correction completed", message = "Extracting wood density values")
         genus <- taxo$genusCorrected
         species <- taxo$speciesCorrected
       } else {
@@ -186,20 +188,22 @@ function(input, output, session) {
       } else { # if not a message will appear
 
         output$out_wd_error <- renderPrint({
-          print("Taxonomic levels at which wood density was attributed to trees (in %):")
+          cat("Taxonomic levels at which wood density was attributed to trees (in %):\n")
           levelswd <- 100 * table(wd()$levelWD) / nrow(wd())
           if (input$sel_PLOT != "<unselected>") {
             data.frame(
-              species = round(levelswd["species"], 1),
-              genus = round(levelswd["genus"], 1),
-              plot_level = round(sum(levelswd[!names(levelswd) %in% c("dataset", "genus", "species")]), 1),
-              dataset = round(levelswd["dataset"], 1)
+              "Species level" = round(levelswd["species"], 1),
+              "Genus level" = round(levelswd["genus"], 1),
+              "Plot level" = round(sum(levelswd[!names(levelswd) %in% c("dataset", "genus", "species")]), 1),
+              "User dataset level" = round(levelswd["dataset"], 1),
+              check.names = FALSE
             )
           } else {
             data.frame(
-              species = round(levelswd["species"], 1),
-              genus = round(levelswd["genus"], 1),
-              dataset = round(levelswd["dataset"], 1)
+              "Species level" = round(levelswd["species"], 1),
+              "Genus level" = round(levelswd["genus"], 1),
+              "User dataset level" = round(levelswd["dataset"], 1),
+              check.names = FALSE
             )
           }
         })

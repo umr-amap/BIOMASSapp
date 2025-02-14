@@ -1,5 +1,6 @@
 library(shiny)
 library(shinydashboard)
+library(shinycssloaders)
 library(data.table)
 library(ggplot2)
 library(maps)
@@ -14,7 +15,7 @@ library(BIOMASS)
 # set maximum input file size (here 30Mo)
 options(shiny.maxRequestSize = 30 * 1024^2)
 
-# add an id to a box so that it can be shown/hidden
+# add an id to a box so that it can be shown/hidden (instead of wrap the box() on a div() )
 boxWithId <- function(..., title = NULL, footer = NULL, status = NULL,
                       solidHeader = FALSE, background = NULL, width = 6, height = NULL,
                       collapsible = FALSE, collapsed = FALSE, id = NULL) {
