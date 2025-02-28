@@ -13,7 +13,7 @@ function(input, output, session) {
   })
 
 
-  # load dataset ------------------------------------------------------------
+  # LOAD DATASET ---------------------------------------------------------------
 
   inv <- reactiveVal(label = "data frame")
   observeEvent(ignoreInit = T, {
@@ -31,11 +31,12 @@ function(input, output, session) {
       ))
 
       # show the box
-      showElement("box_DATASET")
       showElement("box_FIELDS")
+      showElement("box_DATASET")
 
       # show the content
-      output$table_DATASET <- renderDataTable(inv())
+      output$table_DATASET <- renderDT(inv(),
+                                       options = list(scrollX = TRUE))
 
       int_num_col <- names(inv())[ sapply(inv(), class) %in% c("integer", "numeric") ]
 
@@ -127,14 +128,14 @@ function(input, output, session) {
 
 
 
-  # taxonomy ----------------------------------------------------------------
+  # TAXONOMY -------------------------------------------------------------------
 
   wd <- reactiveVal(NULL, label = "wood density")
 
   observeEvent(input$btn_TAXO_RESULT, {
     showElement("box_RESULT_TAXO")
     # show a progress bar
-    withProgress(message = "Extracting wood density values", value = 0, {
+    withProgress(message = "Correcting the taxonomy", value = 0, {
       # if the users have selected the correct taxo + get wd
       if (input$rad_WD == "corr") {
         # correct the taxo and catch the error if there is error
@@ -152,16 +153,16 @@ function(input, output, session) {
           })
         } else { # if not a message will appear
           output$out_taxo_error <- renderPrint({
-            print("Number of modified taxa names:")
-            table(taxo$nameModified)
+            cat("Summary of taxonomy corrections (in number of trees):\n")
+            taxo_display <- factor(taxo$nameModified, labels = c("Correct spelling of taxa (unmodified)","Species not found (unmodified)","Taxa not found (unmodified)","Taxa found and corrected (modified)"))
+            print(table(taxo_display, dnn = ""))
           })
         }
         # update the progression
-        incProgress(1 / 2, detail = "Taxonomy correction completed")
+        incProgress(1 / 2, detail = "Taxonomy correction completed", message = "Extracting wood density values")
         genus <- taxo$genusCorrected
         species <- taxo$speciesCorrected
       } else {
-
         # if the users do not choose the correct taxo
         genus <- inv()[, input$sel_GENUS]
         if (input$sel_SPECIES == "<unselected>") {
@@ -171,6 +172,7 @@ function(input, output, session) {
         } else {
           species <- inv()[, input$sel_SPECIES]
         }
+        hideSpinner(id = "out_taxo_error")
       }
       wd(tryCatch(getWoodDensity(genus, species, stand = if (input$sel_PLOT != "<unselected>") inv()[, input$sel_PLOT]),
         error = function(e) e,
@@ -186,20 +188,22 @@ function(input, output, session) {
       } else { # if not a message will appear
 
         output$out_wd_error <- renderPrint({
-          print("Taxonomic levels at which wood density was attributed to trees (in %):")
+          cat("Taxonomic levels at which wood density was attributed to trees (in %):\n")
           levelswd <- 100 * table(wd()$levelWD) / nrow(wd())
           if (input$sel_PLOT != "<unselected>") {
             data.frame(
-              species = round(levelswd["species"], 1),
-              genus = round(levelswd["genus"], 1),
-              plot_level = round(sum(levelswd[!names(levelswd) %in% c("dataset", "genus", "species")]), 1),
-              dataset = round(levelswd["dataset"], 1)
+              "Species level" = round(levelswd["species"], 1),
+              "Genus level" = round(levelswd["genus"], 1),
+              "Plot level" = round(sum(levelswd[!names(levelswd) %in% c("dataset", "genus", "species")]), 1),
+              "User dataset level" = round(levelswd["dataset"], 1),
+              check.names = FALSE
             )
           } else {
             data.frame(
-              species = round(levelswd["species"], 1),
-              genus = round(levelswd["genus"], 1),
-              dataset = round(levelswd["dataset"], 1)
+              "Species level" = round(levelswd["species"], 1),
+              "Genus level" = round(levelswd["genus"], 1),
+              "User dataset level" = round(levelswd["dataset"], 1),
+              check.names = FALSE
             )
           }
         })
@@ -207,7 +211,7 @@ function(input, output, session) {
       incProgress(1, detail = "Wood density extraction completed")
     })
 
-    showElement(id = "box_TAXO_DONE")
+    show(id = "btn_TAXO_DONE")
   })
 
   # when the taxo is done
@@ -221,11 +225,10 @@ function(input, output, session) {
   })
 
 
-  # height parameters -------------------------------------------------------
+  # HEIGHT ---------------------------------------------------------------------
   observe({
-    toggleElement("box_RESULT_HDEND", condition = !is.null(input$chkgrp_HEIGHT) || input$sel_H != "<unselected>")
+    toggle("btn_HD_DONE", condition = !is.null(input$chkgrp_HEIGHT) || input$sel_H != "<unselected>")
   })
-
 
   feldRegion <- reactiveVal(c(
     Africa = "Africa",
@@ -242,8 +245,6 @@ function(input, output, session) {
     Pantropical = "Pantropical"
   ))
 
-
-
   observeEvent(input$chkgrp_HEIGHT, ignoreNULL = F, {
     id <- input$chkgrp_HEIGHT
 
@@ -258,7 +259,7 @@ function(input, output, session) {
         )
 
         # render the table
-        output$out_tab_HD <- renderTable(tab_modelHD[, -2], digits = 4)
+        output$out_tab_HD <- renderTable(tab_modelHD[, -3], digits = 4)
         # update the radio button with the method and choose the minimun of the RSE
         with(
           tab_modelHD,
@@ -289,11 +290,10 @@ function(input, output, session) {
       condition = (any(c("feld", "chave") %in% id) || long_lat)
     )
 
-    # if the user command a feldpausch region
+    # If Feldpausch box is ticked
     toggleElement("box_RESULT_FELD", condition = "feld" %in% id)
 
-
-    # if the user command a chave
+    # If Chave box is ticked
     toggleElement("box_result_chave", condition = "chave" %in% id)
   })
 
@@ -308,18 +308,15 @@ function(input, output, session) {
   })
 
 
+  ## HD model local ----------------------------------------------------------------
 
-
-
-  # HD model local ----------------------------------------------------------------
-
-  observe({
-    if ("HDloc" %in% input$chkgrp_HEIGHT & input$sel_H == "<unselected>") {
-      updateCheckboxGroupInput(session, "chkgrp_HEIGHT",
-        selected = input$chkgrp_HEIGHT[!input$chkgrp_HEIGHT %in% "HDloc"]
-      )
-    }
-  })
+  # observe({
+  #   if ("HDloc" %in% input$chkgrp_HEIGHT & input$sel_H == "<unselected>") {
+  #     updateCheckboxGroupInput(session, "chkgrp_HEIGHT",
+  #       selected = input$chkgrp_HEIGHT[!input$chkgrp_HEIGHT %in% "HDloc"]
+  #     )
+  #   }
+  # })
 
   model <- reactiveVal(label = "model HD local")
 
@@ -332,9 +329,7 @@ function(input, output, session) {
     input$rad_HDMOD
     input$chkgrp_HEIGHT
   }, ignoreNULL = F, ignoreInit = T, {
-    if (!("HDloc" %in% input$chkgrp_HEIGHT & input$sel_H != "<unselected>" & input$rad_HDMOD != "NULL")) {
-      model(NULL)
-    } else {
+    if (("HDloc" %in% input$chkgrp_HEIGHT) & (input$sel_H != "<unselected>") & (input$rad_HDMOD != "NULL")) {
       # take the data D, H, plot
       data <- setDT(inv()[, c(input$sel_DIAMETER, input$sel_H)])
       setnames(data, names(data), c("D", "H"))
@@ -370,11 +365,12 @@ function(input, output, session) {
           "\n\t - height measurements are likely not representative of tree size distribution"
         ), type = "warning")
       }
+    } else {
+      model(NULL)
     }
   })
 
-
-  # Maps + comparison of methods --------------------------------------------------------------------
+  ## Maps + comparison of methods --------------------------------------------------------------------
 
   observe({
     toggleElement("box_MAP",
@@ -423,8 +419,7 @@ function(input, output, session) {
 
     D <- seq(0, 250)
 
-
-    # Plot with the comparison of the method with ggplot
+    ### Basic plot for HD-methods comparison
     plot <- ggplot(data = NULL, aes(x = D)) +
       xlab("Diameter (cm)") +
       ylab("Predicted Height (m)") +
@@ -435,17 +430,19 @@ function(input, output, session) {
         axis.title = element_text(size = rel(1.3))
       ) +
       scale_fill_manual(values = c(HD_local = "blue", Feldpausch = "green", Chave = "red")) +
-      scale_colour_manual(values = c(HD_local = "blue", Feldpausch = "green", Chave = "red"))
+      scale_colour_manual(values = c(HD_local = "blue", Feldpausch = "green", Chave = "red")) +
+      theme_minimal()
 
 
-    # comparison of the method: comparison with the HD local
+    #### Including HD local model in comparison
     if (!is.null(model())) {
-      plot <- plot + if (length(model()[[1]]) == 2) { # if we haven't plot HD model
+
+      plot <- plot + if (input$sel_PLOT == "<unselected>") { # if Plot variable has not been provided
         geom_line(aes(y = retrieveH(D, model = model())$H, colour = "HD_local"))
-      } else { # if we have plot HD model
+      } else { # # if Plot variable has been provided
         H <- sapply(model(), function(x) {
           retrieveH(D, model = x)$H
-        }) # retrive all the data of H for the D value for each models
+        }) # retrieve all the data of H for the D value for each models
         geom_ribbon(aes(
           ymin = apply(H, 1, min, na.rm = T),
           ymax = apply(H, 1, max, na.rm = T),
@@ -470,7 +467,8 @@ function(input, output, session) {
       output$plot_MAP <- renderPlot({
         ggplot(coordinate) + xlab("longitude") + ylab("latitude") +
           mapWorld() +
-          geom_point(aes(x = longitude, y = latitude), color = "red", size = 2)
+          geom_point(aes(x = longitude, y = latitude), color = "red", size = 2) +
+          theme_minimal()
       })
     }
 
@@ -539,29 +537,25 @@ function(input, output, session) {
 
 
 
-
-
-
-  # AGB section -------------------------------------------------------------
-
+  # AGB ----
 
   AGB_sum <- reactiveVal(list(), label = "summary by plot")
   observeEvent(input$btn_AGB_DONE, {
 
+    ## Retrieving and checking parameters ----
 
     # AGB list
     AGB_res <- list()
 
-    # take the mode of AGB
+    # AGB alone or with error propagation
     AGBmod <- input$rad_AGB_MOD
 
-    # take the plot ID
+    # Retrieve plot's ID
     if (input$sel_PLOT != "<unselected>") {
       plot_id <- inv()[, input$sel_PLOT]
     } else {
       plot_id <- rep("plot", nrow(inv()))
     }
-
 
     multiple_model_loc <- F
     # if there is plot to remove from the dataset
@@ -569,12 +563,11 @@ function(input, output, session) {
       multiple_model_loc <- T
     }
 
-    # take the diameter
+    # Retrieve diameters
     D <- inv()[, input$sel_DIAMETER]
 
 
-
-    # WD treatement
+    # Retrieve WD and its uncertainties
     if (is.data.frame(wd())) {
       WD <- wd()[, "meanWD"]
       errWD <- wd()[, "sdWD"]
@@ -582,9 +575,6 @@ function(input, output, session) {
       WD <- inv()[, input$sel_WD]
       errWD <- NULL
     }
-
-
-    #### parameters verification
     if (is.null(errWD) && AGBmod != "agb") {
       shinyalert("WARNING", "Error associated with wood dentity estimates will not be accounted for \n (if you want to, please provide the genus or species at the beginning)",
         type = "warning"
@@ -592,27 +582,26 @@ function(input, output, session) {
       errWD <- rep(0, length(WD))
     }
 
-    # height treatement
+    # Retrieve heights
     if (input$sel_H != "<unselected>") {
       H <- inv()[, input$sel_H]
-    } # if H is unselected
+    }
 
-    # take the length of the input of check box for the height
+    # Get the number of height estimation's methods
     length_progression <- length(input$chkgrp_HEIGHT)
 
 
-
-    # plain color
-    # use for names too
-    color <- c(HD_local = "blue", feldpausch = "red", chave = "green", height = "black")
+    # Set method's color
+    color <- c(HD_local = "#619CFF", feldpausch = "#F8766D", chave = "#00BA38", height = "black")
 
 
 
-    ####### calculation of the AGB
+    ## Calculation of AGB ----
 
-    withProgress(message = "AGB build", value = 0, {
+    withProgress(message = "AGB calculation", value = 0, {
       newValue <- AGB_sum()
-      # if we have an HD local
+
+      # if we have an HD local model
       if ("HDloc" %in% input$chkgrp_HEIGHT) {
         AGB_res <- AGB_predict(AGBmod, D, WD, errWD, HDmodel = model(), plot = if (multiple_model_loc) plot_id)
         newValue[[names(color)[1]]] <- summaryByPlot(AGB_res, if (!multiple_model_loc) plot_id else plot_id[plot_id %in% names(model())])
@@ -638,7 +627,7 @@ function(input, output, session) {
       AGB_sum(newValue)
     })
 
-    ###### After the calculation of the AGB
+    ## Render AGB plot's ----
     # plot the output
     output$out_plot_AGB <- renderPlot({
       plot_list(AGB_sum(), color, if (multiple_model_loc) names(model()))
@@ -650,7 +639,7 @@ function(input, output, session) {
 
 
 
-  # download part -----------------------------------------------------------
+  # Download part -----------------------------------------------------------
 
 
   ##### download the report

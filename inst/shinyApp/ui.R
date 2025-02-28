@@ -1,4 +1,5 @@
 dashboardPage(
+  skin="green",
   dashboardHeader(title = "BIOMASS application"),
   dashboardSidebar(
     sidebarMenu(
@@ -14,18 +15,16 @@ dashboardPage(
     useShinyjs(),
     tabItems(
 
-      # load dataset ------------------------------------------------------------
+      # Load dataset -----------------------------------------------------------
 
       tabItem(
         "tab_LOAD",
         fluidRow(
           box( # box with the file input
             title = "Forest inventory file", width = 6,
-            fileInput("file_DATASET", "Select data file", accept = c(
-              "text/csv",
-              "text/comma-separated-values,text/plain",
-              ".csv"
-            )),
+            fileInput("file_DATASET", "Select data file",
+                      accept = c("text/csv", "text/comma-separated-values,text/plain",".csv")
+            ),
             numericInput("num_skip_line", "Skip lines", value = 0, min = 0),
             radioButtons("rad_decimal", "Decimal:", choices = c(Dot = ".",
                                                                 Comma = ","))
@@ -77,88 +76,115 @@ dashboardPage(
 
       tabItem(
         "tab_TAXO",
-        box(
-          title = "Wood density (WD) extraction", width = 12,
-          radioButtons(
-            "rad_WD", "Correct the taxonomy (mispelling) before wood density extraction?",
-            c(
-              "Correct taxonomy and extract WD" = "corr",
-              "Extract WD without taxonomic correction" = "WD"
-            )
-          ),
-          actionButton("btn_TAXO_RESULT", "Go on")
-        ),
-        hidden(boxWithId(
-          id = "box_RESULT_TAXO", title = "Result", width = 12,
-          verbatimTextOutput("out_taxo_error"),
-          hr(),
-          verbatimTextOutput("out_wd_error")
+        fluidRow(
+          box(
+            title = "Wood density (WD) extraction", width = 6,
+            radioButtons(
+              "rad_WD", "Correct the taxonomy (mispelling) before wood density extraction?",
+              c(
+                "Correct taxonomy and extract WD" = "corr",
+                "Extract WD without taxonomic correction" = "WD"
+              )
+            ),
+            actionButton("btn_TAXO_RESULT", "Go on")
         )),
-        hidden(boxWithId(id = "box_TAXO_DONE", actionButton("btn_TAXO_DONE", "continue")))
+        fluidRow(
+          hidden(boxWithId(
+            id = "box_RESULT_TAXO", title = "Results", width = 12,
+            withSpinner(
+              verbatimTextOutput("out_taxo_error"),
+              type = getOption("spinner.type", default = 5),
+              color = getOption("spinner.color", default = "#158A0C")),
+            hr(),
+            verbatimTextOutput("out_wd_error")
+          ))
+        ),
+        fluidRow(
+          column(
+            width = 12,
+            hidden(actionButton("btn_TAXO_DONE", "Continue")),
+            align = "center"
+          )
+        )
       ),
 
 
-      # heigth ------------------------------------------------------------------
+      # Height -----------------------------------------------------------------
 
 
       tabItem(
         "tab_HEIGHT",
-        box(
-          title = "HD model", width = 12,
-          checkboxGroupInput(
-            "chkgrp_HEIGHT", "Choose the HD model:",
-            inline = T,
-            c(
-              "Local HD model" = "HDloc",
-              "Feldpausch" = "feld",
-              "Chave" = "chave"
+        fluidRow(
+          box(
+            title = "Retrieving tree heights via a Height-Diameter model",
+            checkboxGroupInput(
+              "chkgrp_HEIGHT", "Choose the HD model:",
+              inline = T,
+              c(
+                "Local HD model" = "HDloc",
+                "Feldpausch" = "feld",
+                "Chave" = "chave"
+              )
             )
+        )),
+        fluidRow(
+          column( 4 ,
+            ## HD model
+            hidden(boxWithId(
+              width = 12,
+              id = "box_RESULT_HDMOD", title = "Local HD model",
+              # (model accuracy is estimated on all HD data)
+              tableOutput("out_tab_HD"),
+              radioButtons("rad_HDMOD", "Choose your local HD model:", choices = "NULL")
+            ))
+          ),
+          column( 3 ,
+            ## Feldpausch
+            hidden(boxWithId(
+              width = 12,
+              id = "box_RESULT_FELD", title = "Feldpausch et al. (2012)",
+              textOutput("txt_feld")
+            ))
+          ),
+          column( 5 ,
+            ## Chave
+            hidden(boxWithId(
+              width = 12,
+              id = "box_result_chave", title = "Chave et al. (2014)",
+              withSpinner(textOutput("txt_chave"),
+                          type = getOption("spinner.type", default = 5),
+                          color = getOption("spinner.color", default = "#158A0C")
+              )
+            )),
+            ## Map
+            hidden(boxWithId(
+              width = 12,
+              id = "box_MAP", title = "Map",
+              numericInput("num_LONG", "longitude", 3.8614, min = -180, max = 180, step = 0.01),
+              numericInput("num_LAT", "latitude", 43.652, min = -90, max = 90, step = 0.01),
+              plotOutput("plot_MAP")
+            ))
           )
         ),
-        column(
-          6,
-          ## HD model
-          hidden(boxWithId(
-            id = "box_RESULT_HDMOD", title = "Local HD model (model accuracy is estimated on all HD data)", width = 12,
-            tableOutput("out_tab_HD"),
-            radioButtons("rad_HDMOD", "Choose your HD model:", choices = "NULL")
-          )),
-
-          ## Map
-          hidden(boxWithId(
-            id = "box_MAP", title = "Map", width = 12,
-            numericInput("num_LONG", "longitude", 3.8614, min = -180, max = 180, step = 0.01),
-            numericInput("num_LAT", "latitude", 43.652, min = -90, max = 90, step = 0.01),
-            plotOutput("plot_MAP")
-          ))
+        fluidRow(
+          ## Comparison of the methods
+          column(
+            width = 12,
+            hidden(boxWithId(
+              id = "box_plot_comparison", title = "Model comparison",
+              plotOutput("out_plot_comp"),
+              align = "center"
+          )))
         ),
-
-        column(
-          6,
-          ## Feldpauch
-          hidden(boxWithId(
-            id = "box_RESULT_FELD", title = "Feldpausch et al. (2012)", width = 12,
-            textOutput("txt_feld")
-          )),
-
-          ## chave
-          hidden(boxWithId(
-            id = "box_result_chave", title = "Chave et al. (2014)", width = 12,
-            textOutput("txt_chave")
-          )),
-
-          ## comparison of the methods
-          hidden(boxWithId(
-            id = "box_plot_comparison", title = "Model comparison", width = 12,
-            plotOutput("out_plot_comp")
-          )),
-
-          hidden(boxWithId(
-            id = "box_RESULT_HDEND", title = NULL, width = 12,
-            actionButton("btn_HD_DONE", "continue")
-          ))
+        fluidRow(
+          column(
+            width = 12,
+            hidden(actionButton("btn_HD_DONE", "Continue")),
+            align = "center"
+          )
         )
       ),
+
 
 
       # AGB -----------------------------------------------------------------
@@ -166,17 +192,21 @@ dashboardPage(
         "tab_AGB",
         fluidRow(
           box(
-            title = "AGB estimation",
+            title = "AGB estimation", width = 3,
             radioButtons("rad_AGB_MOD", NULL, choices = c("AGB" = "agb", "AGB + error" = "agbe"), inline = T),
             actionButton("btn_AGB_DONE", "Go on")
           ),
           hidden(boxWithId(
             id = "box_AGB_res", title = "AGB result", width = 12,
-            plotOutput("out_plot_AGB")
+            withSpinner(plotOutput("out_plot_AGB"),
+                        type = getOption("spinner.type", default = 5),
+                        color = getOption("spinner.color", default = "#158A0C")
+            )
           )),
           hidden(boxWithId(
-            id = "box_AGB_Report", downloadButton("dwl_report", label = "Report"),
-            downloadButton("dwl_file", label = "file FOS")
+            id = "box_AGB_Report", width = 2,
+            downloadButton("dwl_report", label = "Report"),
+            downloadButton("dwl_file", label = "Download results")
           ))
         )
       )
