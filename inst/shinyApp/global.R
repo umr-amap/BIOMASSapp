@@ -93,15 +93,24 @@ AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, c
       H <- retrieveH(D, region = region)
       errH <- H$RSE
       H <- H$H
+      AGB <- AGBmonteCarlo(
+        D, Dpropag = "chave2004",
+        WD, errWD,
+        H = H, errH = errH,
+        plot = plot
+      )
     }
 
-    AGB <- AGBmonteCarlo(D, WD, errWD,
-      H = H,
-      errH = errH,
-      HDmodel = HDmodel,
-      plot = plot,
-      Dpropag = "chave2004"
-    )
+    if(!is.null(HDmodel)) { # HD local model
+      AGB <- AGBmonteCarlo(
+        D, Dpropag = "chave2004",
+        WD, errWD,
+        HDmodel = HDmodel,
+        plot = plot
+      )
+    }
+
+
   }
 
   return(AGB)
@@ -141,7 +150,9 @@ plot_list <- function(list, color, plot = NULL) {
     list <- list(comp = list)
   }
 
-  plot <- ggplot(cbind(name = names(list[1]), list[[1]]), aes(x = plot_order)) + xlab(NULL) + ylab("AGB (Mg)")
+  plot <- ggplot(cbind(name = names(list[1]), list[[1]]), aes(x = plot_order))+
+    xlab(NULL) + ylab("AGB (Mg)") +
+    theme_minimal()
 
   if (ncol(list[[1]]) > 3) {
     if (is_vector || "HD_local" %in% names(list)) {
