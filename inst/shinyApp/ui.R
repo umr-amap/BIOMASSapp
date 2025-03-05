@@ -20,52 +20,108 @@ dashboardPage(
       tabItem(
         "tab_LOAD",
         fluidRow(
-          box( # box with the file input
-            title = "Forest inventory file", width = 6,
-            fileInput("file_DATASET", "Select data file",
-                      accept = c("text/csv", "text/comma-separated-values,text/plain",".csv")
-            ),
-            numericInput("num_skip_line", "Skip lines", value = 0, min = 0),
-            radioButtons("rad_decimal", "Decimal:", choices = c(Dot = ".",
-                                                                Comma = ","))
+          column(6,
+                 box( # Forest inventory file's box
+                   title = h3("Forest inventory file"), width = 12,
+                   fileInput("file_DATASET", "Choose a CSV file",
+                             accept = c("text/csv", "text/comma-separated-values,text/plain",".csv")
+                   ),
+                   #numericInput("num_skip_line", "Skip lines", value = 0, min = 0),
+                   radioButtons("rad_decimal", "Decimal:", choices = c(Dot = ".",
+                                                                       Comma = ",")),
+                   radioButtons("rad_several_plots", "Does your dataset contain several plots?",
+                                choices = c(Yes = "several_plots", No = "single_plot"), selected = character(0)),
+                   hidden(selectInput("sel_PLOT", "Which column contains the plots IDs?", choices = NULL))
+                 ),
+                 hidden(boxWithId( # Coordinate's box
+                   id = "box_COORD", title = h3("Geographic coordinates (optional)"), width = 12,
+                   radioButtons("rad_coord", "Do you have:",
+                                choices = c("The coordinates of each tree" = "coord_each_tree",
+                                            "The coordinates of the plot(s) in another dataset (see below for an overview)" = "coord_plot",
+                                            "No coordinates" = "coord_none"),
+                                selected = character(0)),
+                   # If coordinates of each tree
+                   hidden(div(id = "id_sel_coord",
+                              selectInput("sel_LAT", "Latitude", choices = NULL),
+                              selectInput("sel_LONG", "Longitude", choices = NULL),
+                   )),
+                   # If coordinates of plot(s)
+                   hidden(div(id = "id_file_coord",
+                              fileInput("file_coord", "Choose a CSV file",
+                                        accept = c("text/csv", "text/comma-separated-values,text/plain",".csv")),
+                   )),
+                   hidden(div(id = "id_sel_coord_plot",
+                              selectInput("sel_LAT_sup_coord", "Latitude", choices = NULL),
+                              selectInput("sel_LONG_sup_coord", "Longitude", choices = NULL)
+                   )),
+                  # If coordinates of plots and several plots
+                  hidden(selectInput("sel_plot_coord", "Plots IDs", choices = NULL))
+                 ))
           ),
+          column(6,
+                 hidden(boxWithId( # AGB inputs box
+                   id = "box_FIELDS", title = h3("Required parameters"), width = 12,
+                   hr(),
 
-          hidden(boxWithId( # box for the input
-            id = "box_FIELDS", title = "Column selection", width = 6,
+                   ## Diameter (compulsory) ----
+                   h4("Diameter"),
+                   column(9, selectInput("sel_DIAMETER", "", choices = NULL)),
+                   column(3, radioButtons("rad_units_diameter", "Unit:", choices = c("mm", "cm", "m"), selected = "cm")),
+                   hr(), hr(), hr(), #just to get one horizontal row
 
-            # obligatory argument
-            column(9, selectInput("sel_DIAMETER", "Diameter", choices = NULL)),
-            column(3, radioButtons("rad_units_diameter", "Unit:", choices = c("mm", "cm", "m"), selected = "cm")),
+                   ## Wood density or taxonmy (compulsory) ----
+                   hr(), hr(), hr(),
+                   h4("Wood density or taxonomy"),
+                   selectInput("sel_WD", "Wood density", choices = NULL),
+                   selectInput("sel_GENUS", "Genus (e.g. Terminalia) or scientific name)", choices = NULL),
+                   selectInput("sel_SPECIES", "Species (e.g. superba)", choices = NULL),
+                   hidden(div("Impossible combination", id = "msg_wd", style = "color:red;")),
 
-            # wood density argument
-            hr(),
-            h4("Provide either wood density values or the taxonomy"),
-            selectInput("sel_WD", "Wood density", choices = NULL),
-            selectInput("sel_GENUS", "Genus (e.g. Terminalia) or scientific name (e.g. Terminalia superba or Terminalia superba Engl. & Diels)", choices = NULL),
-            selectInput("sel_SPECIES", "Species (e.g. superba)", choices = NULL),
-            hidden(div("Impossible combination", id = "msg_wd", style = "color:red;")),
+                   ## Height ----
+                   hr(),
+                   h4("Height"),
+                   radioButtons("rad_height", "Do you have:",
+                                choices = c("The height of each tree" = "h_each_tree",
+                                            "The height of some trees" = "h_some_tree",
+                                            "A subset of well-measured trees in another dataset (see below for an overview)" = "h_sup_data",
+                                            "No height measurements (use coordinates to estimate height)" = "h_none"),
+                                selected = character(0)),
+                   # If height of each tree or some trees
+                   hidden(div(id = "id_sel_h",
+                              column(9 , selectInput("sel_H", "Select height column", choices = NULL)),
+                              column(3, radioButtons("rad_units_height", "Unit:", choices = c("cm", "m"), selected = "m"))
+                   )),
+                   # If height in another dataset
+                   hidden(div(id = "id_file_h_sup",
+                              fileInput("file_h_sup", "Choose a CSV file",
+                                        accept = c("text/csv", "text/comma-separated-values,text/plain",".csv")),
+                              selectInput("sel_D_sup_data", "Diameter", choices = NULL),
+                              selectInput("sel_H_sup_data", "Height", choices = NULL)
+                   )),
 
-            # Height argument
-            hr(),
-            h4("Optional"),
-            column(9, selectInput("sel_H", "Height", choices = NULL)),
-            column(3, radioButtons("rad_units_height", "Unit:", choices = c("cm", "m"), selected = "m")),
-            selectInput("sel_LONG", "Coordinate longitude", choices = NULL),
-            selectInput("sel_LAT", "Coordinate latitude", choices = NULL),
-            hidden(div("Impossible combination", id = "msg_h", style = "color:red;")),
-
-            # plot id
-            hr(),
-            selectInput("sel_PLOT", "Plot name", choices = NULL),
-
-            # action button to continue
-            hr(),
-            actionButton("btn_DATASET_LOADED", "Continue", color = "#0040FF")
-          )),
-
+                   # action button to continue
+                   hr(),
+                   actionButton("btn_DATASET_LOADED", "Continue", color = "#0040FF")
+                 )))),
+        # Inventory data preview
+        fluidRow(
           hidden(boxWithId(
-            id = "box_DATASET", title = "Inventory file preview content", width = 12,
+            id = "box_DATASET", title = "Preview of forest inventory data", width = 12,
             DT::DTOutput("table_DATASET")
+          ))
+        ),
+        # Coordinates data preview
+        fluidRow(
+          hidden(boxWithId(
+            id = "box_coord_preview", title = "Preview of plot's coordinates data", width = 12,
+            DT::DTOutput("table_coord")
+          ))
+        ),
+        # Supplementary H-D data preview
+        fluidRow(
+          hidden(boxWithId(
+            id = "box_h_sup_preview", title = "Preview of Height-Diameter supplementary data", width = 12,
+            DT::DTOutput("table_h_sup")
           ))
         )
       ),
@@ -81,10 +137,8 @@ dashboardPage(
             title = "Wood density (WD) extraction", width = 6,
             radioButtons(
               "rad_WD", "Correct the taxonomy (mispelling) before wood density extraction?",
-              c(
-                "Correct taxonomy and extract WD" = "corr",
-                "Extract WD without taxonomic correction" = "WD"
-              )
+              c("Correct taxonomy and extract WD" = "corr",
+                "Extract WD without taxonomic correction" = "WD")
             ),
             actionButton("btn_TAXO_RESULT", "Go on")
         )),

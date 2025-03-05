@@ -16,16 +16,17 @@ function(input, output, session) {
   # LOAD DATASET ---------------------------------------------------------------
 
   inv <- reactiveVal(label = "data frame")
+  ## Forest inventory file actions ----
   observeEvent(ignoreInit = T, {
     input$file_DATASET
-    input$num_skip_line
+    #input$num_skip_line
     input$rad_decimal
   }, {
-    # file importation
+    # Read forest inventory upload
     if (!is.null(input$file_DATASET)) {
       inv(fread(
         file = input$file_DATASET$datapath,
-        skip = ifelse(is.na(input$num_skip_line) || input$num_skip_line == 0, "__auto__", input$num_skip_line),
+        #skip = ifelse(is.na(input$num_skip_line) || input$num_skip_line == 0, "__auto__", input$num_skip_line),
         data.table = F,
         dec = input$rad_decimal
       ))
@@ -33,47 +34,104 @@ function(input, output, session) {
       # show the box
       showElement("box_FIELDS")
       showElement("box_DATASET")
+      showElement("box_COORD")
 
-      # show the content
-      output$table_DATASET <- renderDT(inv(),
-                                       options = list(scrollX = TRUE))
+      # show forest inventory content
+      output$table_DATASET <- renderDT(inv(), options = list(scrollX = TRUE))
 
-      int_num_col <- names(inv())[ sapply(inv(), class) %in% c("integer", "numeric") ]
 
-      # fill the selector with the column name
-      for (id in c("sel_DIAMETER", "sel_WD", "sel_H", "sel_LONG", "sel_LAT")) {
+      # update the values of the select inputs with the column names
+      int_num_col <- names(inv())[ sapply(inv(), class) %in% c("integer", "numeric")]
+      for (id in c("sel_DIAMETER", "sel_WD")) {
         updateSelectInput(session, id, choices = c("<unselected>", int_num_col))
       }
-
       char_col <- names(inv())[ sapply(inv(), class) %in% "character" ]
-
       for (id in c("sel_GENUS", "sel_SPECIES")) {
         updateSelectInput(session, id, choices = c("<unselected>", char_col))
       }
-
       name <- names(inv())
-      updateSelectInput(session, "sel_PLOT", choices = c("<unselected>", name))
     }
   })
 
-  # If the diameter is unselected => red box
-  observeEvent(input$sel_DIAMETER, {
-    feedbackDanger("sel_DIAMETER",
-      show = input$sel_DIAMETER == "<unselected>",
-      text = "Compulsory argument"
-    )
+  # Plot's IDs selection when several plots
+  observeEvent(input$rad_several_plots, {
+    updateSelectInput(session, "sel_PLOT", choices = c("<unselected>", names(inv())))
+    toggleElement("sel_PLOT", condition = input$rad_several_plots == "several_plots")
   })
 
-  # If the diameter is unselected => yellow box
-  observeEvent(input$sel_PLOT, {
-    feedbackWarning("sel_PLOT",
-      show = input$sel_PLOT == "<unselected>",
-      text = "Optional (if you want to get AGB estimates per plot)"
-    )
+  ## Height ----
+  ### height radio button actions ----
+  observeEvent(input$rad_height, {
+    int_num_col <- names(inv())[ sapply(inv(), class) %in% c("integer", "numeric")]
+    updateSelectInput(session, "sel_H", choices = c("<unselected>", int_num_col))
+    toggleElement("id_sel_h",
+                  condition = input$rad_height %in% c("h_each_tree","h_some_tree"))
+    toggleElement("id_file_h_sup",
+                  condition = input$rad_height == "h_sup_data")
+  })
+  ### height file actions ----
+  observeEvent(input$file_h_sup, {
+    # Read HD supplementary dataset
+    if (!is.null(input$file_h_sup)) {
+      rv_h_sup <- reactiveVal(label = "data frame")
+      rv_h_sup(fread(
+        file = input$file_h_sup$datapath,
+        data.table = F))
+
+      # show coordinates table content
+      output$table_h_sup <- renderDT(rv_h_sup(),
+                                     options = list(scrollX = TRUE))
+      toggleElement("box_h_sup_preview", condition = input$rad_height == "h_sup_data")
+
+      # Update Diameter & Height seletions
+      int_num_col <- names(rv_h_sup())[ sapply(rv_h_sup(), class) %in% c("integer", "numeric") ]
+      updateSelectInput(session, "sel_D_sup_data", choices = c("<unselected>", int_num_col))
+      updateSelectInput(session, "sel_H_sup_data", choices = c("<unselected>", int_num_col))
+    }
+  })
+
+  ## Coordinates ----
+  ### coordinates radio button actions ----
+  observeEvent(input$rad_coord, {
+    if(input$rad_coord == "coord_each_tree") {
+      # Show latitude and longitude select inputs for forest inventory table
+      int_num_col <- names(inv())[ sapply(inv(), class) %in% c("integer", "numeric")]
+      updateSelectInput(session, "sel_LAT", choices = c("<unselected>", int_num_col))
+      updateSelectInput(session, "sel_LONG", choices = c("<unselected>", int_num_col))
+    }
+    toggleElement("id_sel_coord", condition = input$rad_coord == "coord_each_tree") # show latitude & longitude selection from forest inventory data
+    toggleElement("id_file_coord", condition = input$rad_coord == "coord_plot") # show file input
+    toggleElement("id_sel_coord_plot", condition = input$rad_coord == "coord_plot") # show latitude & longitude selection from coordinates data
+    toggleElement("sel_plot_coord", # show plot ID selection
+                  condition = input$rad_coord == "coord_plot" &
+                    !is.null(input$rad_several_plots) &&
+                    input$rad_several_plots == "several_plots")
+  })
+
+  ### coordinates file actions  ----
+  observeEvent(input$file_coord, {
+    # Read plot coordinates upload
+    if (!is.null(input$file_coord)) {
+      rv_coord <- reactiveVal(label = "data frame")
+      rv_coord(fread(
+        file = input$file_coord$datapath,
+        data.table = F))
+
+      # show coordinates table content
+      output$table_coord <- renderDT(rv_coord(),
+                                     options = list(scrollX = TRUE))
+      toggleElement("box_coord_preview", condition = input$rad_coord == "coord_plot")
+
+      # Update latitude & longitude & plot's IDs selections
+      int_num_col <- names(rv_coord())[ sapply(rv_coord(), class) %in% c("integer", "numeric") ]
+      updateSelectInput(session, "sel_LAT_sup_coord", choices = c("<unselected>", int_num_col))
+      updateSelectInput(session, "sel_LONG_sup_coord", choices = c("<unselected>", int_num_col))
+      updateSelectInput(session, "sel_plot_coord", choices = c("<unselected>", names(rv_coord())))
+    }
   })
 
 
-  # error when the user click on the button on the first page
+  ## Errors management when clicking on continue ----
   observeEvent(input$btn_DATASET_LOADED, {
     error <- F
     if (input$sel_DIAMETER == "<unselected>") { # if diameter is not selected
@@ -82,11 +140,11 @@ function(input, output, session) {
     } else if (!xor(input$sel_WD == "<unselected>", input$sel_GENUS == "<unselected>")) {
       # if the wd is not selected or genus not selected but not the two
       error <- T
-      shinyalert("Oops!", "Please either select the wood density or genus and species or genus", type = "error")
-    } else if (xor(input$sel_LONG == "<unselected>", input$sel_LAT == "<unselected>")) {
+      shinyalert("Oops!", "To estimate the Above Ground Biomass, you either need the wood density or the taxonomy of the trees", type = "error")
+    } else if (input$rad_height == "h_none" & xor(input$sel_LONG == "<unselected>", input$sel_LAT == "<unselected>")) {
       # if the H is not selected and one of the two (long or lat) is not selected
       error <- T
-      shinyalert("Oops!", "Please either select or deselect both the longitude and latitude", type = "error")
+      shinyalert("Oops!", "To estimate tree heights, you either need a subset of well-measured trees or the coordinates of the plots", type = "error")
     } else if (input$sel_WD == "<unselected>") {
       # if the WD is not selected then show the tab TAXO
       showMenuItem("tab_TAXO")
@@ -109,6 +167,14 @@ function(input, output, session) {
     }
   })
 
+  ## Warnings ----
+  # If the diameter is unselected => red box
+  observeEvent(input$sel_DIAMETER, {
+    feedbackDanger("sel_DIAMETER",
+                   show = input$sel_DIAMETER == "<unselected>",
+                   text = "Compulsory argument"
+    )
+  })
   # if the wd is not selected or genus not selected but not the two
   observe({
     toggleElement("msg_wd",
@@ -116,16 +182,6 @@ function(input, output, session) {
         !xor(input$sel_WD == "<unselected>", input$sel_GENUS == "<unselected>")
     )
   })
-
-  # for the height long lat
-  observe({
-    toggleElement("msg_h",
-      condition = xor(input$sel_LONG == "<unselected>", input$sel_LAT == "<unselected>")
-    )
-  })
-
-
-
 
 
   # TAXONOMY -------------------------------------------------------------------
