@@ -41,7 +41,7 @@ jobs:
         - name: Create R Shinylive App from working directory files
           shell: Rscript {0}
           run: |
-           shinylive::export(".", "_site")
+           shinylive::export("inst/shinyApp/", "_site")
 
         # Upload a tar file that will work with GitHub Pages
         # Make sure to set a retention day to avoid running into a cap
