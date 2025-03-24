@@ -19,38 +19,36 @@ function(input, output, session) {
   ## Forest inventory file actions ----
   observeEvent(ignoreInit = T, {
     input$file_DATASET
-    #input$num_skip_line
     input$rad_decimal
+    #input$num_skip_line
   }, {
     # Read forest inventory upload
-    if (!is.null(input$file_DATASET)) {
-      inv(fread(
-        file = input$file_DATASET$datapath,
-        #skip = ifelse(is.na(input$num_skip_line) || input$num_skip_line == 0, "__auto__", input$num_skip_line),
-        data.table = F,
-        dec = input$rad_decimal
-      ))
+    inv(fread(
+      file = req(input$file_DATASET)$datapath,
+      #skip = ifelse(is.na(input$num_skip_line) || input$num_skip_line == 0, "__auto__", input$num_skip_line),
+      data.table = F,
+      dec = input$rad_decimal
+    ))
 
-      # show the box
-      showElement("box_FIELDS")
-      showElement("box_DATASET")
-      showElement("box_COORD")
+    # show the box
+    showElement("box_FIELDS")
+    showElement("box_DATASET")
+    showElement("box_COORD")
 
-      # show forest inventory content
-      output$table_DATASET <- renderDT(inv(), options = list(scrollX = TRUE))
+    # show forest inventory content
+    output$table_DATASET <- renderDT(inv(), options = list(scrollX = TRUE))
 
 
-      # update the values of the select inputs with the column names
-      int_num_col <- names(inv())[ sapply(inv(), class) %in% c("integer", "numeric")]
-      for (id in c("sel_DIAMETER", "sel_WD")) {
-        updateSelectInput(session, id, choices = c("<unselected>", int_num_col))
-      }
-      char_col <- names(inv())[ sapply(inv(), class) %in% "character" ]
-      for (id in c("sel_GENUS", "sel_SPECIES")) {
-        updateSelectInput(session, id, choices = c("<unselected>", char_col))
-      }
-      name <- names(inv())
+    # update the values of the select inputs with the column names
+    int_num_col <- names(inv())[ sapply(inv(), class) %in% c("integer", "numeric")]
+    for (id in c("sel_DIAMETER", "sel_WD")) {
+      updateSelectInput(session, id, choices = c("<unselected>", int_num_col))
     }
+    char_col <- names(inv())[ sapply(inv(), class) %in% "character" ]
+    for (id in c("sel_GENUS", "sel_SPECIES")) {
+      updateSelectInput(session, id, choices = c("<unselected>", char_col))
+    }
+    name <- names(inv())
   })
 
   # Plot's IDs selection when several plots
@@ -59,35 +57,45 @@ function(input, output, session) {
     toggleElement("sel_PLOT", condition = input$rad_several_plots == "several_plots")
   })
 
+  # Hide/Show "information required" message
+  observe(
+    if( (req(input$rad_several_plots) == "single_plot") | (req(input$rad_several_plots) =="several_plots" & ! req(input$sel_PLOT) %in% c("<unselected>","")) ) {
+      hideElement("msg_several_plots")
+    } else {
+      showElement("msg_several_plots")
+    }
+  )
+
   ## Height ----
   ### height radio button actions ----
   observeEvent(input$rad_height, {
     int_num_col <- names(inv())[ sapply(inv(), class) %in% c("integer", "numeric")]
     updateSelectInput(session, "sel_H", choices = c("<unselected>", int_num_col))
+    updateSelectInput(session, "sel_HDmodel_by", choices = c("<unselected>", names(inv())))
     toggleElement("id_sel_h",
                   condition = input$rad_height %in% c("h_each_tree","h_some_tree"))
+    toggleElement("id_sel_HDmodel_by",
+                  condition = input$rad_height == "h_some_tree")
     toggleElement("id_file_h_sup",
                   condition = input$rad_height == "h_sup_data")
   })
   ### height file actions ----
-  observeEvent(input$file_h_sup, {
+  observeEvent(req(input$file_h_sup), {
     # Read HD supplementary dataset
-    if (!is.null(input$file_h_sup)) {
-      rv_h_sup <- reactiveVal(label = "data frame")
-      rv_h_sup(fread(
-        file = input$file_h_sup$datapath,
-        data.table = F))
+    rv_h_sup <- reactiveVal(label = "data frame")
+    rv_h_sup(fread(
+      file = req(input$file_h_sup)$datapath,
+      data.table = F))
 
-      # show coordinates table content
-      output$table_h_sup <- renderDT(rv_h_sup(),
-                                     options = list(scrollX = TRUE))
-      toggleElement("box_h_sup_preview", condition = input$rad_height == "h_sup_data")
+    # show coordinates table content
+    output$table_h_sup <- renderDT(rv_h_sup(),
+                                   options = list(scrollX = TRUE))
+    toggleElement("box_h_sup_preview", condition = input$rad_height == "h_sup_data")
 
-      # Update Diameter & Height seletions
-      int_num_col <- names(rv_h_sup())[ sapply(rv_h_sup(), class) %in% c("integer", "numeric") ]
-      updateSelectInput(session, "sel_D_sup_data", choices = c("<unselected>", int_num_col))
-      updateSelectInput(session, "sel_H_sup_data", choices = c("<unselected>", int_num_col))
-    }
+    # Update Diameter & Height seletions
+    int_num_col <- names(rv_h_sup())[ sapply(rv_h_sup(), class) %in% c("integer", "numeric") ]
+    updateSelectInput(session, "sel_D_sup_data", choices = c("<unselected>", int_num_col))
+    updateSelectInput(session, "sel_H_sup_data", choices = c("<unselected>", int_num_col))
   })
 
   ## Coordinates ----
@@ -111,48 +119,91 @@ function(input, output, session) {
   ### coordinates file actions  ----
   observeEvent(input$file_coord, {
     # Read plot coordinates upload
-    if (!is.null(input$file_coord)) {
-      rv_coord <- reactiveVal(label = "data frame")
-      rv_coord(fread(
-        file = input$file_coord$datapath,
-        data.table = F))
+    rv_coord <- reactiveVal(label = "data frame")
+    rv_coord(fread(
+      file = req(input$file_coord)$datapath,
+      data.table = F))
 
-      # show coordinates table content
-      output$table_coord <- renderDT(rv_coord(),
-                                     options = list(scrollX = TRUE))
-      toggleElement("box_coord_preview", condition = input$rad_coord == "coord_plot")
+    # show coordinates table content
+    output$table_coord <- renderDT(rv_coord(),
+                                   options = list(scrollX = TRUE))
+    toggleElement("box_coord_preview", condition = input$rad_coord == "coord_plot")
 
-      # Update latitude & longitude & plot's IDs selections
-      int_num_col <- names(rv_coord())[ sapply(rv_coord(), class) %in% c("integer", "numeric") ]
-      updateSelectInput(session, "sel_LAT_sup_coord", choices = c("<unselected>", int_num_col))
-      updateSelectInput(session, "sel_LONG_sup_coord", choices = c("<unselected>", int_num_col))
-      updateSelectInput(session, "sel_plot_coord", choices = c("<unselected>", names(rv_coord())))
-    }
+    # Update latitude & longitude & plot's IDs selections
+    int_num_col <- names(rv_coord())[ sapply(rv_coord(), class) %in% c("integer", "numeric") ]
+    updateSelectInput(session, "sel_LAT_sup_coord", choices = c("<unselected>", int_num_col))
+    updateSelectInput(session, "sel_LONG_sup_coord", choices = c("<unselected>", int_num_col))
+    updateSelectInput(session, "sel_plot_coord", choices = c("<unselected>", names(rv_coord())))
   })
 
 
   ## Errors management when clicking on continue ----
   observeEvent(input$btn_DATASET_LOADED, {
     error <- F
-    if (input$sel_DIAMETER == "<unselected>") { # if diameter is not selected
+    if ( is.null(input$rad_several_plots) ) {
+      # if the plot number information is not provide
+      error <- T
+      shinyalert("Oops!", "You need to answer to the question : Does your dataset contain several plots?", type = "error")
+    } else if (input$rad_several_plots =="several_plots" && input$sel_PLOT == "<unselected>" ) {
+      # if the column corresponding to the plot IDs is unselected
+      error <- T
+      shinyalert("Oops!", "The column containing the plots IDs is unselected", type = "error")
+    } else if (input$sel_DIAMETER == "<unselected>") { # if diameter is not selected
       error <- T
       shinyalert("Oops!", "D is unselected", type = "error")
     } else if (!xor(input$sel_WD == "<unselected>", input$sel_GENUS == "<unselected>")) {
       # if the wd is not selected or genus not selected but not the two
       error <- T
       shinyalert("Oops!", "To estimate the Above Ground Biomass, you either need the wood density or the taxonomy of the trees", type = "error")
-    } else if (input$rad_height == "h_none" & xor(input$sel_LONG == "<unselected>", input$sel_LAT == "<unselected>")) {
-      # if the H is not selected and one of the two (long or lat) is not selected
+    } else if (is.null(input$rad_height)) {
+      # if the H radio button has not been ticked
+      error <- T
+      shinyalert("Oops!", "Height information has not been provided", type = "error")
+    } else if ( input$rad_height %in% c("h_each_tree","h_some_tree") && input$sel_H == "<unselected>" ) {
+      # if the H column is unselected
+      error <- T
+      shinyalert("Oops!", "Height column is unselected", type = "error")
+    } else if ( input$rad_height == "h_sup_data" && is.null(input$file_h_sup)){
+      # if the H-D relationship is in another dataset which have not been loaded
+      error <- T
+      shinyalert("Oops!", "The dataset containing a subset of well-measured trees has not been loaded", type = "error")
+    } else if ( input$rad_height == "h_sup_data" && (input$sel_H_sup_data == "<unselected>" | input$sel_D_sup_data == "<unselected>") ){
+      # if the H or D column (of the sup dataset containing H-D relationship) are unselected
+      error <- T
+      shinyalert("Oops!", "Diameter and/or Height column(s) of the dataset containing a subset of well-measured trees is/are unselected ", type = "error")
+    } else if (input$rad_height == "h_none" && (is.null(input$rad_coord) || input$rad_coord %in% c("","coord_none"))  ) {
+      # if no height measurements and no coordinates
       error <- T
       shinyalert("Oops!", "To estimate tree heights, you either need a subset of well-measured trees or the coordinates of the plots", type = "error")
+    } else if (!is.null(input$rad_coord) && input$rad_coord == "coord_each_tree" & (input$sel_LONG == "<unselected>" | input$sel_LAT == "<unselected>")) {
+      # if the coordinates of each tree is ticked but one of the two (long or lat) is not selected
+      error <- T
+      shinyalert("Oops!", "Tree's longitude and/or latitude is/are unselected", type = "error")
+    } else if (!is.null(input$rad_coord) && input$rad_coord == "coord_plot" & is.null(input$file_coord) ) {
+      # if the coordinates of the plots (in another dataset) is ticked but the dataset has not been loaded
+      error <- T
+      shinyalert("Oops!", "The dataset containing the coordinates of the plot(s) has not been loaded", type = "error")
+    } else if (!is.null(input$rad_coord) && input$rad_coord == "coord_plot" & (input$sel_LAT_sup_coord == "<unselected>" | input$sel_LAT_sup_coord == "<unselected>") ) {
+      # if the Latitude or Longitude column (of the sup dataset containing plot's coordinates) are unselected
+      error <- T
+      shinyalert("Oops!", "Latitude and/or Longitude column(s) of the dataset containing the coordinates of the plot(s) is/are unselected ", type = "error")
+    } else if (!is.null(input$rad_coord) && input$rad_coord == "coord_plot" & input$rad_several_plots == "several_plots" & input$sel_plot_coord == "<unselected>") {
+      # if the plots IDs column for sup coord is unselected
+      error <- T
+      shinyalert("Oops!", "Plots IDs of the dataset containing the coordinates of the plot(s) is unselected ", type = "error")
     } else if (input$sel_WD == "<unselected>") {
       # if the WD is not selected then show the tab TAXO
       showMenuItem("tab_TAXO")
       updateTabItems(session, "mnu_MENU", "tab_TAXO")
-    } else {
-      # else show the height tab
-      showMenuItem("tab_HEIGHT")
-      updateTabItems(session, "mnu_MENU", "tab_HEIGHT")
+    } else { # If no error
+      if (input$rad_height == "h_each_tree") { # if heights are not to estimate
+        showMenuItem("tab_AGB")
+        updateTabItems(session, "mnu_MENU", "tab_AGB")
+      } else {
+        # else show the height tab
+        showMenuItem("tab_HEIGHT")
+        updateTabItems(session, "mnu_MENU", "tab_HEIGHT")
+      }
     }
 
     if (!error) {
@@ -282,10 +333,13 @@ function(input, output, session) {
 
 
   # HEIGHT ---------------------------------------------------------------------
+
+  # Affichage du boutton Done : il faut au moins une des cases du model choisi et c'est tout ???
   observe({
-    toggle("btn_HD_DONE", condition = !is.null(input$chkgrp_HEIGHT) || input$sel_H != "<unselected>")
+    toggle("btn_HD_DONE", condition = !is.null(input$chkgrp_HEIGHT))
   })
 
+  # feldRgion en reactiveVal ??
   feldRegion <- reactiveVal(c(
     Africa = "Africa",
     CAfrica = "Central Africa",
@@ -301,44 +355,115 @@ function(input, output, session) {
     Pantropical = "Pantropical"
   ))
 
-  observeEvent(input$chkgrp_HEIGHT, ignoreNULL = F, {
-    id <- input$chkgrp_HEIGHT
+  # If Local HD model, Feldpausch or Chave :
+  #observeEvent(input$chkgrp_HEIGHT, ignoreNULL = F, {
+  observe({
 
-    ## If they want to construct an HD model
-    if ("HDloc" %in% id) {
-      if (input$sel_H != "<unselected>") { # if there is H selected
+    print("prout")
 
-        # Do the HD model
-        tab_modelHD <- modelHD(
-          D = inv()[, input$sel_DIAMETER],
-          H = inv()[, input$sel_H]
-        )
+    ## HD local model ----------------------------------------------------------
+    if ("HDloc" %in% req(input$chkgrp_HEIGHT)) {
 
-        # render the table
-        output$out_tab_HD <- renderTable(tab_modelHD[, -3], digits = 4)
-        # update the radio button with the method and choose the minimun of the RSE
-        with(
-          tab_modelHD,
-          updateRadioButtons(session,
-            inputId = "rad_HDMOD",
-            choices = method,
-            selected = method[which.min(RSE)],
-            inline = T
-          )
-        )
-
-        # show the box for the result of HDmod
-        showElement("box_RESULT_HDMOD")
-      } else {
-        shinyalert(title = "Oops", text = "Local height measurements have not been provided", type = "error")
-        updateCheckboxGroupInput(session, "chkgrp_HEIGHT",
-          selected = input$chkgrp_HEIGHT[!input$chkgrp_HEIGHT %in% "HDloc"]
-        )
+      if (input$rad_height == "h_none") { # if no height at all, not possible
+        shinyalert("Oops", "Local HD model cannot be build if no height measurements have been provided.", type = "error")
       }
+
+      ### Formatting the dataset which will be used to build the models
+      #hd_data <- reactiveVal(label = "HD data") # hd_data must be reactive to changes in column selection
+
+      if (input$rad_height == "h_some_tree") { # if height of some trees in the same dataset
+        #hd_data(setDT(inv()[, c(input$sel_DIAMETER, input$sel_H)]))
+        hd_data <- setDT(inv()[, c(input$sel_DIAMETER, input$sel_H)])
+        if(input$sel_HDmodel_by != "<unselected>"){ # if one model by plot or region or whatever
+          #hd_data()[, model_by := input$sel_HDmodel_by]
+          hd_data[, model_by := input$sel_HDmodel_by]
+          # remove all the plots with less than 15 non NA value
+          removedPlot <- unique(hd_data()[, .(nbNonNA = sum(!is.na(H))), by = model_by][nbNonNA < 15, model_by])
+          hd_data()[!model_by %in% removedPlot]
+          # remove plots for which D is not well distributed --> WHY ???
+          hd_data()[, quantile := findInterval(D, c(-1, quantile(D, probs = c(0.5, 0.75)), max(D) + 1)), by = model_by]
+          removedPlot <- c(removedPlot, unique(hd_data()[, .N, by = .(model_by, quantile)][N < 3, model_by]))
+          hd_data()[!model_by %in% removedPlot]
+          # if there is a least one plot in the removed plot -> warning message
+          if (length(removedPlot) != 0) {
+            shinyalert("Oops", paste(
+              "Local HD model cannot be built for:",
+              paste(removedPlot, collapse = ", "),
+              "\n either:",
+              "\n\t - there are not enough local height measurements",
+              "\n\t - height measurements are likely not representative of tree size distribution",
+              "\n You may have to build a single model grouping all the plots together by unselecting corresponding column."
+            ), type = "warning")
+          }
+        }
+      }
+
+      if (input$rad_height == "h_sup_data") { # if height in another dataset
+        hd_data(setDT(rv_h_sup()[, c(input$sel_D_sup_data, input$sel_H_sup_data)]))
+      }
+
+      # Setting D and H column names of hd_data()
+      #setnames(hd_data(), names(hd_data())[1:2], c("D", "H"))
+      setnames(hd_data, names(hd_data)[1:2], c("D", "H"))
+
+      #print(summary(hd_data()$H))
+      print(summary(hd_data$H))
+
+      ### Building and compare the 4 local HD models
+      tab_modelHD <- modelHD(
+        #D = hd_data()$D,
+        D = hd_data$D,
+        #H = hd_data()$H,
+        H = hd_data$H,
+        plot = ifelse(test = req(input$sel_HDmodel_by) != "<unselected>", yes = inv()[, input$sel_HDmodel_by], no = "all")
+      )
+      # render the table
+      output$out_tab_HD <- renderTable(tab_modelHD[, -3], digits = 4)
+      # update the radio button with the method and choose the minimun of the RSE
+      if(req(input$rad_HDMOD) != tab_modelHD$method[which.min(tab_modelHD$RSE)]) {
+        updateRadioButtons(session,
+                           inputId = "rad_HDMOD",
+                           choices = tab_modelHD$method,
+                           selected = tab_modelHD$method[which.min(tab_modelHD$RSE)],
+                           inline = T)
+      }
+
+
+      # with(
+      #   tab_modelHD,
+      #   updateRadioButtons(session,
+      #     inputId = "rad_HDMOD",
+      #     choices = method,
+      #     selected = method[which.min(RSE)],
+      #     inline = T
+      #   )
+      # )
+
+      ### Building the model with the lowest RMSE or chosen by the user
+      #hd_model <- reactiveVal(label = "HD local model")
+      #hd_model(tryCatch({
+      hd_model <- (tryCatch({
+        modelHD(
+          #D = hd_data()$D,
+          D = hd_data$D,
+          #H = hd_data()$H,
+          H = hd_data$H,
+          method = input$rad_HDMOD,
+          plot = ifelse(input$sel_HDmodel_by != "<unselected>", yes = inv()[, input$sel_HDmodel_by], no = "all"),
+          useWeight = T
+        )
+      }, error = function(e) NULL, warning = function(e) NULL, message = function(e) NULL))
+
+      ### Show the box containing the result of hd_model
+      showElement("box_RESULT_HDMOD")
+
     } else {
       hideElement("box_RESULT_HDMOD")
     }
 
+    # Feldpausch method --------------------------------------------------------
+
+    if ("feld" %in% input$chkgrp_HEIGHT) {
 
     long_lat <- input$sel_LONG != "<unselected>" && input$sel_LAT != "<unselected>"
 
@@ -351,6 +476,7 @@ function(input, output, session) {
 
     # If Chave box is ticked
     toggleElement("box_result_chave", condition = "chave" %in% id)
+    }
   })
 
 
@@ -364,8 +490,6 @@ function(input, output, session) {
   })
 
 
-  ## HD model local ----------------------------------------------------------------
-
   # observe({
   #   if ("HDloc" %in% input$chkgrp_HEIGHT & input$sel_H == "<unselected>") {
   #     updateCheckboxGroupInput(session, "chkgrp_HEIGHT",
@@ -374,76 +498,63 @@ function(input, output, session) {
   #   }
   # })
 
-  model <- reactiveVal(label = "model HD local")
-
-  observeEvent({
-    if (input$btn_DATASET_LOADED >= 1) {
-      input$sel_PLOT
-      input$sel_H
-      input$sel_DIAMETER
-    }
-    input$rad_HDMOD
-    input$chkgrp_HEIGHT
-  }, ignoreNULL = F, ignoreInit = T, {
-    if (("HDloc" %in% input$chkgrp_HEIGHT) & (input$sel_H != "<unselected>") & (input$rad_HDMOD != "NULL")) {
-      # take the data D, H, plot
-      data <- setDT(inv()[, c(input$sel_DIAMETER, input$sel_H)])
-      setnames(data, names(data), c("D", "H"))
-      data[, plot := if (input$sel_PLOT == "<unselected>") "plot" else inv()[, input$sel_PLOT]]
-
-      # remove all the plots with 15 non NA value
-      removedPlot <- unique(data[, .(nbNonNA = sum(!is.na(H))), by = plot][nbNonNA < 15, plot])
-      data <- data[!plot %in% removedPlot]
-
-      # remove the plots where there the plot is not really distributed
-      data[, quantile := findInterval(D, c(-1, quantile(D, probs = c(0.5, 0.75)), max(D) + 1)), by = plot]
-      removedPlot <- c(removedPlot, unique(data[, .N, by = .(plot, quantile)][N < 3, plot]))
-      data <- data[!plot %in% removedPlot]
-
-      # do the model
-      model(tryCatch({
-        modelHD(
-          D = data$D,
-          H = data$H,
-          method = input$rad_HDMOD,
-          plot = data$plot,
-          useWeight = T
-        )
-      }, error = function(e) NULL, warning = function(e) NULL, message = function(e) NULL))
-
-      # if there is a least one plot in the removed plot -> warning message
-      if (length(removedPlot) != 0) {
-        shinyalert("Oops", paste(
-          "Local HD model cannot be built for plot(s):",
-          paste(removedPlot, collapse = ", "),
-          "\n either:",
-          "\n\t - there are not enough local height measurements",
-          "\n\t - height measurements are likely not representative of tree size distribution"
-        ), type = "warning")
-      }
-    } else {
-      model(NULL)
-    }
-  })
+  # observeEvent({
+  #   if (input$btn_DATASET_LOADED >= 1) {
+  #     input$sel_PLOT
+  #     input$sel_H
+  #     input$sel_DIAMETER
+  #   }
+  #   input$rad_HDMOD
+  #   input$chkgrp_HEIGHT
+  # }, ignoreNULL = F, ignoreInit = T, {
+  #   if (("HDloc" %in% input$chkgrp_HEIGHT) & (input$sel_H != "<unselected>") & (input$rad_HDMOD != "NULL")) {
+  #     # take the data D, H, plot
+  #     data <- setDT(inv()[, c(input$sel_DIAMETER, input$sel_H)])
+  #     setnames(data, names(data), c("D", "H"))
+  #     data[, plot := if (input$sel_PLOT == "<unselected>") "plot" else inv()[, input$sel_PLOT]]
+  #
+  #     # remove all the plots with 15 non NA value
+  #     removedPlot <- unique(data[, .(nbNonNA = sum(!is.na(H))), by = plot][nbNonNA < 15, plot])
+  #     data <- data[!plot %in% removedPlot]
+  #
+  #     # remove the plots where there the plot is not really distributed
+  #     data[, quantile := findInterval(D, c(-1, quantile(D, probs = c(0.5, 0.75)), max(D) + 1)), by = plot]
+  #     removedPlot <- c(removedPlot, unique(data[, .N, by = .(plot, quantile)][N < 3, plot]))
+  #     data <- data[!plot %in% removedPlot]
+  #
+  #     # do the model
+  #     model(tryCatch({
+  #       modelHD(
+  #         D = data$D,
+  #         H = data$H,
+  #         method = input$rad_HDMOD,
+  #         plot = data$plot,
+  #         useWeight = T
+  #       )
+  #     }, error = function(e) NULL, warning = function(e) NULL, message = function(e) NULL))
+  #
+  #     # if there is a least one plot in the removed plot -> warning message
+  #     if (length(removedPlot) != 0) {
+  #       shinyalert("Oops", paste(
+  #         "Local HD model cannot be built for plot(s):",
+  #         paste(removedPlot, collapse = ", "),
+  #         "\n either:",
+  #         "\n\t - there are not enough local height measurements",
+  #         "\n\t - height measurements are likely not representative of tree size distribution"
+  #       ), type = "warning")
+  #     }
+  #   } else {
+  #     model(NULL)
+  #   }
+  # })
 
   ## Maps + comparison of methods --------------------------------------------------------------------
 
-  observe({
-    toggleElement("box_MAP",
-      condition = any(c("chave", "feld") %in% input$chkgrp_HEIGHT) || (input$sel_LONG != "<unselected>" && input$sel_LAT != "<unselected>")
-    )
-  })
-
-
-  observe({
-    # show the elements when the condition are complete
-    toggleElement("num_LONG",
-      condition = (input$sel_LONG == "<unselected>" && input$sel_LAT == "<unselected>")
-    )
-    toggleElement("num_LAT",
-      condition = (input$sel_LONG == "<unselected>" && input$sel_LAT == "<unselected>")
-    )
-  })
+  # observe({
+  #   toggleElement("box_MAP",
+  #     condition = any(c("chave", "feld") %in% input$chkgrp_HEIGHT) || (input$sel_LONG != "<unselected>" && input$sel_LAT != "<unselected>")
+  #   )
+  # })
 
 
   # create a layer of borders
@@ -452,141 +563,138 @@ function(input, output, session) {
 
   # create the table of coordinate and update it when NULL
   coord <- reactiveVal()
-  observe({
-    # if the err is F the value coord will be updated
-    err <- (input$sel_LONG == "<unselected>" && is.na(input$num_LONG)) || (input$sel_LAT == "<unselected>" && is.na(input$num_LAT))
+  # observe({
+  #   if (input$btn_DATASET_LOADED >= 1 && !err) {
+  #     coord(data.table(
+  #       plot = if (input$sel_PLOT != "<unselected>") inv()[, input$sel_PLOT] else "plot",
+  #       longitude = if (input$sel_LONG != "<unselected>") inv()[, input$sel_LONG] else input$num_LONG,
+  #       latitude = if (input$sel_LAT != "<unselected>") inv()[, input$sel_LAT] else input$num_LAT
+  #     ))
+  #   }
+  # })
 
-    if (input$btn_DATASET_LOADED >= 1 && !err) {
-      coord(data.table(
-        plot = if (input$sel_PLOT != "<unselected>") inv()[, input$sel_PLOT] else "plot",
-        longitude = if (input$sel_LONG != "<unselected>") inv()[, input$sel_LONG] else input$num_LONG,
-        latitude = if (input$sel_LAT != "<unselected>") inv()[, input$sel_LAT] else input$num_LAT
-      ))
-    }
-  })
-
-  observeEvent({
-    coord()
-    model()
-    input$chkgrp_HEIGHT
-    input$rad_HDMOD
-  }, ignoreNULL = F, ignoreInit = T, {
-    toggleElement("box_plot_comparison", condition = !is.null(input$chkgrp_HEIGHT))
-
-    D <- seq(0, 250)
-
-    ### Basic plot for HD-methods comparison
-    plot <- ggplot(data = NULL, aes(x = D)) +
-      xlab("Diameter (cm)") +
-      ylab("Predicted Height (m)") +
-      theme(
-        legend.position = "top",
-        legend.title = element_blank(),
-        legend.text = element_text(size = rel(1.5)),
-        axis.title = element_text(size = rel(1.3))
-      ) +
-      scale_fill_manual(values = c(HD_local = "blue", Feldpausch = "green", Chave = "red")) +
-      scale_colour_manual(values = c(HD_local = "blue", Feldpausch = "green", Chave = "red")) +
-      theme_minimal()
-
-
-    #### Including HD local model in comparison
-    if (!is.null(model())) {
-
-      plot <- plot + if (input$sel_PLOT == "<unselected>") { # if Plot variable has not been provided
-        geom_line(aes(y = retrieveH(D, model = model())$H, colour = "HD_local"))
-      } else { # # if Plot variable has been provided
-        H <- sapply(model(), function(x) {
-          retrieveH(D, model = x)$H
-        }) # retrieve all the data of H for the D value for each models
-        geom_ribbon(aes(
-          ymin = apply(H, 1, min, na.rm = T),
-          ymax = apply(H, 1, max, na.rm = T),
-          fill = "HD_local"
-        ), alpha = 0.3) # take all the H min and max for each line (each different D)
-      }
-    }
-
-    # Create the table of coordinate
-    coordinate <- coord()[, .(
-      longitude = mean(longitude, na.rm = T),
-      latitude = mean(latitude, na.rm = T)
-    ),
-    by = plot
-    ]
-
-    # remove all NA and take the unique coordinate
-    coordinate <- unique(na.omit(coordinate))
-
-    # draw the coordinate if there is one remaining
-    if (nrow(coordinate) != 0) {
-      output$plot_MAP <- renderPlot({
-        ggplot(coordinate) + xlab("longitude") + ylab("latitude") +
-          mapWorld() +
-          geom_point(aes(x = longitude, y = latitude), color = "red", size = 2) +
-          theme_minimal()
-      })
-    }
-
-    if ("feld" %in% input$chkgrp_HEIGHT) {
-      region <- computeFeldRegion(coord()[, cbind(longitude, latitude)])
-      region[is.na(region)] <- "Pantropical"
-      output$txt_feld <- renderText({
-        paste("Feldpausch region(s):", paste(unique(feldRegion()[region]), collapse = ", "))
-      })
-      # continuation with the plot whith feld
-      plot <- plot + if (length(unique(region)) >= 2) {
-        H <- sapply(region, function(x) {
-          retrieveH(D, region = x)$H
-        })
-        geom_ribbon(aes(
-          ymin = apply(H, 1, min, na.rm = T),
-          ymax = apply(H, 1, max, na.rm = T),
-          fill = "Feldpausch"
-        ), alpha = 0.3)
-      } else {
-        geom_line(aes(y = retrieveH(D, region = unique(region))$H, colour = "Feldpausch"))
-      }
-    }
-
-    if ("chave" %in% input$chkgrp_HEIGHT) {
-      E <- tryCatch(computeE(coord()[, cbind(longitude, latitude)]), error = function(e) e)
-      output$txt_chave <- renderText({
-        if (!is.list(E)) {
-          if (length(unique(E)) > 1) {
-            paste(
-              "E parameter of Chave et al. (2014):",
-              paste(round(range(E), digits = 3), collapse = " to ")
-            )
-          } else {
-            paste(
-              "E parameter of Chave et al. (2014):",
-              round(unique(E), digits = 3)
-            )
-          }
-        } else {
-          "E cannot be retrieved for those coordinates"
-        }
-      })
-      # continuation with the plot whith chave
-      if (!is.list(E)) {
-        plot <- plot + if (length(unique(E)) >= 2) { # if there is multiple E
-          geom_ribbon(aes(
-            ymax = retrieveH(D, coord = coord()[which.min(E), c(longitude, latitude)])$H,
-            ymin = retrieveH(D, coord = coord()[which.max(E), c(longitude, latitude)])$H,
-            fill = "Chave"
-          ), alpha = 0.3)
-        } else { # if there is just one E
-          geom_line(aes(y = retrieveH(D, coord = coord()[, c(mean(longitude), mean(latitude))])$H, colour = "Chave"))
-        }
-      }
-    }
-
-    if (!is.null(input$chkgrp_HEIGHT)) {
-      # show the plot of the comparison of the methods
-      output$out_plot_comp <- renderPlot(plot)
-    }
-  })
+  # observeEvent({
+  #   coord()
+  #   model()
+  #   input$chkgrp_HEIGHT
+  #   input$rad_HDMOD
+  # }, ignoreNULL = F, ignoreInit = T, {
+  #   toggleElement("box_plot_comparison", condition = !is.null(input$chkgrp_HEIGHT))
+  #
+  #   D <- seq(0, 250)
+  #
+  #   ### Basic plot for HD-methods comparison
+  #   plot <- ggplot(data = NULL, aes(x = D)) +
+  #     xlab("Diameter (cm)") +
+  #     ylab("Predicted Height (m)") +
+  #     theme(
+  #       legend.position = "top",
+  #       legend.title = element_blank(),
+  #       legend.text = element_text(size = rel(1.5)),
+  #       axis.title = element_text(size = rel(1.3))
+  #     ) +
+  #     scale_fill_manual(values = c(HD_local = "blue", Feldpausch = "green", Chave = "red")) +
+  #     scale_colour_manual(values = c(HD_local = "blue", Feldpausch = "green", Chave = "red")) +
+  #     theme_minimal()
+  #
+  #
+  #   #### Including HD local model in comparison
+  #   if (!is.null(model())) {
+  #
+  #     plot <- plot + if (input$sel_PLOT == "<unselected>") { # if Plot variable has not been provided
+  #       geom_line(aes(y = retrieveH(D, model = model())$H, colour = "HD_local"))
+  #     } else { # # if Plot variable has been provided
+  #       H <- sapply(model(), function(x) {
+  #         retrieveH(D, model = x)$H
+  #       }) # retrieve all the data of H for the D value for each models
+  #       geom_ribbon(aes(
+  #         ymin = apply(H, 1, min, na.rm = T),
+  #         ymax = apply(H, 1, max, na.rm = T),
+  #         fill = "HD_local"
+  #       ), alpha = 0.3) # take all the H min and max for each line (each different D)
+  #     }
+  #   }
+  #
+  #   # # Create the table of coordinate
+  #   # coordinate <- coord()[, .(
+  #   #   longitude = mean(longitude, na.rm = T),
+  #   #   latitude = mean(latitude, na.rm = T)
+  #   # ),
+  #   # by = plot
+  #   # ]
+  #
+  #   # remove all NA and take the unique coordinate
+  #   # coordinate <- unique(na.omit(coordinate))
+  #
+  #   # draw the coordinate if there is one remaining
+  #   # if (nrow(coordinate) != 0) {
+  #   #   output$plot_MAP <- renderPlot({
+  #   #     ggplot(coordinate) + xlab("longitude") + ylab("latitude") +
+  #   #       mapWorld() +
+  #   #       geom_point(aes(x = longitude, y = latitude), color = "red", size = 2) +
+  #   #       theme_minimal()
+  #   #   })
+  #   # }
+  #
+  #   if ("feld" %in% input$chkgrp_HEIGHT) {
+  #     region <- computeFeldRegion(coord()[, cbind(longitude, latitude)])
+  #     region[is.na(region)] <- "Pantropical"
+  #     output$txt_feld <- renderText({
+  #       paste("Feldpausch region(s):", paste(unique(feldRegion()[region]), collapse = ", "))
+  #     })
+  #     # continuation with the plot whith feld
+  #     plot <- plot + if (length(unique(region)) >= 2) {
+  #       H <- sapply(region, function(x) {
+  #         retrieveH(D, region = x)$H
+  #       })
+  #       geom_ribbon(aes(
+  #         ymin = apply(H, 1, min, na.rm = T),
+  #         ymax = apply(H, 1, max, na.rm = T),
+  #         fill = "Feldpausch"
+  #       ), alpha = 0.3)
+  #     } else {
+  #       geom_line(aes(y = retrieveH(D, region = unique(region))$H, colour = "Feldpausch"))
+  #     }
+  #   }
+  #
+  #   if ("chave" %in% input$chkgrp_HEIGHT) {
+  #     E <- tryCatch(computeE(coord()[, cbind(longitude, latitude)]), error = function(e) e)
+  #     output$txt_chave <- renderText({
+  #       if (!is.list(E)) {
+  #         if (length(unique(E)) > 1) {
+  #           paste(
+  #             "E parameter of Chave et al. (2014):",
+  #             paste(round(range(E), digits = 3), collapse = " to ")
+  #           )
+  #         } else {
+  #           paste(
+  #             "E parameter of Chave et al. (2014):",
+  #             round(unique(E), digits = 3)
+  #           )
+  #         }
+  #       } else {
+  #         "E cannot be retrieved for those coordinates"
+  #       }
+  #     })
+  #     # continuation with the plot whith chave
+  #     if (!is.list(E)) {
+  #       plot <- plot + if (length(unique(E)) >= 2) { # if there is multiple E
+  #         geom_ribbon(aes(
+  #           ymax = retrieveH(D, coord = coord()[which.min(E), c(longitude, latitude)])$H,
+  #           ymin = retrieveH(D, coord = coord()[which.max(E), c(longitude, latitude)])$H,
+  #           fill = "Chave"
+  #         ), alpha = 0.3)
+  #       } else { # if there is just one E
+  #         geom_line(aes(y = retrieveH(D, coord = coord()[, c(mean(longitude), mean(latitude))])$H, colour = "Chave"))
+  #       }
+  #     }
+  #   }
+  #
+  #   if (!is.null(input$chkgrp_HEIGHT)) {
+  #     # show the plot of the comparison of the methods
+  #     output$out_plot_comp <- renderPlot(plot)
+  #   }
+  # })
 
 
 

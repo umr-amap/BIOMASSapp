@@ -31,14 +31,15 @@ dashboardPage(
                                                                        Comma = ",")),
                    radioButtons("rad_several_plots", "Does your dataset contain several plots?",
                                 choices = c(Yes = "several_plots", No = "single_plot"), selected = character(0)),
+                   div("information required", id = "msg_several_plots", style = "color:red;"),
                    hidden(selectInput("sel_PLOT", "Which column contains the plots IDs?", choices = NULL))
                  ),
                  hidden(boxWithId( # Coordinate's box
                    id = "box_COORD", title = h3("Geographic coordinates (optional)"), width = 12,
                    radioButtons("rad_coord", "Do you have:",
-                                choices = c("The coordinates of each tree" = "coord_each_tree",
-                                            "The coordinates of the plot(s) in another dataset (see below for an overview)" = "coord_plot",
-                                            "No coordinates" = "coord_none"),
+                                choices = c("the columns corresponding to the coordinates of each tree" = "coord_each_tree",
+                                            "the coordinates of the plot(s) in another dataset (see below for an overview)" = "coord_plot",
+                                            "no coordinates" = "coord_none"),
                                 selected = character(0)),
                    # If coordinates of each tree
                    hidden(div(id = "id_sel_coord",
@@ -73,16 +74,17 @@ dashboardPage(
                    hr(), hr(), hr(),
                    h4("Wood density or taxonomy"),
                    selectInput("sel_WD", "Wood density", choices = NULL),
-                   selectInput("sel_GENUS", "Genus (e.g. Terminalia) or scientific name)", choices = NULL),
+                   h5("or"),
+                   selectInput("sel_GENUS", "Genus (e.g. Terminalia) or scientific name (e.g. Terminalia superba or Terminalia superba Engl. & Diels)", choices = NULL),
                    selectInput("sel_SPECIES", "Species (e.g. superba)", choices = NULL),
-                   hidden(div("Impossible combination", id = "msg_wd", style = "color:red;")),
+                   hidden(div("Provide either wood density or taxonomy information ", id = "msg_wd", style = "color:red;")),
 
                    ## Height ----
                    hr(),
                    h4("Height"),
                    radioButtons("rad_height", "Do you have:",
                                 choices = c("The height of each tree" = "h_each_tree",
-                                            "The height of some trees" = "h_some_tree",
+                                            "The height of some trees in the same dataset" = "h_some_tree",
                                             "A subset of well-measured trees in another dataset (see below for an overview)" = "h_sup_data",
                                             "No height measurements (use coordinates to estimate height)" = "h_none"),
                                 selected = character(0)),
@@ -90,6 +92,11 @@ dashboardPage(
                    hidden(div(id = "id_sel_h",
                               column(9 , selectInput("sel_H", "Select height column", choices = NULL)),
                               column(3, radioButtons("rad_units_height", "Unit:", choices = c("cm", "m"), selected = "m"))
+                   )),
+                   hidden(div(id = "id_sel_HDmodel_by",
+                              h5("The heights of non-measured trees will be estimated using Height-Diameter relationships on measured trees."),
+                              h5("If you want to create a Height-Diameter model by plot (or by region), please specify the column corresponding to the plot (or region) IDs:"),
+                              selectInput("sel_HDmodel_by", "", choices = NULL)
                    )),
                    # If height in another dataset
                    hidden(div(id = "id_file_h_sup",
@@ -214,8 +221,6 @@ dashboardPage(
             hidden(boxWithId(
               width = 12,
               id = "box_MAP", title = "Map",
-              numericInput("num_LONG", "longitude", 3.8614, min = -180, max = 180, step = 0.01),
-              numericInput("num_LAT", "latitude", 43.652, min = -90, max = 90, step = 0.01),
               plotOutput("plot_MAP")
             ))
           )
