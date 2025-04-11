@@ -3,7 +3,7 @@ library(shinydashboard)
 library(shinycssloaders)
 library(data.table)
 library(ggplot2)
-library(maps)
+library(leaflet)
 library(shinyjs)
 library(shinyalert)
 library(shinyFeedback)
@@ -49,46 +49,50 @@ tstrsplit_NA <- function(x, pattern = " ", count = 2) {
 }
 
 
-# AGB predictions
-AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, coord = NULL, region = NULL, plot = NULL) {
+AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, errH = NULL, region = NULL, E_vec = NULL, coord = NULL, model_by = NULL) {
 
-  ##### AGB calculation
-
-  # if coordinates are given
-  if (!is.null(coord)) {
-    if (nrow(coord) == 1) {
-      coord <- c(coord[1, 1], coord[1, 2])
-    }
-    AGB <- if (AGBmod == "agb") {
-      computeAGB(D, WD, coord = coord)
-    } else {
-      AGBmonteCarlo(D, WD, errWD, coord = coord, Dpropag = "chave2004")
-    }
-    return(AGB)
+  # Setting parameters for stand-specific HD local model
+  if (!is.null(HDmodel) && !is.null(model_by)) {
+    valid_plots <- model_by %in% names(HDmodel) # names(HDmodel) doesn't contain removed plots (the ones containing less than 15 non-NA values for exemple)
+    D <- D[valid_plots]
+    WD <- WD[valid_plots]
+    errWD <- if (!is.null(errWD)) errWD[valid_plots]
+    model_by <- model_by[valid_plots]
   }
 
-  if (!is.null(HDmodel) && !is.null(plot)) {
-    sorting <- plot %in% names(HDmodel)
-
-    D <- D[sorting]
-    WD <- WD[sorting]
-    errWD <- if (!is.null(errWD)) errWD[sorting]
-    plot <- plot[sorting]
-  }
-
-  # AGB without error
+  # AGB without error propagation
   if (AGBmod == "agb") {
-    if (!is.null(HDmodel)) { # HD model
-      H <- retrieveH(D, model = HDmodel, plot = plot)$H
+
+    if (!is.null(E_vec)) { # Chave method
+      # Modified Eq 7 from Chave et al. 2014 Global change biology
+      # We apply the formula instead of calling computeAGB with a coord argument (which call computeE() which is time consuming)
+      AGB <- exp(-2.023977 - 0.89563505 * E_vec + 0.92023559 * log(WD) + 2.79495823 * log(D) - 0.04606298 * (log(D)^2)) / 1000
+      return(as.matrix(AGB))
     }
+
+    if (!is.null(HDmodel)) { # HD model
+      H <- retrieveH(D, model = HDmodel, plot = model_by)$H
+    }
+
     if (!is.null(region)) { # feld region
       H <- retrieveH(D, region = region)$H
     }
-    AGB <- computeAGB(D, WD, H = H)
+
+    AGB <- as.matrix(computeAGB(D, WD, H = H))
   }
 
   # AGB with error
   if (AGBmod == "agbe") {
+
+    if( !is.null(errH) ) { # heights (and errH) provided by the user
+      AGB <- AGBmonteCarlo(
+        D, Dpropag = "chave2004",
+        WD, errWD,
+        H = H, errH = errH,
+        plot = model_by
+      )
+    }
+
     if (!is.null(region)) { # feld region
       H <- retrieveH(D, region = region)
       errH <- H$RSE
@@ -97,7 +101,7 @@ AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, c
         D, Dpropag = "chave2004",
         WD, errWD,
         H = H, errH = errH,
-        plot = plot
+        plot = model_by
       )
     }
 
@@ -106,95 +110,80 @@ AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, c
         D, Dpropag = "chave2004",
         WD, errWD,
         HDmodel = HDmodel,
-        plot = plot
+        plot = model_by
       )
     }
 
-
+    if(!is.null(coord)) { # Chave's AGB equation
+      AGB <- AGBmonteCarlo(
+        D, Dpropag = "chave2004",
+        WD, errWD,
+        coord = coord
+      )
+    }
   }
 
   return(AGB)
 }
 
-# AGB plots
-plot_list <- function(list, color, plot = NULL) {
-  nr <- nrow(list[[1]])
 
-  is_vector <- nr == 1
+plot_list <- function(list, color, AGBmod, removedPlot = NULL) {
 
-  if (!is.null(plot)) {
-    list <- lapply(list, function(x) {
-      x[x$plot %in% plot, ]
-    })
-    nr <- nrow(list[[1]])
-  }
+  ### Formatting the data-frame which will be used for ggplot
+  df_res <- rbindlist(lapply(names(list), function(i) { # looping on methods
+    x <- list[[i]]
+    x$method <- i
+    if(!is.null(removedPlot)) {
+      # Adding a row containing NA's for plots which were not in local HD model
+      removed_plot_res <- rbindlist(lapply(removedPlot[! removedPlot %in% x$plot], function(x) data.frame(plot=x, AGB=NA, Cred_2.5=NA, Cred_97.5=NA, method=i)))
+      x <- rbindlist(list(x,removed_plot_res))
+    }
+    x
+  }))
 
-  # take the order of the first result
-  if (!is_vector) {
-    plot_order <- with(list[[1]], match(AGB, sort(AGB)))
-    list <- lapply(list, function(x) {
-      x$plot_order <- plot_order
-      x
-    })
-  } else {
-    list <- rbindlist(lapply(names(list), function(i) {
-      x <- list[[i]][1, -1]
-      names(x) <- names(list[[i]])[-1]
-      x <- as.list(x)
-      x$plot <- i
-      x
-    }))
+  # Defining the plot's order along x-axis: in increasing order of biomass and NA's (removed plots) in last position)
+  df_res[, mean_AGB := mean(AGB), by = plot]
+  df_res[, plot_order := order(mean_AGB), by = method]
+  df_res[, plot := factor(plot, levels = unique(df_res$plot)[unique(df_res$plot_order)] )]
 
-    list[, plot_order := seq(.N)]
-    nr <- list[, .N]
-    list <- list(comp = list)
-  }
-
-  plot <- ggplot(cbind(name = names(list[1]), list[[1]]), aes(x = plot_order))+
+  render_plot <- ggplot(df_res, aes(x = plot, colour = method)) +
     xlab(NULL) + ylab("AGB (Mg)") +
-    theme_minimal()
+    theme_minimal() +
+    scale_color_manual(values = color) +
+    xlab(NULL) + ylab("AGB (Mg)") +
+    theme(axis.title = element_text(size = rel(1.2)))
 
-  if (ncol(list[[1]]) > 3) {
-    if (is_vector || "HD_local" %in% names(list)) {
-      plot <- plot + geom_pointrange(aes(y = AGB, ymin = Cred_2.5, ymax = Cred_97.5, colour = name, na.rm = T))
-    }
-    if (!is_vector) {
-      for (i in names(list)[names(list) != "HD_local"]) {
-        plot <- plot + geom_ribbon(
-          data = cbind(name = i, list[[i]]),
-          aes(ymin = Cred_2.5, ymax = Cred_97.5, fill = name),
-          alpha = 0.3, na.rm = T
-        )
-      }
-    }
+  if(AGBmod == "agb") {
+    render_plot <- render_plot + geom_point(aes(y = AGB), size = 2, position = position_dodge(width = 0.2) )
   } else {
-    for (i in names(list)) {
-      plot <- plot + geom_point(
-        data = cbind(name = i, list[[i]]),
-        aes(y = AGB, colour = name),
-        na.rm = T
-      )
-    }
+    render_plot <- render_plot + geom_errorbar(aes(ymin = Cred_2.5, ymax = Cred_97.5), position = "dodge",  width = 0.1)
   }
 
-  # legend + size of text + color
-  if (!is_vector) {
-    plot <- plot +
+  if ( length(unique(df_res$method)) != 1 ) { # if several method for estimating tree heights
+    # Add a great legend
+    render_plot <- render_plot +
+      guides(color = guide_legend(title="method for\nestimating\ntree heights")) +
       theme(
         legend.position = "bottom",
-        legend.title = element_blank(),
-        axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5, size = rel(1.2)),
-        legend.text = element_text(size = rel(1.5)),
-        axis.title = element_text(size = rel(1.2))
-      ) +
-      with(list[[1]], scale_x_continuous(breaks = 1:nr, labels = plot[order(AGB)])) +
-      scale_fill_manual(values = color) + scale_color_manual(values = color)
-  } else {
-    plot <- plot + theme(legend.position = "none", axis.text.x = element_text(size = rel(1.5))) +
-      scale_colour_manual(values = "black") +
-      scale_x_continuous(breaks = 1:nr, labels = list[[1]]$plot)
+        legend.title = element_text(size = rel(1)),
+        legend.text = element_text(size = rel(1.2))
+      )
+  } else { # if one method for estimating tree heights
+    # do not display the legend and set the colour to black
+    render_plot <- render_plot +
+      theme(legend.position = "none") +
+      scale_colour_manual(values = "black")
   }
 
+  if( length(unique(df_res$plot)) != 1 ) { #  if several plots
+    # display plot's names along x-axis in a 45° angle
+    render_plot <- render_plot +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, size = rel(1.2)))
+  } else { # if single plot
+    # do not display plot name
+    render_plot <- render_plot +
+      theme(axis.text.x = element_blank())
+  }
 
-  return(plot)
+  return(render_plot)
 }

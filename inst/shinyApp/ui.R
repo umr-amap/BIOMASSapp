@@ -31,14 +31,15 @@ dashboardPage(
                                                                        Comma = ",")),
                    radioButtons("rad_several_plots", "Does your dataset contain several plots?",
                                 choices = c(Yes = "several_plots", No = "single_plot"), selected = character(0)),
+                   div("information required", id = "msg_several_plots", style = "color:red;"),
                    hidden(selectInput("sel_PLOT", "Which column contains the plots IDs?", choices = NULL))
                  ),
                  hidden(boxWithId( # Coordinate's box
                    id = "box_COORD", title = h3("Geographic coordinates (optional)"), width = 12,
                    radioButtons("rad_coord", "Do you have:",
-                                choices = c("The coordinates of each tree" = "coord_each_tree",
-                                            "The coordinates of the plot(s) in another dataset (see below for an overview)" = "coord_plot",
-                                            "No coordinates" = "coord_none"),
+                                choices = c("the columns corresponding to the coordinates of each tree" = "coord_each_tree",
+                                            "the coordinates of the plot(s) in another dataset (see below for an overview)" = "coord_plot",
+                                            "no coordinates" = "coord_none"),
                                 selected = character(0)),
                    # If coordinates of each tree
                    hidden(div(id = "id_sel_coord",
@@ -54,8 +55,8 @@ dashboardPage(
                               selectInput("sel_LAT_sup_coord", "Latitude", choices = NULL),
                               selectInput("sel_LONG_sup_coord", "Longitude", choices = NULL)
                    )),
-                  # If coordinates of plots and several plots
-                  hidden(selectInput("sel_plot_coord", "Plots IDs", choices = NULL))
+                   # If coordinates of plots and several plots
+                   hidden(selectInput("sel_plot_coord", "Plots IDs", choices = NULL))
                  ))
           ),
           column(6,
@@ -73,16 +74,21 @@ dashboardPage(
                    hr(), hr(), hr(),
                    h4("Wood density or taxonomy"),
                    selectInput("sel_WD", "Wood density", choices = NULL),
-                   selectInput("sel_GENUS", "Genus (e.g. Terminalia) or scientific name)", choices = NULL),
+                   hidden(div(id = "id_set_errWD",
+                              numericInput("set_errWD", label = "What is the assumed error associated with the wood densities measurements ?",
+                                           value = 0.07, min = 0),
+                   )),
+                   h5("or"),
+                   selectInput("sel_GENUS", "Genus (e.g. Terminalia) or scientific name (e.g. Terminalia superba or Terminalia superba Engl. & Diels)", choices = NULL),
                    selectInput("sel_SPECIES", "Species (e.g. superba)", choices = NULL),
-                   hidden(div("Impossible combination", id = "msg_wd", style = "color:red;")),
+                   hidden(div("Provide either wood density or taxonomy information ", id = "msg_wd", style = "color:red;")),
 
                    ## Height ----
                    hr(),
                    h4("Height"),
                    radioButtons("rad_height", "Do you have:",
                                 choices = c("The height of each tree" = "h_each_tree",
-                                            "The height of some trees" = "h_some_tree",
+                                            "The height of some trees in the same dataset" = "h_some_tree",
                                             "A subset of well-measured trees in another dataset (see below for an overview)" = "h_sup_data",
                                             "No height measurements (use coordinates to estimate height)" = "h_none"),
                                 selected = character(0)),
@@ -91,18 +97,33 @@ dashboardPage(
                               column(9 , selectInput("sel_H", "Select height column", choices = NULL)),
                               column(3, radioButtons("rad_units_height", "Unit:", choices = c("cm", "m"), selected = "m"))
                    )),
+                   hidden(div(id = "id_sel_HDmodel_by",
+                              h5("The heights of non-measured trees will be estimated using Height-Diameter relationships on measured trees."),
+                              h5("If you want to create a Height-Diameter model by plot (or by any category), please specify the column corresponding to the plot (or category) IDs:"),
+                              selectInput("sel_HDmodel_by", "", choices = NULL)
+                   )),
+                   hidden(div(id = "id_set_errH",
+                              numericInput("set_errH", label = "What is the assumed error associated with the individual height measurements ?",
+                                           value = 4.22, min = 0),
+                   )),
                    # If height in another dataset
                    hidden(div(id = "id_file_h_sup",
                               fileInput("file_h_sup", "Choose a CSV file",
                                         accept = c("text/csv", "text/comma-separated-values,text/plain",".csv")),
                               selectInput("sel_D_sup_data", "Diameter", choices = NULL),
                               selectInput("sel_H_sup_data", "Height", choices = NULL)
-                   )),
-
-                   # action button to continue
-                   hr(),
-                   actionButton("btn_DATASET_LOADED", "Continue", color = "#0040FF")
+                   ))
                  )))),
+
+        # Action button to continue
+        fluidRow(
+          column(
+            width = 12,
+            actionButton("btn_DATASET_LOADED", "Continue", color = "#0040FF"),
+            align = "center"
+          )
+        ),
+
         # Inventory data preview
         fluidRow(
           hidden(boxWithId(
@@ -165,12 +186,11 @@ dashboardPage(
 
       # Height -----------------------------------------------------------------
 
-
       tabItem(
         "tab_HEIGHT",
         fluidRow(
           box(
-            title = "Retrieving tree heights via a Height-Diameter model",
+            title = h3("Retrieving tree heights via a Height-Diameter model"),
             checkboxGroupInput(
               "chkgrp_HEIGHT", "Choose the HD model:",
               inline = T,
@@ -192,15 +212,16 @@ dashboardPage(
               radioButtons("rad_HDMOD", "Choose your local HD model:", choices = "NULL")
             ))
           ),
-          column( 3 ,
+          column( 4 ,
             ## Feldpausch
             hidden(boxWithId(
               width = 12,
               id = "box_RESULT_FELD", title = "Feldpausch et al. (2012)",
-              textOutput("txt_feld")
+              #textOutput("txt_feld")
+              tableOutput("out_tab_feld"),
             ))
           ),
-          column( 5 ,
+          column( 4 ,
             ## Chave
             hidden(boxWithId(
               width = 12,
@@ -209,26 +230,28 @@ dashboardPage(
                           type = getOption("spinner.type", default = 5),
                           color = getOption("spinner.color", default = "#158A0C")
               )
-            )),
-            ## Map
-            hidden(boxWithId(
-              width = 12,
-              id = "box_MAP", title = "Map",
-              numericInput("num_LONG", "longitude", 3.8614, min = -180, max = 180, step = 0.01),
-              numericInput("num_LAT", "latitude", 43.652, min = -90, max = 90, step = 0.01),
-              plotOutput("plot_MAP")
             ))
           )
         ),
         fluidRow(
-          ## Comparison of the methods
+          ## Comparison of the methods and map if Chave is ticked
           column(
-            width = 12,
+            width = 8,
             hidden(boxWithId(
               id = "box_plot_comparison", title = "Model comparison",
-              plotOutput("out_plot_comp"),
-              align = "center"
-          )))
+              plotOutput("out_plot_comp", height = "600px"),
+              align = "center", width = 12
+            ))),
+          ## Map
+          column(
+            width = 4,
+            hidden(boxWithId(
+              id = "box_MAP", title = "Map",
+              #plotOutput("plot_MAP"),
+              width = 12,
+              leafletOutput(outputId = "plot_MAP")
+            ))
+          )
         ),
         fluidRow(
           column(
