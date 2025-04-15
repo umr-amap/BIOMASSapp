@@ -260,10 +260,10 @@ function(input, output, session) {
     if (!error()) {
       newData <- inv()
       if (input$sel_DIAMETER != "<unselected>") {
-        newData[,input$sel_DIAMETER] <- conv_unit(newData[,input$sel_DIAMETER], input$rad_units_diameter, "cm")
+        newData[, var := conv_unit(var, input$rad_units_diameter, "cm"), env=list(var=input$sel_DIAMETER)]
       }
       if (input$sel_H != "<unselected>") {
-        newData[,input$sel_H] <- conv_unit(newData[,input$sel_H], input$rad_units_height, "m")
+        newData[, var := conv_unit(var, input$rad_units_diameter, "m"), env=list(var=input$sel_H)]
       }
       inv(newData)
     }
