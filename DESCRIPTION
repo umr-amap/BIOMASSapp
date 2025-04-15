@@ -26,4 +26,6 @@ Imports:
 	ggplot2,
 	maps,
 	measurements,
-	httr
+	httr,
+  shinycssloaders,
+  DT
