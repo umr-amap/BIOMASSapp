@@ -1,31 +1,50 @@
-library(shiny)
-library(shinydashboard)
-library(shinycssloaders)
-library(data.table)
-library(ggplot2)
-library(leaflet)
-library(shinyjs)
-library(shinyalert)
-library(shinyFeedback)
-library(rmarkdown)
-library(measurements)
-library(DT)
-library(BIOMASS)
+#GCO ATTENTION Globalement éviter d'utiliser T et F à la place de TRUE et FALSE
+#GCO pour s'en rendre compte il suffit de faire T <- FALSE et le monde s'écroule :-)
+#GCO TRUE <- FALSE provoquera une erreur
+
+#GCO réduire le bruit dans la console
+suppressPackageStartupMessages({
+  library(shiny)
+  library(shinydashboard)
+  library(shinycssloaders)
+  library(data.table)
+  library(ggplot2)
+  library(leaflet)
+  library(shinyjs)
+  library(shinyalert)
+  library(shinyFeedback)
+  library(rmarkdown)
+  library(measurements)
+  library(DT)
+  library(BIOMASS)
+})
 
 # set maximum input file size (here 30Mo)
 options(shiny.maxRequestSize = 30 * 1024^2)
 
+#GCO fermeture de l'application uniquement en local (compatbilité avec le mode serveur)
+# SERVER auto close application when session ends
+# only if run locally (ie not on a remote server)
+autoCloseApp <- function(session=getDefaultReactiveDomain()) {
+  isLocal <- Sys.getenv("SHINY_PORT") == ""
+  if(isLocal) {
+    session$onSessionEnded(function() {
+      stopApp()
+    })
+  }
+}
+
+#GCO fonction générique pour ajouter un id au tag
+# UI add an id to a tag
+setId <- function(tag, id) {
+  htmltools::tagAppendAttributes(tag, id=id)
+}
+
+#GCO réécriture de boxWithId utilisant setId
+#GCO mais on pourrait aussi utiliser directement setId(box(...), id="") ou box(...) |> setId("") dans le code
 # add an id to a box so that it can be shown/hidden (instead of wrap the box() on a div() )
-boxWithId <- function(..., title = NULL, footer = NULL, status = NULL,
-                      solidHeader = FALSE, background = NULL, width = 6, height = NULL,
-                      collapsible = FALSE, collapsed = FALSE, id = NULL) {
-  b <- match.call(expand.dots = TRUE)
-  bid <- id
-  b$id <- NULL
-  b[[1]] <- as.name("box")
-  b <- eval(b, parent.frame())
-  b$attribs$id <- bid
-  b
+boxWithId <- function(..., id=NULL) {
+  box(...) |> setId(id)
 }
 
 hideMenuItem <- function(tabName) {

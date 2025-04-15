@@ -1,9 +1,21 @@
+#GCO Globalement Attention T/F -> TRUE/FALSE
+#GCO Globalement on peut regrouper les req() en début d'observateur/render (notion de prérequis)
+#GCO Globalement Attention dans les if c'est || et && qu'il faut utiliser pas | et &
+#GCO Globalement Eviter les prints, l'utilisateur interagit avec le navigateur, pas la console
+#GCO   en plus ce ne sera pas utilisable en mode server (il n'y a pas de console)
+#GCO Globalement Attention pour observer plusieurs input il faut utiliser list() et pas {}
+#GCO   un événement est un changement de valeur, la valeur de {a;b;c;d} est d !!!
+#GCO Globalement Attention les shinyalert sont déconnectés du flux d'exécution. Elles sont
+#GCO   modales à l'écran mais ne bloquent pas l'exécution
+#GCO Globalement Je ne comprends pas la logique de l'implémentation. Le file de la fonction
+#GCO   content = function(file) est le nom d'un fichier temporaire prêt à recevoir ce qu'il
+#GCO   faut renvoyer. Pourquoi créer un autre fichier temporaire pour finalement le copier dedans ?
+#GCO Au cours de la production du rapport il ne trouve pas les champs longitude et latitude
+
 function(input, output, session) {
 
-  # stop the serveur in the end of the session
-  session$onSessionEnded(function() {
-    stopApp()
-  })
+  #GCO version compatible local/server
+  autoCloseApp()
 
   observe({
     # hide few menu at the begining
@@ -35,6 +47,7 @@ function(input, output, session) {
     showElement("box_DATASET")
     showElement("box_COORD")
 
+    #GCO ça ne devrait pas être là ! Eviter d'imbriquer les blocs réactifs
     # show forest inventory content
     output$table_DATASET <- renderDT(inv(), options = list(scrollX = TRUE))
 
@@ -163,6 +176,9 @@ function(input, output, session) {
 
 
   ## Errors management when clicking on continue ----
+  #GCO pourquoi utiliser une variable réactive pour error ? Tout tes test sont mutuellement exclusifs
+  #GCO if else if else if else ....
+  #GCO je lui aurais donné un nom plus parlant (had_error, error_occured, any_error, ...)
   error <- reactiveVal()
   observeEvent(input$btn_DATASET_LOADED, {
     print("Reaction to btn_DATASET_LOADED -> error management")
