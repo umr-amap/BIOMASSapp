@@ -226,7 +226,7 @@ dashboardPage(
             hidden(boxWithId(
               width = 12,
               id = "box_result_chave", title = "Chave et al. (2014)",
-              withSpinner(textOutput("txt_chave"),
+              withSpinner(tableOutput("out_tab_chave"),
                           type = getOption("spinner.type", default = 5),
                           color = getOption("spinner.color", default = "#158A0C")
               )
@@ -281,9 +281,10 @@ dashboardPage(
             )
           )),
           hidden(boxWithId(
-            id = "box_AGB_Report", width = 2,
-            downloadButton("dwl_report", label = "Report"),
-            downloadButton("dwl_file", label = "Download results")
+            id = "box_AGB_Report", width = 4,
+            downloadButton("dwl_tree_file", label = "Download tree level results"),
+            downloadButton("dwl_plot_file", label = "Download plot level results"),
+            downloadButton("dwl_report", label = "Downloal report"),
           ))
         )
       )
