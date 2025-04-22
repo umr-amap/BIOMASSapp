@@ -10,7 +10,8 @@ library(shinyFeedback)
 library(rmarkdown)
 library(measurements)
 library(DT)
-library(BIOMASS)
+#library(BIOMASS)
+devtools::load_all("~/BIOMASS/")
 
 # set maximum input file size (here 30Mo)
 options(shiny.maxRequestSize = 30 * 1024^2)
@@ -61,13 +62,14 @@ AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, e
   }
 
   # AGB without error propagation
+  # The output will be in a list format to standardise it with the error propagation output
   if (AGBmod == "agb") {
 
     if (!is.null(E_vec)) { # Chave method
       # Modified Eq 7 from Chave et al. 2014 Global change biology
       # We apply the formula instead of calling computeAGB with a coord argument (which call computeE() which is time consuming)
       AGB <- exp(-2.023977 - 0.89563505 * E_vec + 0.92023559 * log(WD) + 2.79495823 * log(D) - 0.04606298 * (log(D)^2)) / 1000
-      return(as.matrix(AGB))
+      return(list(AGB_pred = as.matrix(AGB)))
     }
 
     if (!is.null(HDmodel)) { # HD model
@@ -78,10 +80,11 @@ AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, e
       H <- retrieveH(D, region = region)$H
     }
 
-    AGB <- as.matrix(computeAGB(D, WD, H = H))
+    AGB <- list(AGB_pred = as.matrix(computeAGB(D, WD, H = H)))
   }
 
   # AGB with error
+  # We will add (to the AGB list output) the AGB_pred element containing individual AGB predictions, similarly to AGB without propagation (for the downloads)
   if (AGBmod == "agbe") {
 
     if( !is.null(errH) ) { # heights (and errH) provided by the user
@@ -91,6 +94,7 @@ AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, e
         H = H, errH = errH,
         plot = model_by
       )
+      AGB[["AGB_pred"]] <- AGB_predict("agb", D, WD, errWD, H = H, errH = errH, model_by = model_by)$AGB_pred
     }
 
     if (!is.null(region)) { # feld region
@@ -101,8 +105,9 @@ AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, e
         D, Dpropag = "chave2004",
         WD, errWD,
         H = H, errH = errH,
-        plot = model_by
+        plot = model_by,
       )
+      AGB[["AGB_pred"]] <- AGB_predict("agb", D, WD, errWD, H = H, errH = errH, model_by = model_by)$AGB_pred
     }
 
     if(!is.null(HDmodel)) { # HD local model
@@ -112,6 +117,7 @@ AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, e
         HDmodel = HDmodel,
         plot = model_by
       )
+      AGB[["AGB_pred"]] <- AGB_predict("agb", D, WD, errWD, HDmodel = HDmodel, model_by = model_by)$AGB_pred
     }
 
     if(!is.null(coord)) { # Chave's AGB equation
@@ -120,10 +126,46 @@ AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, e
         WD, errWD,
         coord = coord
       )
+      # We don't want to call back AGB_predict so we will take the mean of the 1000 simu
+      AGB[["AGB_pred"]] <- as.matrix(apply(AGB$AGB_simu,1,mean))
     }
   }
 
   return(AGB)
+}
+
+indiv_H_pred <- function(inv, rad_height, H, AGB_res, chkgrp_HEIGHT, sel_HDmodel_by, hd_data, hd_model, D, region, coord){
+
+  inv_h_pred <- inv
+
+  if(!is.null(rad_height) && rad_height == "h_each_tree") {
+    inv_h_pred$H_Lorey <- H * inv_h_pred$BA
+    inv_h_pred$AGB <- round(as.vector(AGB_res[["height"]]$AGB_pred), 3)
+  }
+  if ("HDloc" %in% chkgrp_HEIGHT) {
+    if( !is.null(sel_HDmodel_by) && sel_HDmodel_by != "<unselected>" ) { # if stand-specific models
+      inv_h_pred$H_local_model <- round(retrieveH(hd_data$D, hd_model, plot = hd_data$model_for)$H, 2)
+    } else {
+      inv_h_pred$H_local_model <- round(retrieveH(D, hd_model)$H, 2)
+    }
+    inv_h_pred$H_Lorey_local_model <- inv_h_pred$H_local_model * inv_h_pred$BA
+    inv_h_pred$AGB_local_model <- round(as.vector(AGB_res[["local HD model"]]$AGB_pred), 3)
+  }
+  if ("feld" %in% chkgrp_HEIGHT) {
+    inv_h_pred$H_Feldpausch <- round( retrieveH(D,
+                                                region = region[ match( inv_h_pred[["plot"]] ,
+                                                                        table = region$plot),
+                                                                 "feld_region"]
+                                                )$H, 2)
+    inv_h_pred$H_Lorey_Feldpausch <- inv_h_pred$H_Feldpausch * inv_h_pred$BA
+    inv_h_pred$AGB_Feldpausch <- round(as.vector(AGB_res[["Feldpausch"]]$AGB_pred), 3)
+  }
+  if ("chave" %in% chkgrp_HEIGHT) {
+    inv_h_pred$H_Chave <- round(retrieveH(D, coord = coord[,c("long","lat")])$H, 2)
+    inv_h_pred$H_Lorey_Chave <- inv_h_pred$H_Chave * inv_h_pred$BA
+    inv_h_pred$AGB_Chave <- round(as.vector(AGB_res[["Chave"]]$AGB_pred), 3)
+  }
+  return(inv_h_pred)
 }
 
 
