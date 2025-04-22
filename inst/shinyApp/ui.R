@@ -247,7 +247,6 @@ dashboardPage(
             width = 4,
             hidden(boxWithId(
               id = "box_MAP", title = "Map",
-              #plotOutput("plot_MAP"),
               width = 12,
               leafletOutput(outputId = "plot_MAP")
             ))
@@ -281,7 +280,7 @@ dashboardPage(
             )
           )),
           hidden(boxWithId(
-            id = "box_AGB_Report", width = 4,
+            id = "box_AGB_Report", width = 5,
             downloadButton("dwl_tree_file", label = "Download tree level results"),
             downloadButton("dwl_plot_file", label = "Download plot level results"),
             downloadButton("dwl_report", label = "Downloal report"),
