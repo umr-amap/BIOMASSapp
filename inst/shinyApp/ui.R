@@ -73,45 +73,52 @@ dashboardPage(
                    ## Wood density or taxonmy (compulsory) ----
                    hr(), hr(), hr(),
                    h4("Wood density or taxonomy"),
-                   selectInput("sel_WD", "Wood density", choices = NULL),
-                   hidden(div(id = "id_set_errWD",
-                              numericInput("set_errWD", label = "What is the assumed error associated with the wood densities measurements ?",
-                                           value = 0.07, min = 0),
-                   )),
+                   column(9,
+                          selectInput("sel_WD", "Wood density", choices = NULL)),
+                   column(3, radioButtons("rad_units_wd", "Unit:",
+                                          choices = c("g.cm-3","kg.m-3"),
+                                          selected = "g.cm-3")),
+                   column(12, hidden(div(id = "id_set_errWD",
+                                         numericInput("set_errWD", label = "What is the assumed error associated with the wood densities measurements (in m) ?",
+                                                      value = 0.07, min = 0)))),
                    h5("or"),
-                   selectInput("sel_GENUS", "Genus (e.g. Terminalia) or scientific name (e.g. Terminalia superba or Terminalia superba Engl. & Diels)", choices = NULL),
-                   selectInput("sel_SPECIES", "Species (e.g. superba)", choices = NULL),
+                   column(12, selectInput("sel_GENUS", "Genus (e.g. Terminalia) or scientific name (e.g. Terminalia superba or Terminalia superba Engl. & Diels)", choices = NULL)), # column to keep the same layout than Diameter and Wood density selections
+                   column(12, selectInput("sel_SPECIES", "Species (e.g. superba)", choices = NULL)),
                    hidden(div("Provide either wood density or taxonomy information ", id = "msg_wd", style = "color:red;")),
 
                    ## Height ----
                    hr(),
                    h4("Height"),
-                   radioButtons("rad_height", "Do you have:",
-                                choices = c("The height of each tree" = "h_each_tree",
-                                            "The height of some trees in the same dataset" = "h_some_tree",
-                                            "A subset of well-measured trees in another dataset (see below for an overview)" = "h_sup_data",
-                                            "No height measurements (use coordinates to estimate height)" = "h_none"),
-                                selected = character(0)),
+                   column(12, radioButtons("rad_height", "Do you have:",
+
+                                           choices = c("The height of each tree" = "h_each_tree",
+                                                       "The height of some trees in the same dataset" = "h_some_tree",
+                                                       "A subset of well-measured trees in another dataset (see below for an overview)" = "h_sup_data",
+                                                       "No height measurements (use coordinates to estimate height)" = "h_none"),
+                                           selected = character(0))),
                    # If height of each tree or some trees
                    hidden(div(id = "id_sel_h",
                               column(9 , selectInput("sel_H", "Select height column", choices = NULL)),
                               column(3, radioButtons("rad_units_height", "Unit:", choices = c("cm", "m"), selected = "m"))
                    )),
                    hidden(div(id = "id_sel_HDmodel_by",
-                              h5("The heights of non-measured trees will be estimated using Height-Diameter relationships on measured trees."),
-                              h5("If you want to create a Height-Diameter model by plot (or by any category), please specify the column corresponding to the plot (or category) IDs:"),
-                              selectInput("sel_HDmodel_by", "", choices = NULL)
+                              column(12,
+                                     h5("The heights of non-measured trees will be estimated using Height-Diameter relationships on measured trees."),
+                                     h5("If you want to create a Height-Diameter model by plot (or by any category), please specify the column corresponding to the plot (or category) IDs:"),
+                                     selectInput("sel_HDmodel_by", "", choices = NULL))
                    )),
                    hidden(div(id = "id_set_errH",
-                              numericInput("set_errH", label = "What is the assumed error associated with the individual height measurements ?",
-                                           value = 4.22, min = 0),
+                              column(12, numericInput("set_errH", label = "What is the assumed error associated with the individual height measurements ?",
+                                                      value = 4.22, min = 0)),
                    )),
                    # If height in another dataset
                    hidden(div(id = "id_file_h_sup",
-                              fileInput("file_h_sup", "Choose a CSV file",
-                                        accept = c("text/csv", "text/comma-separated-values,text/plain",".csv")),
-                              selectInput("sel_D_sup_data", "Diameter", choices = NULL),
-                              selectInput("sel_H_sup_data", "Height", choices = NULL)
+                              column(12, fileInput("file_h_sup", "Choose a CSV file",
+                                                   accept = c("text/csv", "text/comma-separated-values,text/plain",".csv"))),
+                              column(9 , selectInput("sel_D_sup_data", "Diameter", choices = NULL)),
+                              column(3, radioButtons("rad_units_D_sup", "Unit:", choices = c("mm","cm", "m"), selected = "cm")),
+                              column(9 , selectInput("sel_H_sup_data", "Height", choices = NULL)),
+                              column(3, radioButtons("rad_units_H_sup", "Unit:", choices = c("cm", "m"), selected = "m"))
                    ))
                  )))),
 
@@ -162,7 +169,7 @@ dashboardPage(
                 "Extract WD without taxonomic correction" = "WD")
             ),
             actionButton("btn_TAXO_RESULT", "Go on")
-        )),
+          )),
         fluidRow(
           hidden(boxWithId(
             id = "box_RESULT_TAXO", title = "Results", width = 12,
@@ -200,37 +207,37 @@ dashboardPage(
                 "Chave" = "chave"
               )
             )
-        )),
+          )),
         fluidRow(
           column( 4 ,
-            ## HD model
-            hidden(boxWithId(
-              width = 12,
-              id = "box_RESULT_HDMOD", title = "Local HD model",
-              # (model accuracy is estimated on all HD data)
-              tableOutput("out_tab_HD"),
-              radioButtons("rad_HDMOD", "Choose your local HD model:", choices = "NULL")
-            ))
+                  ## HD model
+                  hidden(boxWithId(
+                    width = 12,
+                    id = "box_RESULT_HDMOD", title = "Local HD model",
+                    # (model accuracy is estimated on all HD data)
+                    tableOutput("out_tab_HD"),
+                    radioButtons("rad_HDMOD", "Choose your local HD model:", choices = "NULL")
+                  ))
           ),
           column( 4 ,
-            ## Feldpausch
-            hidden(boxWithId(
-              width = 12,
-              id = "box_RESULT_FELD", title = "Feldpausch et al. (2012)",
-              #textOutput("txt_feld")
-              tableOutput("out_tab_feld"),
-            ))
+                  ## Feldpausch
+                  hidden(boxWithId(
+                    width = 12,
+                    id = "box_RESULT_FELD", title = "Feldpausch et al. (2012)",
+                    #textOutput("txt_feld")
+                    tableOutput("out_tab_feld"),
+                  ))
           ),
           column( 4 ,
-            ## Chave
-            hidden(boxWithId(
-              width = 12,
-              id = "box_result_chave", title = "Chave et al. (2014)",
-              withSpinner(tableOutput("out_tab_chave"),
-                          type = getOption("spinner.type", default = 5),
-                          color = getOption("spinner.color", default = "#158A0C")
-              )
-            ))
+                  ## Chave
+                  hidden(boxWithId(
+                    width = 12,
+                    id = "box_result_chave", title = "Chave et al. (2014)",
+                    withSpinner(tableOutput("out_tab_chave"),
+                                type = getOption("spinner.type", default = 5),
+                                color = getOption("spinner.color", default = "#158A0C")
+                    )
+                  ))
           )
         ),
         fluidRow(
@@ -248,8 +255,10 @@ dashboardPage(
             hidden(boxWithId(
               id = "box_MAP", title = "Map",
               width = 12,
-              leafletOutput(outputId = "plot_MAP")
-            ))
+              withSpinner(leafletOutput(outputId = "plot_MAP"),
+                          type = getOption("spinner.type", default = 5),
+                          color = getOption("spinner.color", default = "#158A0C")
+              )))
           )
         ),
         fluidRow(

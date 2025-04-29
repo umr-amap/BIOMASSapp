@@ -14,7 +14,7 @@ function(input, output, session) {
 
   # Reactive values:
   rv <- reactiveValues(
-    inv = NULL, # forest inventory data-frame
+    inv = NULL, # forest inventory data-frame (created when clicking on 'Continue' in 'Load dataset' item)
     df_h_sup = NULL, # supplementary height data-frame (e.g NouraguesHD)
     df_coord = NULL, # supplementary plot coordinates data-frame (e.g NouraguesCoord)
     wd = NULL, # output of getWoodDensity()
@@ -29,8 +29,12 @@ function(input, output, session) {
     E = NULL, # a vector of E parameter for each plot
     AGB_sum = list(), # output of summaryByPlot()
     AGB_res = list(), # output of AGB_predict() (in global.R)
-    inv_h_pred = NULL # data-frame containing tree-level results to download
+    inv_h_pred = NULL, # data-frame containing tree-level results to download
+    removedPlot = NULL, #removedPlot will contain plots that don't have enough height measurements when building a model stand/region specific or those with diameter not well distributed
+    plot = NULL # reactive value to access the plot for the report
   )
+  # Preparing forest_inv to receive input$file_DATASET thanks to <<-
+  forest_inv <- NULL
 
 
   # LOAD DATASET ---------------------------------------------------------------
@@ -42,7 +46,7 @@ function(input, output, session) {
     #input$num_skip_line
   }, priority = 1, {
     # Read forest inventory upload
-    rv$inv <- fread(
+    forest_inv <<- fread(
       file = req(input$file_DATASET)$datapath,
       #skip = ifelse(is.na(input$num_skip_line) || input$num_skip_line == 0, "__auto__", input$num_skip_line),
       data.table = FALSE,
@@ -55,52 +59,38 @@ function(input, output, session) {
     showElement("box_COORD")
 
     # show forest inventory content
-    output$table_DATASET <- renderDT(rv$inv, options = list(scrollX = TRUE))
+    output$table_DATASET <- renderDT(forest_inv, options = list(scrollX = TRUE))
 
     # update the values of the select inputs with the column names
-    int_num_col <- names(rv$inv)[ sapply(rv$inv, class) %in% c("integer", "numeric")]
+    int_num_col <- names(forest_inv)[ sapply(forest_inv, class) %in% c("integer", "numeric")]
     for (id in c("sel_DIAMETER", "sel_WD")) {
       updateSelectInput(session, id, choices = c("<unselected>", int_num_col))
     }
-    char_col <- names(rv$inv)[ sapply(rv$inv, class) %in% "character" ]
+    char_col <- names(forest_inv)[ sapply(forest_inv, class) %in% "character" ]
     for (id in c("sel_GENUS", "sel_SPECIES")) {
       updateSelectInput(session, id, choices = c("<unselected>", char_col))
     }
-    updateSelectInput(session, "sel_PLOT", choices = c("<unselected>", names(rv$inv)))
+    updateSelectInput(session, "sel_PLOT", choices = c("<unselected>", names(forest_inv)))
   })
 
-  # Plot's IDs selection when several plots
-  observeEvent({
-    input$rad_several_plots
-    input$file_DATASET
-  },{
+  # Show plot's IDs selection when several plots
+  observeEvent(input$rad_several_plots, {
     toggleElement("sel_PLOT", condition = req(input$rad_several_plots) == "several_plots")
-    updateSelectInput(session, "sel_PLOT", choices = c("<unselected>", names(rv$inv)))
+    updateSelectInput(session, "sel_PLOT", choices = c("<unselected>", names(forest_inv)))
   })
 
   # Hide/Show "information required" message
-  observe(
-    if( (req(input$rad_several_plots) == "single_plot") | (req(input$rad_several_plots) =="several_plots" & ! req(input$sel_PLOT) %in% c("<unselected>","")) ) {
+  observe({
+    req(input$rad_several_plots, input$sel_PLOT)
+    if( (input$rad_several_plots == "single_plot") | (input$rad_several_plots =="several_plots" & ! input$sel_PLOT %in% c("<unselected>","")) ) {
       hideElement("msg_several_plots")
     } else {
       showElement("msg_several_plots")
     }
-  )
-
-  # Set the plot column that contains plotID (in inv)
-  observeEvent(
-    list(input$rad_several_plots, input$sel_PLOT), ignoreInit = TRUE, ignoreNULL = TRUE, {
-      req(rv$inv)
-      print("Set the plot column that contains plotID")
-      inv_plot <- rv$inv
-      if(req(input$rad_several_plots) == "several_plots" && req(input$sel_PLOT) != "<unselected>" ) {
-        rv$inv$plot <- as.character(rv$inv[,input$sel_PLOT])
-      } else if (req(input$rad_several_plots) == "single_plot") {
-        rv$inv$plot <- ""
-      }
   })
 
   ## WD ----
+  # Show the setting of errWD when the user provides the wood density
   observeEvent(input$sel_WD, {
     toggleElement("id_set_errWD",
                   condition = input$sel_WD != "<unselected>")
@@ -109,9 +99,9 @@ function(input, output, session) {
   ## Height ----
   ### height radio button actions ----
   observeEvent(input$rad_height, {
-    int_num_col <- names(rv$inv)[ sapply(rv$inv, class) %in% c("integer", "numeric")]
+    int_num_col <- names(forest_inv)[ sapply(forest_inv, class) %in% c("integer", "numeric")]
     updateSelectInput(session, "sel_H", choices = c("<unselected>", int_num_col))
-    updateSelectInput(session, "sel_HDmodel_by", choices = c("<unselected>", names(rv$inv)))
+    updateSelectInput(session, "sel_HDmodel_by", choices = c("<unselected>", names(forest_inv)))
     toggleElement("id_sel_h",
                   condition = input$rad_height %in% c("h_each_tree","h_some_tree"))
     toggleElement("id_set_errH",
@@ -144,7 +134,7 @@ function(input, output, session) {
   observeEvent(input$rad_coord, {
     if(input$rad_coord == "coord_each_tree") {
       # Show latitude and longitude select inputs for forest inventory table
-      int_num_col <- names(rv$inv)[ sapply(rv$inv, class) %in% c("integer", "numeric")]
+      int_num_col <- names(forest_inv)[ sapply(forest_inv, class) %in% c("integer", "numeric")]
       updateSelectInput(session, "sel_LAT", choices = c("<unselected>", int_num_col))
       updateSelectInput(session, "sel_LONG", choices = c("<unselected>", int_num_col))
     }
@@ -158,9 +148,8 @@ function(input, output, session) {
   })
 
   ### coordinates file actions  ----
-  observeEvent({
-    input$file_coord
-    input$rad_several_plots}, {
+  observeEvent(
+    list(input$file_coord, input$rad_several_plots), {
       # Read plot coordinates upload
       rv$df_coord <- fread(
         file = req(input$file_coord)$datapath,
@@ -178,9 +167,11 @@ function(input, output, session) {
       updateSelectInput(session, "sel_plot_coord", choices = c("<unselected>", names(rv$df_coord)))
     })
 
-  ## Errors management when clicking on continue ----
-  observeEvent(input$btn_DATASET_LOADED, {
-    print("Reaction to btn_DATASET_LOADED -> error management")
+  ## Reaction to 'Continue' button ----
+  observeEvent(input$btn_DATASET_LOADED, priority = 10, {
+    print("Reaction to btn_DATASET_LOADED")
+
+    ### Error management ----
     error <- FALSE
     if ( is.null(input$file_DATASET) ) {
       # if no dataset is provided
@@ -252,32 +243,57 @@ function(input, output, session) {
       }
     }
 
-    if (!error) {
-      if (input$sel_DIAMETER != "<unselected>") {
-        rv$inv[,input$sel_DIAMETER] <- conv_unit(rv$inv[,input$sel_DIAMETER], input$rad_units_diameter, "cm")
+    ## Reset the "Choose the HD model" button (used if the user go back to the Load dataset after Retrieving tree heights) ----
+    updateCheckboxGroupInput(session, inputId = "chkgrp_HEIGHT",
+                             choices = c("Local HD model" = "HDloc","Feldpausch" = "feld","Chave" = "chave"),
+                             selected = NULL, inline = T)
+
+    ## Setting rv$inv ----
+    if(!error) {
+
+      rv$inv <- forest_inv
+
+      ### Setting the plot column that contains plotID
+      if(input$rad_several_plots == "several_plots" && input$sel_PLOT != "<unselected>" ) {
+        rv$inv$plot <- as.character(rv$inv[,input$sel_PLOT])
+      } else if (input$rad_several_plots == "single_plot") {
+        rv$inv$plot <- ""
       }
+
+      ### Unit conversions
+      # Diameter
+      rv$inv[,input$sel_DIAMETER] <- conv_unit(rv$inv[,input$sel_DIAMETER], input$rad_units_diameter, "cm")
+      # WD (note that errWD unit will be changed when clicking on the 'Go on' button for AGB calculation)
+      if (input$sel_WD != "<unselected>") {
+        if(input$rad_units_wd == "kg.m-3") {
+          rv$inv[,input$sel_WD] <- rv$inv[,input$sel_WD] / 1000
+        }
+      }
+      # Height (note that errH unit will be changed when clicking on the 'Go on' button for AGB calculation)
       if (input$sel_H != "<unselected>") {
-        rv$inv[,input$sel_H] <- conv_unit(rv$inv[,input$sel_H], input$rad_units_height, "m")
+        rv$inv[,input$sel_H] <- conv_unit(rv$inv[,input$sel_H], input$rad_units_height, "cm")
+      }
+      # diameter and height for sup data
+      if (!is.null(input$file_h_sup)) {
+        rv$df_h_sup[,input$sel_D_sup_data] <- conv_unit(rv$df_h_sup[,input$sel_D_sup_data], input$rad_units_D_sup, "cm")
+        rv$df_h_sup[,input$sel_H_sup_data] <- conv_unit(rv$df_h_sup[,input$sel_H_sup_data], input$rad_units_H_sup, "cm")
       }
     }
-  })
+  }) # end of "reaction to 'Continue' button
 
   ## Warnings ----
   # If the diameter is unselected => red box
   observeEvent(input$sel_DIAMETER, {
     feedbackDanger("sel_DIAMETER",
                    show = input$sel_DIAMETER == "<unselected>",
-                   text = "Compulsory argument"
-    )
+                   text = "Compulsory argument" )
   })
   # if the wd or genus not selected (but not both)
   observe({
     toggleElement("msg_wd",
                   condition =
-                    !xor(input$sel_WD == "<unselected>", input$sel_GENUS == "<unselected>")
-    )
+                    !xor(input$sel_WD == "<unselected>", input$sel_GENUS == "<unselected>") )
   })
-
 
   # TAXONOMY -------------------------------------------------------------------
 
@@ -320,7 +336,6 @@ function(input, output, session) {
         rv$inv$genusCorrected <- rv$taxo$genusCorrected
         rv$inv$speciesCorrected <- rv$taxo$speciesCorrected
 
-
       } else {
         # if the users do not choose the correct taxo
         genus <- rv$inv[, input$sel_GENUS]
@@ -344,7 +359,7 @@ function(input, output, session) {
           rv$taxo$message
         })
         rv$wd <- NULL
-      } else { # if not a message will appear
+      } else { # if not display the results
 
         # add WD and sdWD columns to inv for the download of the tree level results
         rv$inv$WD <- rv$wd$meanWD
@@ -396,30 +411,16 @@ function(input, output, session) {
 
   # HEIGHT ---------------------------------------------------------------------
 
-  # Reset the "Choose the HD model" button (used if the user go back to the Load dataset after Retrieving tree heights)
-  observeEvent(
-    list(input$btn_TAXO_DONE,
-         input$sel_H, input$sel_H_sup_data, input$sel_D_sup_data,
-         input$sel_DIAMETER, input$sel_PLOT, input$sel_HDmodel_by, input$btn_DATASET_LOADED), ignoreInit = TRUE , priority = 10, {
-
-           print("Reset chkgrp_HEIGHT radio buttons")
-           updateCheckboxGroupInput(session, inputId = "chkgrp_HEIGHT",
-                                    choices = c("Local HD model" = "HDloc","Feldpausch" = "feld","Chave" = "chave"),
-                                    selected = NULL, inline = T)
-
-  })
-
-
   ## HD local models -----------------------------------------------------------
 
   observeEvent({
     input$chkgrp_HEIGHT
     # List of event that can modify data and affecting model fitting:
-    input$sel_DIAMETER
-    input$sel_H
-    input$sel_D_sup_data
-    input$sel_H_sup_data
-    input$sel_HDmodel_by
+    # input$sel_DIAMETER
+    # input$sel_H
+    # input$sel_D_sup_data
+    # input$sel_H_sup_data
+    # input$sel_HDmodel_by
   }, ignoreNULL = FALSE, ignoreInit = TRUE, priority = 9, {
 
     if ("HDloc" %in% input$chkgrp_HEIGHT) {
@@ -446,18 +447,18 @@ function(input, output, session) {
           rv$hd_data[, model_for := as.character(rv$inv[[input$sel_HDmodel_by]])]
           new_hd_data <- rv$hd_data
           # remove all the plots with less than 15 non NA value
-          removedPlot <- unique(new_hd_data[, .(nbNonNA = sum(!is.na(H))), by = model_for][nbNonNA < 15, model_for])
-          new_hd_data <- new_hd_data[!model_for %in% removedPlot]
+          rv$removedPlot <- unique(new_hd_data[, .(nbNonNA = sum(!is.na(H))), by = model_for][nbNonNA < 15, model_for])
+          new_hd_data <- new_hd_data[!model_for %in% rv$removedPlot]
           # remove plots for which D is not well distributed
           new_hd_data <- new_hd_data[, quantile := findInterval(D, c(-1, quantile(D, probs = c(0.5, 0.75)), max(D) + 1)), by = model_for]
-          removedPlot <- c(removedPlot, unique(new_hd_data[, .N, by = .(model_for, quantile)][N < 3, model_for]))
-          rv$hd_data <- new_hd_data[!model_for %in% removedPlot]
+          rv$removedPlot <- c(rv$removedPlot, unique(new_hd_data[, .N, by = .(model_for, quantile)][N < 3, model_for]))
+          rv$hd_data <- new_hd_data[!model_for %in% rv$removedPlot]
 
           # if there is a least one plot in the removed plot -> warning message
-          if (length(removedPlot) != 0) {
+          if (length(rv$removedPlot) != 0) {
             shinyalert("Be carefull !", paste(
               "Local HD model cannot be built for:",
-              paste(removedPlot, collapse = ", "),
+              paste(rv$removedPlot, collapse = ", "),
               "\n either:",
               "\n\t - there are not enough local height measurements",
               "\n\t - height measurements are likely not representative of tree size distribution",
@@ -480,34 +481,44 @@ function(input, output, session) {
 
 
       ## Building and compare the 4 local HD models ----------------------------
-      tab_modelHD <- modelHD(
-        D = rv$hd_data$D,
-        H = rv$hd_data$H,
-        plot = rv$hd_data$model_for
-      )
+      tab_modelHD <- tryCatch({
+        modelHD(
+          D = rv$hd_data$D,
+          H = rv$hd_data$H,
+          plot = rv$hd_data$model_for
+        )
+      }, error = function(e) NULL)
 
-      # render the table
-      if (input$sel_HDmodel_by == "<unselected>"){
-        output$out_tab_HD <- renderTable(tab_modelHD[, -3], digits = 4)
-      } else { # If one model per plot/region/whatever, compute the mean of RMSE and Average_bias over all models
-        tab_modelHD <- do.call(rbind,tab_modelHD)
-        tab_modelHD <- data.table(tab_modelHD[,-3])
-        tab_modelHD <- tab_modelHD[, lapply(.SD, mean) , by = method]
-        output$out_tab_HD <- renderTable(tab_modelHD, digits = 4)
+      if(is.null(tab_modelHD)) { # if models cannot be built
+        shinyalert("Oops !", "Local H-D models cannot be built. You should check your data, in particular the units of your diameter and height values (if provided)", type = "error")
+        # Reset the checkbox
+        updateCheckboxGroupInput(session, inputId = "chkgrp_HEIGHT",
+                                 choices = c("Local HD model" = "HDloc","Feldpausch" = "feld","Chave" = "chave"),
+                                 selected = NULL, inline = T)
+        return()
+      } else {
+        # render the table
+        if (input$sel_HDmodel_by == "<unselected>"){
+          output$out_tab_HD <- renderTable(tab_modelHD[, -3], digits = 4)
+        } else { # If one model per plot/region/whatever, compute the mean of RMSE and Average_bias over all models
+          tab_modelHD <- do.call(rbind,tab_modelHD)
+          tab_modelHD <- data.table(tab_modelHD[,-3])
+          tab_modelHD <- tab_modelHD[, lapply(.SD, mean) , by = method]
+          output$out_tab_HD <- renderTable(tab_modelHD, digits = 4)
+        }
+
+        # update the radio button with the method and choose the minimum of the RSE
+        print("Updating radio button for HD model")
+        updateRadioButtons(session,
+                           inputId = "rad_HDMOD",
+                           choices = tab_modelHD$method,
+                           selected = tab_modelHD$method[which.min(tab_modelHD$RSE)],
+                           inline = TRUE)
+
+        ### Show the box containing the result of hd_model
+        showElement("box_RESULT_HDMOD")
       }
-
-      # update the radio button with the method and choose the minimum of the RSE
-      print("Updating radio button for HD model")
-      updateRadioButtons(session,
-                         inputId = "rad_HDMOD",
-                         choices = tab_modelHD$method,
-                         selected = tab_modelHD$method[which.min(tab_modelHD$RSE)],
-                         inline = TRUE)
-
-      ### Show the box containing the result of hd_model
-      showElement("box_RESULT_HDMOD")
-
-    } else {
+    } else { # if ("HDloc" not in input$chkgrp_HEIGHT)
       hideElement("box_RESULT_HDMOD")
     }
   })
@@ -535,7 +546,7 @@ function(input, output, session) {
 
   observeEvent(
     input$btn_DATASET_LOADED,
-    ignoreInit = TRUE, priority = 10, {
+    ignoreInit = TRUE, {
 
       req(input$file_DATASET)
       req(input$rad_coord)
@@ -581,9 +592,9 @@ function(input, output, session) {
 
   observeEvent( {
     input$chkgrp_HEIGHT
-    input$btn_DATASET_LOADED # if the user go back to the Load dataset item
+    #input$btn_DATASET_LOADED # if the user go back to the Load dataset item
   },
-  ignoreNULL = FALSE, ignoreInit = TRUE, {
+  ignoreNULL = TRUE, ignoreInit = TRUE, {
 
     if ("feld" %in% input$chkgrp_HEIGHT) {
       print("Observing chkrgrp_HEIGHT for Feldpausch method")
@@ -645,8 +656,8 @@ function(input, output, session) {
 
   observeEvent( {
     input$chkgrp_HEIGHT
-    input$btn_DATASET_LOADED # if the user go back to the Load dataset item
-  }, ignoreNULL = FALSE, ignoreInit = TRUE, {
+    #input$btn_DATASET_LOADED # if the user go back to the Load dataset item
+  }, ignoreNULL = TRUE, ignoreInit = TRUE, {
 
     if ("chave" %in% input$chkgrp_HEIGHT) {
 
@@ -700,7 +711,7 @@ function(input, output, session) {
 
   ## Plotting height predictions --------------
   observeEvent({
-    list(input$chkgrp_HEIGHT, input$rad_HDMOD, input$btn_DATASET_LOADED)
+    list(input$chkgrp_HEIGHT, input$rad_HDMOD)
   }, ignoreNULL = TRUE, ignoreInit = TRUE, {
 
     req(input$file_DATASET)
@@ -711,7 +722,7 @@ function(input, output, session) {
     D <- seq(1, max( c(rv$inv$D, rv$hd_data$D) ) )
 
     ### Basic plot for HD-methods comparison ----
-    plot <- ggplot(data = NULL, aes(x = D)) +
+    rv$plot <- ggplot(data = NULL, aes(x = D)) +
       xlab("Diameter (cm)") +
       ylab("Height (m)") +
       #scale_fill_manual(name = "model confidence interval", values = c("local HD model" = "#619CFF", Feldpausch = "#00BA38", Chave = "#F8766D")) +
@@ -734,7 +745,7 @@ function(input, output, session) {
       if ( !is.null(rv$hd_model) ) {
 
         if (input$sel_HDmodel_by == "<unselected>"){
-          plot <- plot +
+          rv$plot <- rv$plot +
             geom_point(data = rv$hd_data, mapping = aes(x = D, y = H), size=1.5) + # measured trees
             geom_line(aes(y = retrieveH(D, model = rv$hd_model)$H, colour = "local HD model"), lwd=1.2) + # HD model
             ylim( c(0, max(rv$hd_data$H, na.rm = TRUE) + 5))
@@ -745,7 +756,7 @@ function(input, output, session) {
                         H_pred = retrieveH(D, model = rv$hd_model[[x]])$H,
                         model_for = x)
           }))
-          plot <- plot +
+          rv$plot <- rv$plot +
             geom_point(data = rv$hd_data, mapping = aes(x = D, y = H, shape = model_for), size=1.5) + # measured trees
             geom_line(data = df_lines, mapping = aes(x = D, y = H_pred, colour = "local HD model", lty = model_for), lwd=1.2) + #HD model for each plots/regions..
             ylim( c(0, max(rv$hd_data$H, na.rm = TRUE) + 5))
@@ -765,9 +776,9 @@ function(input, output, session) {
                       model_for = x)
         }))
         if(length(unique(df_lines$model_for)) == 1 ) { # if one single region
-          plot <- plot + geom_line(data = df_lines, mapping = aes(x = D, y = H_pred, colour = "Feldpausch"), lwd=1.2)
+          rv$plot <- rv$plot + geom_line(data = df_lines, mapping = aes(x = D, y = H_pred, colour = "Feldpausch"), lwd=1.2)
         } else {
-          plot <- plot + geom_line(data = df_lines, mapping = aes(x = D, y = H_pred, colour = "Feldpausch", lty=model_for), lwd=1.2)
+          rv$plot <- rv$plot + geom_line(data = df_lines, mapping = aes(x = D, y = H_pred, colour = "Feldpausch", lty=model_for), lwd=1.2)
         }
       }
     }
@@ -787,13 +798,13 @@ function(input, output, session) {
             model_for = as.character(rv$coord_plot[x,"plot"])
           )
         }))
-        plot <- plot +
+        rv$plot <- rv$plot +
           geom_line(data = df_lines, mapping = aes(x=D, y=H_pred, colour = "Chave", lty = model_for), lwd=1.2)
       }
     }
 
     # Render the plot
-    output$out_plot_comp <- renderPlot(plot)
+    output$out_plot_comp <- renderPlot(rv$plot)
   })
 
   ## Done button actions -------------------------------------------------------
@@ -835,6 +846,7 @@ function(input, output, session) {
     } else {
       WD <- rv$inv[, input$sel_WD]
       errWD <- rep(input$set_errWD, length(WD))
+      if(input$set_errWD == "kg.m-3") errWD <- errWD / 1000
     }
 
     # Retrieve heights (and its uncertainties if heights provided by the user)
@@ -940,7 +952,7 @@ function(input, output, session) {
     ## Render AGB plot's ----
     # plot the output
     output$out_plot_AGB <- renderPlot({
-      plot_list(rv$AGB_sum, color, AGBmod = AGBmod)
+      plot_list(rv$AGB_sum, color, AGBmod = AGBmod, removedPlot = rv$removedPlot)
     })
 
     showElement(id = "box_AGB_res")
