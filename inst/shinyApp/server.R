@@ -256,10 +256,13 @@ function(input, output, session) {
       }
     }
 
-    ## Reset the "Choose the HD model" button (used if the user go back to the Load dataset after Retrieving tree heights) ----
+    ## Reset the "Choose the HD model" button and result boxes (used if the user go back to the Load dataset after Retrieving tree heights) ----
     updateCheckboxGroupInput(session, inputId = "chkgrp_HEIGHT",
                              choices = c("Local HD model" = "HDloc","Feldpausch" = "feld","Chave" = "chave"),
                              selected = NULL, inline = T)
+    hideElement("box_RESULT_HDMOD")
+    hideElement("box_RESULT_FELD")
+    hideElement("box_result_chave")
 
     ## Setting rv$inv ----
     if(!error) {
@@ -446,32 +449,20 @@ function(input, output, session) {
 
   # HEIGHT ---------------------------------------------------------------------
 
-
-
-
   ## HD local models -----------------------------------------------------------
 
-  observeEvent({
-    input$chkgrp_HEIGHT
-    # List of event that can modify data and affecting model fitting:
-    # input$sel_DIAMETER
-    # input$sel_H
-    # input$sel_D_sup_data
-    # input$sel_H_sup_data
-    # input$sel_HDmodel_by
-  }, ignoreNULL = TRUE, ignoreInit = TRUE, {
-
+  observeEvent( input$chkgrp_HEIGHT, ignoreNULL = TRUE, ignoreInit = TRUE, priority = 10, {
+    # priority = 10 to format hd_data before any other observeEvent on chkgrp_HEIGHT
     if ("HDloc" %in% input$chkgrp_HEIGHT) {
 
-      print("HD local models --------")
-
-      if(input$sel_H == "<unselected>" & (input$sel_H_sup_data == "<unselected>" | is.null(input$sel_H_sup_data))) return() #if the height column isn't selected (possible if the user go back to the 'Load dataset' Item)
       if (input$rad_height == "h_none") { # if no height at all, not possible
         shinyalert("Oops", "Local HD model cannot be build if no height measurements have been provided.", type = "error")
         updateCheckboxGroupInput(session, inputId = "chkgrp_HEIGHT",
                                  selected = input$chkgrp_HEIGHT[input$chkgrp_HEIGHT != "HDloc"] )
         return()
       }
+
+      print("Building HD local models")
 
       ### Formatting hd_data which will be used to build the models ------------
 
@@ -509,8 +500,6 @@ function(input, output, session) {
       }
 
       if (input$rad_height == "h_sup_data") { # if height in another dataset
-        req(input$sel_D_sup_data)
-        req(input$sel_H_sup_data)
         rv$hd_data <- data.table(rv$df_h_sup[, c(input$sel_D_sup_data, input$sel_H_sup_data)])
         rv$hd_data$model_for <- "all"
         # Setting D and H column names of rv$hd_data
@@ -546,12 +535,11 @@ function(input, output, session) {
         }
 
         # update the radio button with the method and choose the minimum of the RSE
+        # (we first need to reset rad_HDMOD in case user changed settings in 'Load dataset' but the min RSE method remains the same)
         print("Updating radio button for HD model")
-        updateRadioButtons(session,
-                           inputId = "rad_HDMOD",
-                           choices = tab_modelHD$method,
-                           selected = tab_modelHD$method[which.min(tab_modelHD$RSE)],
-                           inline = TRUE)
+        updateRadioButtons(session, inputId = "rad_HDMOD", choices = tab_modelHD$method, selected =character(0), inline = TRUE)
+        updateRadioButtons(session, inputId = "rad_HDMOD", choices = tab_modelHD$method,
+                           selected = tab_modelHD$method[which.min(tab_modelHD$RSE)], inline = TRUE)
 
         ### Show the box containing the result of hd_model
         showElement("box_RESULT_HDMOD")
@@ -562,9 +550,8 @@ function(input, output, session) {
   })
 
   ### Building lowest RMSE local HD model or the one chosen by the user --------
-  observeEvent(input$rad_HDMOD, ignoreNULL = TRUE, ignoreInit = TRUE, {
-
-    #req(input$rad_HDMOD)
+  observeEvent(input$rad_HDMOD, ignoreNULL = TRUE, ignoreInit = TRUE, priority = 9, {
+    # priority = 9 to build hd_model before any other observeEvent on chkgrp_HEIGHT but after formatting hd_data (priority = 10)
 
     print("Building HD lowest RSE local model")
 
@@ -582,11 +569,8 @@ function(input, output, session) {
 
   ## Feldpausch method -------
 
-  observeEvent( {
-    input$chkgrp_HEIGHT
-    #input$btn_DATASET_LOADED # if the user go back to the Load dataset item
-  },
-  ignoreNULL = TRUE, ignoreInit = TRUE, {
+  observeEvent(input$chkgrp_HEIGHT,
+  ignoreNULL = TRUE, ignoreInit = TRUE, priority = 10, {
 
     if ("feld" %in% input$chkgrp_HEIGHT) {
       print("Observing chkrgrp_HEIGHT for Feldpausch method")
@@ -646,10 +630,7 @@ function(input, output, session) {
 
   ## Chave method -------
 
-  observeEvent( {
-    input$chkgrp_HEIGHT
-    #input$btn_DATASET_LOADED # if the user go back to the Load dataset item
-  }, ignoreNULL = TRUE, ignoreInit = TRUE, {
+  observeEvent(input$chkgrp_HEIGHT, ignoreNULL = TRUE, ignoreInit = TRUE, priority = 10, {
 
     if ("chave" %in% input$chkgrp_HEIGHT) {
 
@@ -702,16 +683,19 @@ function(input, output, session) {
 
 
   ## Plotting height predictions --------------
+  D <- NULL # D will contain increasing values from 1 to D_max, used to plot line predictions for all methods
+
+  ### Basic plot for HD-methods comparison ----
   observeEvent({
     list(input$chkgrp_HEIGHT, input$rad_HDMOD)
-  }, ignoreNULL = TRUE, ignoreInit = TRUE, {
+  }, ignoreNULL = TRUE, ignoreInit = TRUE, priority = 10, {
 
-    print("Creating basic plot")
+    print("Plotting basic plot")
     toggleElement("box_plot_comparison", condition = !is.null(input$chkgrp_HEIGHT))
 
-    D <- seq(1, max( c(rv$inv$D, rv$hd_data$D) ) )
+    D_max <- max(rv$inv$D, ifelse(test = is.null(rv$df_h_sup), yes = 0, no = max(rv$df_h_sup[,input$sel_D_sup_data])))
+    D <<- 1:D_max
 
-    ### Basic plot for HD-methods comparison ----
     rv$plot_hd <- ggplot(data = NULL, aes(x = D)) +
       xlab("Diameter (cm)") +
       ylab("Height (m)") +
@@ -727,11 +711,14 @@ function(input, output, session) {
         legend.key.width = unit(3, "line") ) +
       guides(color = guide_legend(override.aes = list(lwd = 1)),
              shape = guide_legend(override.aes = list(size = 3)))
+  })
 
+  observeEvent(input$rad_HDMOD, ignoreNULL = TRUE, ignoreInit = TRUE, priority = 8, {
 
-    ## Including HD local model in comparison ----
+    ### Including HD local model in comparison ----
     if ("HDloc" %in% input$chkgrp_HEIGHT) {
       print("Plotting HD local model")
+
       if ( !is.null(rv$hd_model) ) {
 
         if (input$sel_HDmodel_by == "<unselected>"){
@@ -754,8 +741,7 @@ function(input, output, session) {
       }
     }
 
-
-    ## Including Feldpausch's model in comparison ----
+    ### Including Feldpausch's model in comparison ----
     if ("feld" %in% input$chkgrp_HEIGHT) {
       print("Plotting Feldpausch's model")
       if(!is.null(rv$region)) {
@@ -773,7 +759,7 @@ function(input, output, session) {
       }
     }
 
-    ## Including Chave's model in comparison ----
+    ### Including Chave's model in comparison ----
     if ("chave" %in% input$chkgrp_HEIGHT) {
       print("Plotting Chave's model")
       # creating model prediction lines for each plots/regions/...
@@ -807,6 +793,8 @@ function(input, output, session) {
     } else {
       showMenuItem("tab_AGB")
       updateTabItems(session, "mnu_MENU", "tab_AGB")
+      hideElement("box_AGB_res") # if user has already calculate AGBs
+      hideElement("box_AGB_Report")
     }
   })
 
@@ -821,7 +809,7 @@ function(input, output, session) {
     ## Reset the individual tree results (created when downloading results)
     if(!is.null(rv$inv_h_pred)) rv$inv_h_pred <- NULL
 
-    ## Retrieving and checking parameters ----
+    ### Retrieving and checking parameters ----
 
     # AGB only or with error propagation
     AGBmod <- input$rad_AGB_MOD
@@ -872,7 +860,6 @@ function(input, output, session) {
         }
         rv$AGB_res[[names(color)[4]]] <- AGB_predict(AGBmod, D = D, WD = WD, errWD = errWD, H = H, errH = errH)
         newValue[[names(color)[4]]] <- summaryByPlot(rv$AGB_res[[names(color)[4]]], plot = rv$inv$plot)
-
       }
 
 
@@ -999,7 +986,7 @@ function(input, output, session) {
 
       if(is.null(rv$inv_h_pred)) { # rv$inv_h_pred can also be created in plot level results (see below) and is reset when clicking on "Go on" AGB button
 
-        rv$inv_h_pred <- indiv_H_pred(inv = rv$inv, rad_height = input$rad_height, H = H, AGB_res = rv$AGB_res,
+        rv$inv_h_pred <- indiv_pred(inv = rv$inv, rad_height = input$rad_height, H = H, AGB_res = rv$AGB_res,
                                       chkgrp_HEIGHT = input$chkgrp_HEIGHT, sel_HDmodel_by = input$sel_HDmodel_by,
                                       hd_data = rv$hd_data, hd_model = rv$hd_model, D = D, region = rv$region, coord = rv$coord)
       }
@@ -1013,7 +1000,7 @@ function(input, output, session) {
       # Remove the "plot" column to leave the original name
       n_plot_col <- match("plot", names(out))[length(match("plot", names(out)))] # column number of the plot columnn (use of [length(...)] in case user has already a "plot" column)
       # Remove the Lorey"s height columns (used in plot level results but not in tree level ones)
-      n_lorey_col <- grep("H_Lorey_", names(out)) # column number of the plot columnn (use of [length(...)] in case user has already a "plot" column)
+      n_lorey_col <- grep("H_Lorey", names(out)) # column number of the plot columnn (use of [length(...)] in case user has already a "plot" column)
 
       write.csv(as.data.frame(out[,-c(n_plot_col,n_lorey_col)]), file, row.names = FALSE)
     },
@@ -1044,7 +1031,7 @@ function(input, output, session) {
       # If inv_h_pred is NULL, it means the user didn't download the tree level results, so we need to create it
       #  rv$inv_h_pred is reset when clicking on "Go on" AGB button
       if(is.null(rv$inv_h_pred)) {
-        rv$inv_h_pred <- indiv_H_pred(inv = rv$inv, rad_height = input$rad_height, H = H, AGB_res = rv$AGB_res,
+        rv$inv_h_pred <- indiv_pred(inv = rv$inv, rad_height = input$rad_height, H = H, AGB_res = rv$AGB_res,
                                       chkgrp_HEIGHT = input$chkgrp_HEIGHT, sel_HDmodel_by = input$sel_HDmodel_by,
                                       hd_data = rv$hd_data, hd_model = rv$hd_model, D = D, region = rv$region, coord = rv$coord)
       }
@@ -1068,8 +1055,8 @@ function(input, output, session) {
       ## Summarize by plot: Ndens, MinDBH, BA (sum of individual BA), Wood density (mean), H_Lorey_...(sum) and H_... (max)
       list_fun <- list("Ndens" = min, "MinDBH" = min, "MaxDBH" = max,
                        "BA" = function(x) {round(sum(x), 2)}, "WD" = function(x) {round(mean(x), 4)},
-                       "H_Lorey_local_model"= sum, "H_Lorey_Feldpausch" = sum, "H_Lorey_Chave" = sum,
-                       "H_local_model" = max, "H_Chave" = max, "H_Feldpausch" = max)
+                       "H_Lorey_mes" = sum,"H_Lorey_local_model" = sum, "H_Lorey_Feldpausch" = sum, "H_Lorey_Chave" = sum,
+                       "H_mes" = max,"H_local_model" = max, "H_Chave" = max, "H_Feldpausch" = max)
       list_fun <- list_fun[ names(list_fun)[names(list_fun) %in% names(out)] ]
 
       # Apply each function to each column:
@@ -1077,7 +1064,7 @@ function(input, output, session) {
       setnames(out, old = "WD", new = "MeanWD")
 
       # Dividing Lorey's column by BA to get the correct Lorey's heights
-      for(x in grep("Lorey", names(out), value = TRUE)) out[[x]] <- round(out[[x]] / out$BA, 2)
+      for(x in grep("H_Lorey_", names(out), value = TRUE)) out[[x]] <- round(out[[x]] / out$BA, 2)
 
       ## Adding AGB's columns by merging  rv$AGB_sum (and rename H_... by H_max_...)
       for(method in names(rv$AGB_sum)) { # method = "local HD model"
@@ -1088,10 +1075,13 @@ function(input, output, session) {
         # rename "local HD model" to "local_model" to match the FOS names
         if(method == "local HD model") method <- "local_model"
         # Rename columns depending on the method
-        if(method != "height") { # if x == height, it means that heights were provided by the user, so we don't change column names
+        if(method != "height") { # if x == height, it means that heights were provided by the user, so the column renaming is different
           setnames(res, old = c("AGB","Cred_2.5","Cred_97.5"), new = c(paste0("AGB_",method), paste0("AGB_",method,"_Cred_2.5"), paste0("AGB_",method,"_Cred_97.5")))
           out <- merge(x = out, y = res, by.x = "Plot_ID", by.y = "plot")
           setnames(out, old = paste0("H_",method), new = paste0("H_max_",method))
+        } else {
+          out <- merge(x = out, y = res, by.x = "Plot_ID", by.y = "plot")
+          setnames(out, old = "H_mes", new = "H_mes_max")
         }
       }
 

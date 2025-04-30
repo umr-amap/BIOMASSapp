@@ -134,13 +134,15 @@ AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, e
   return(AGB)
 }
 
-indiv_H_pred <- function(inv, rad_height, H, AGB_res, chkgrp_HEIGHT, sel_HDmodel_by, hd_data, hd_model, D, region, coord){
+indiv_pred <- function(inv, rad_height, H, AGB_res, chkgrp_HEIGHT, sel_HDmodel_by, hd_data, hd_model, D, region, coord){
 
   inv_h_pred <- inv
 
   if(!is.null(rad_height) && rad_height == "h_each_tree") {
-    inv_h_pred$H_Lorey <- H * inv_h_pred$BA
+    inv_h_pred$H_mes <- H
+    inv_h_pred$H_Lorey_mes <- H * inv_h_pred$BA
     inv_h_pred$AGB <- round(as.vector(AGB_res[["height"]]$AGB_pred), 3)
+    return(inv_h_pred)
   }
   if ("HDloc" %in% chkgrp_HEIGHT) {
     if( !is.null(sel_HDmodel_by) && sel_HDmodel_by != "<unselected>" ) { # if stand-specific models
