@@ -126,14 +126,15 @@ disp_check_missp <- input$sel_WD == "<unselected>" && !is.null(input$rad_WD) && 
 
 ```{asis, echo = disp_check_missp}
 <font size="4.5">
-Spelling errors in the taxonomy have been corrected, yielding to the following results (in number of trees): 
+Spelling errors in the taxonomy have been corrected, yielding to the following results: 
 </font>
 ```
+
 ```{r correctTaxo, message=F, eval = disp_check_missp}
 taxo_display <- factor(rv$taxo$nameModified,
                        levels = c("FALSE","SpNotFound","TaxaNotFound","TRUE"),
                        labels = c("Correct spelling of taxa (unmodified)","Species not found (unmodified)","Taxa not found (unmodified)","Taxa found and corrected (modified)"))
-print(table(taxo_display, dnn = ""))
+kable(data.frame(table(taxo_display)) , align = "c", col.names = c("","number of trees"))
 ```
 
 ```{r}
@@ -388,7 +389,7 @@ Estimates of AGB were calculated with 95% confidence intervals, using error prop
 ```{asis, echo = (input$rad_height == "h_each_tree") }
 <font size="4.5">
 
-* uncertainty about the **height** values using of `r input$id_set_errH` 
+* uncertainty about the **height** values of `r input$set_errH` 
 </font>
 ```
 
