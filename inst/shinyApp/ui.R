@@ -79,7 +79,7 @@ dashboardPage(
                                           choices = c("g.cm-3","kg.m-3"),
                                           selected = "g.cm-3")),
                    column(12, hidden(div(id = "id_set_errWD",
-                                         numericInput("set_errWD", label = "What is the assumed error associated with the wood densities measurements (in m) ?",
+                                         numericInput("set_errWD", label = "What is the assumed error associated with the wood densities measurements ?",
                                                       value = 0.07, min = 0)))),
                    h5("or"),
                    column(12, selectInput("sel_GENUS", "Genus (e.g. Terminalia) or scientific name (e.g. Terminalia superba or Terminalia superba Engl. & Diels)", choices = NULL)), # column to keep the same layout than Diameter and Wood density selections

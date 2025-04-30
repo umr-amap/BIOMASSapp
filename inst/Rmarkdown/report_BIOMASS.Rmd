@@ -337,7 +337,7 @@ Reference:
 ```
 
 ```{r, eval = (input$rad_height != "h_each_tree"), fig.width=12, fig.height=7, message=FALSE, warning=FALSE}
-rv$plot
+rv$plot_hd
 ```
 
 ```{asis, echo = (input$rad_height %in% c("h_some_tree", "h_sup_data")) }

@@ -31,7 +31,7 @@ function(input, output, session) {
     AGB_res = list(), # output of AGB_predict() (in global.R)
     inv_h_pred = NULL, # data-frame containing tree-level results to download
     removedPlot = NULL, #removedPlot will contain plots that don't have enough height measurements when building a model stand/region specific or those with diameter not well distributed
-    plot = NULL # reactive value to access the plot for the report
+    plot_hd = NULL # reactive value to access the plot for the report
   )
   # Preparing forest_inv to receive input$file_DATASET thanks to <<-
   forest_inv <- NULL
@@ -40,11 +40,8 @@ function(input, output, session) {
   # LOAD DATASET ---------------------------------------------------------------
 
   ## Forest inventory file actions ----
-  observeEvent(ignoreInit = TRUE, {
-    input$file_DATASET
-    input$rad_decimal
-    #input$num_skip_line
-  }, priority = 1, {
+  observeEvent(ignoreInit = TRUE,
+               list(input$file_DATASET, input$rad_decimal), {
     # Read forest inventory upload
     forest_inv <<- fread(
       file = req(input$file_DATASET)$datapath,
@@ -79,7 +76,9 @@ function(input, output, session) {
     updateSelectInput(session, "sel_PLOT", choices = c("<unselected>", names(forest_inv)))
   })
 
-  # Hide/Show "information required" message
+  ## Warnings ----
+
+  # Hide/Show "information required" message for several plots
   observe({
     req(input$rad_several_plots, input$sel_PLOT)
     if( (input$rad_several_plots == "single_plot") | (input$rad_several_plots =="several_plots" & ! input$sel_PLOT %in% c("<unselected>","")) ) {
@@ -88,6 +87,20 @@ function(input, output, session) {
       showElement("msg_several_plots")
     }
   })
+
+  # If the diameter is unselected => red box
+  observeEvent(input$sel_DIAMETER, {
+    feedbackDanger("sel_DIAMETER",
+                   show = input$sel_DIAMETER == "<unselected>",
+                   text = "Compulsory argument" )
+  })
+  # if the wd or genus not selected (but not both)
+  observe({
+    toggleElement("msg_wd",
+                  condition =
+                    !xor(input$sel_WD == "<unselected>", input$sel_GENUS == "<unselected>") )
+  })
+
 
   ## WD ----
   # Show the setting of errWD when the user provides the wood density
@@ -168,7 +181,7 @@ function(input, output, session) {
     })
 
   ## Reaction to 'Continue' button ----
-  observeEvent(input$btn_DATASET_LOADED, priority = 10, {
+  observeEvent(input$btn_DATASET_LOADED, ignoreInit = TRUE, {
     print("Reaction to btn_DATASET_LOADED")
 
     ### Error management ----
@@ -271,29 +284,51 @@ function(input, output, session) {
       }
       # Height (note that errH unit will be changed when clicking on the 'Go on' button for AGB calculation)
       if (input$sel_H != "<unselected>") {
-        rv$inv[,input$sel_H] <- conv_unit(rv$inv[,input$sel_H], input$rad_units_height, "cm")
+        rv$inv[,input$sel_H] <- conv_unit(rv$inv[,input$sel_H], input$rad_units_height, "m")
       }
       # diameter and height for sup data
       if (!is.null(input$file_h_sup)) {
         rv$df_h_sup[,input$sel_D_sup_data] <- conv_unit(rv$df_h_sup[,input$sel_D_sup_data], input$rad_units_D_sup, "cm")
-        rv$df_h_sup[,input$sel_H_sup_data] <- conv_unit(rv$df_h_sup[,input$sel_H_sup_data], input$rad_units_H_sup, "cm")
+        rv$df_h_sup[,input$sel_H_sup_data] <- conv_unit(rv$df_h_sup[,input$sel_H_sup_data], input$rad_units_H_sup, "m")
       }
     }
+
+    ## Formatting coordinates for Feldpausch and Chave methods -------------------
+    req(input$rad_coord)
+
+    # If coordinates of each trees:
+    if( input$rad_coord == "coord_each_tree") {
+      rv$coord <- data.table(rv$inv[, c(input$sel_LONG, input$sel_LAT,"plot")]) # coord is simply the inventory dataset
+      setnames(rv$coord, c(input$sel_LONG, input$sel_LAT), c("long","lat"))
+      rv$coord_plot <- rv$coord # coord_plot will be averaging by plot above
+    }
+
+    # If plot's coordinates in another dataset:
+    if( input$rad_coord == "coord_plot") {
+
+      rv$coord_plot <- data.table(rv$df_coord[, c(input$sel_LONG_sup_coord, input$sel_LAT_sup_coord)]) # coord_plot is simply the coordinates sup dataset
+      setnames(rv$coord_plot, names(rv$coord_plot), c("long","lat"))
+
+      if(input$rad_several_plots == "several_plots") {
+        rv$coord_plot[, plot := as.character(rv$df_coord[,input$sel_plot_coord])]
+      } else {
+        rv$coord_plot[, plot := ""]
+      }
+    }
+
+    if(input$rad_coord != "coord_none") { # when rad_coord = coord_each_tree or coord_plot
+      # get the median coordinates of each/the plot
+      rv$coord_plot <- rv$coord_plot[, .(long = median(long, na.rm = TRUE), lat = median(lat, na.rm = TRUE)), by = plot]
+      # remove all NA and take the unique coordinates
+      rv$coord_plot <- unique(na.omit(rv$coord_plot))
+    }
+
+    if(input$rad_coord == "coord_plot") {
+      rv$coord <- merge(rv$inv , rv$coord_plot)[c("long","lat","plot")]
+    }
+
   }) # end of "reaction to 'Continue' button
 
-  ## Warnings ----
-  # If the diameter is unselected => red box
-  observeEvent(input$sel_DIAMETER, {
-    feedbackDanger("sel_DIAMETER",
-                   show = input$sel_DIAMETER == "<unselected>",
-                   text = "Compulsory argument" )
-  })
-  # if the wd or genus not selected (but not both)
-  observe({
-    toggleElement("msg_wd",
-                  condition =
-                    !xor(input$sel_WD == "<unselected>", input$sel_GENUS == "<unselected>") )
-  })
 
   # TAXONOMY -------------------------------------------------------------------
 
@@ -411,6 +446,9 @@ function(input, output, session) {
 
   # HEIGHT ---------------------------------------------------------------------
 
+
+
+
   ## HD local models -----------------------------------------------------------
 
   observeEvent({
@@ -421,7 +459,7 @@ function(input, output, session) {
     # input$sel_D_sup_data
     # input$sel_H_sup_data
     # input$sel_HDmodel_by
-  }, ignoreNULL = FALSE, ignoreInit = TRUE, priority = 9, {
+  }, ignoreNULL = TRUE, ignoreInit = TRUE, {
 
     if ("HDloc" %in% input$chkgrp_HEIGHT) {
 
@@ -524,9 +562,9 @@ function(input, output, session) {
   })
 
   ### Building lowest RMSE local HD model or the one chosen by the user --------
-  observeEvent( list(input$chkgrp_HEIGHT, input$rad_HDMOD), ignoreNULL = TRUE, ignoreInit = TRUE, priority = 8, {
+  observeEvent(input$rad_HDMOD, ignoreNULL = TRUE, ignoreInit = TRUE, {
 
-    req(input$rad_HDMOD)
+    #req(input$rad_HDMOD)
 
     print("Building HD lowest RSE local model")
 
@@ -541,52 +579,6 @@ function(input, output, session) {
     }, error = function(e) NULL, warning = function(e) NULL, message = function(e) NULL)
   })
 
-
-  ## Formatting coordinates for Feldpausch and Chave methods -------------------
-
-  observeEvent(
-    input$btn_DATASET_LOADED,
-    ignoreInit = TRUE, {
-
-      req(input$file_DATASET)
-      req(input$rad_coord)
-
-      if( input$rad_coord != "coord_none" ) {
-
-        print("Reaction to input$btn_DATASET_LOADED for formatting coordinates dataset ")
-
-        # If coordinates of each trees:
-        if( input$rad_coord == "coord_each_tree") {
-          rv$coord <- data.table(rv$inv[, c(input$sel_LONG, input$sel_LAT,"plot")]) # coord is simply the inventory dataset
-          setnames(rv$coord, c(input$sel_LONG, input$sel_LAT), c("long","lat"))
-          rv$coord_plot <- rv$coord # coord_plot will be averaging by plot above
-        }
-
-        # If plot's coordinates in another dataset:
-        if( input$rad_coord == "coord_plot") {
-
-          rv$coord_plot <- data.table(rv$df_coord[, c(input$sel_LONG_sup_coord, input$sel_LAT_sup_coord)]) # coord_plot is simply the coordinates sup dataset
-          setnames(rv$coord_plot, names(rv$coord_plot), c("long","lat"))
-
-          if(input$rad_several_plots == "several_plots") {
-            rv$coord_plot[, plot := as.character(rv$df_coord[,input$sel_plot_coord])]
-          } else {
-            rv$coord_plot[, plot := ""]
-          }
-        }
-
-        # get the median coordinates of each/the plot
-        rv$coord_plot <- rv$coord_plot[, .(long = median(long, na.rm = TRUE), lat = median(lat, na.rm = TRUE)), by = plot]
-        # remove all NA and take the unique coordinates
-        rv$coord_plot <- unique(na.omit(rv$coord_plot))
-
-        if(req(input$rad_coord) == "coord_plot") {
-          rv$coord <- merge(rv$inv , rv$coord_plot)[c("long","lat","plot")]
-        }
-      }
-    }
-
-  )
 
   ## Feldpausch method -------
 
@@ -714,15 +706,13 @@ function(input, output, session) {
     list(input$chkgrp_HEIGHT, input$rad_HDMOD)
   }, ignoreNULL = TRUE, ignoreInit = TRUE, {
 
-    req(input$file_DATASET)
-
     print("Creating basic plot")
     toggleElement("box_plot_comparison", condition = !is.null(input$chkgrp_HEIGHT))
 
     D <- seq(1, max( c(rv$inv$D, rv$hd_data$D) ) )
 
     ### Basic plot for HD-methods comparison ----
-    rv$plot <- ggplot(data = NULL, aes(x = D)) +
+    rv$plot_hd <- ggplot(data = NULL, aes(x = D)) +
       xlab("Diameter (cm)") +
       ylab("Height (m)") +
       #scale_fill_manual(name = "model confidence interval", values = c("local HD model" = "#619CFF", Feldpausch = "#00BA38", Chave = "#F8766D")) +
@@ -745,7 +735,7 @@ function(input, output, session) {
       if ( !is.null(rv$hd_model) ) {
 
         if (input$sel_HDmodel_by == "<unselected>"){
-          rv$plot <- rv$plot +
+          rv$plot_hd <- rv$plot_hd +
             geom_point(data = rv$hd_data, mapping = aes(x = D, y = H), size=1.5) + # measured trees
             geom_line(aes(y = retrieveH(D, model = rv$hd_model)$H, colour = "local HD model"), lwd=1.2) + # HD model
             ylim( c(0, max(rv$hd_data$H, na.rm = TRUE) + 5))
@@ -756,7 +746,7 @@ function(input, output, session) {
                         H_pred = retrieveH(D, model = rv$hd_model[[x]])$H,
                         model_for = x)
           }))
-          rv$plot <- rv$plot +
+          rv$plot_hd <- rv$plot_hd +
             geom_point(data = rv$hd_data, mapping = aes(x = D, y = H, shape = model_for), size=1.5) + # measured trees
             geom_line(data = df_lines, mapping = aes(x = D, y = H_pred, colour = "local HD model", lty = model_for), lwd=1.2) + #HD model for each plots/regions..
             ylim( c(0, max(rv$hd_data$H, na.rm = TRUE) + 5))
@@ -776,9 +766,9 @@ function(input, output, session) {
                       model_for = x)
         }))
         if(length(unique(df_lines$model_for)) == 1 ) { # if one single region
-          rv$plot <- rv$plot + geom_line(data = df_lines, mapping = aes(x = D, y = H_pred, colour = "Feldpausch"), lwd=1.2)
+          rv$plot_hd <- rv$plot_hd + geom_line(data = df_lines, mapping = aes(x = D, y = H_pred, colour = "Feldpausch"), lwd=1.2)
         } else {
-          rv$plot <- rv$plot + geom_line(data = df_lines, mapping = aes(x = D, y = H_pred, colour = "Feldpausch", lty=model_for), lwd=1.2)
+          rv$plot_hd <- rv$plot_hd + geom_line(data = df_lines, mapping = aes(x = D, y = H_pred, colour = "Feldpausch", lty=model_for), lwd=1.2)
         }
       }
     }
@@ -798,13 +788,13 @@ function(input, output, session) {
             model_for = as.character(rv$coord_plot[x,"plot"])
           )
         }))
-        rv$plot <- rv$plot +
+        rv$plot_hd <- rv$plot_hd +
           geom_line(data = df_lines, mapping = aes(x=D, y=H_pred, colour = "Chave", lty = model_for), lwd=1.2)
       }
     }
 
     # Render the plot
-    output$out_plot_comp <- renderPlot(rv$plot)
+    output$out_plot_comp <- renderPlot(rv$plot_hd)
   })
 
   ## Done button actions -------------------------------------------------------
