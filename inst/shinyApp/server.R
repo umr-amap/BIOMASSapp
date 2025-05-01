@@ -34,7 +34,6 @@ function(input, output, session) {
   # Preparing forest_inv to receive input$file_DATASET thanks to <<-
   forest_inv <- NULL
 
-
   # LOAD DATASET ---------------------------------------------------------------
 
   ## Forest inventory file actions ----
@@ -447,6 +446,20 @@ function(input, output, session) {
 
   # HEIGHT ---------------------------------------------------------------------
 
+  # Reset the "Choose the HD model" button (used if the user go back to the Load dataset after Retrieving tree heights)
+  observeEvent(
+    list(input$btn_TAXO_DONE,
+         input$sel_H, input$sel_H_sup_data, input$sel_D_sup_data,
+         input$sel_DIAMETER, input$sel_PLOT, input$sel_HDmodel_by, input$btn_DATASET_LOADED), ignoreInit = TRUE , priority = 10, {
+
+           print("Reset chkgrp_HEIGHT radio buttons")
+           updateCheckboxGroupInput(session, inputId = "chkgrp_HEIGHT",
+                                    choices = c("Local HD model" = "HDloc","Feldpausch" = "feld","Chave" = "chave"),
+                                    selected = NULL, inline = T)
+
+  })
+
+
   ## HD local models -----------------------------------------------------------
 
   observeEvent( input$chkgrp_HEIGHT, ignoreNULL = TRUE, ignoreInit = TRUE, priority = 10, {
@@ -627,7 +640,6 @@ function(input, output, session) {
 
 
   ## Chave method -------
-
   observeEvent(input$chkgrp_HEIGHT, ignoreNULL = TRUE, ignoreInit = TRUE, priority = 10, {
 
     if ("chave" %in% input$chkgrp_HEIGHT) {
@@ -718,7 +730,6 @@ function(input, output, session) {
       print("Plotting HD local model")
 
       if ( !is.null(rv$hd_model) ) {
-
         if (input$sel_HDmodel_by == "<unselected>"){
           rv$plot_hd <- rv$plot_hd +
             geom_point(data = rv$hd_data, mapping = aes(x = D, y = H), size=1.5) + # measured trees
