@@ -822,7 +822,7 @@ function(input, output, session) {
     } else {
       WD <- rv$inv[, input$sel_WD]
       errWD <- rep(input$set_errWD, length(WD))
-      if(input$set_errWD == "kg.m-3") errWD <- errWD / 1000
+      if(input$rad_units_wd == "kg.m-3") errWD <- errWD / 1000
     }
 
     # Retrieve heights (and its uncertainties if heights provided by the user)
@@ -947,7 +947,7 @@ function(input, output, session) {
       # Copy the report file to a temporary directory before processing it, in case we don't have write permissions to the current working dir (which can happen when deployed).
       tempReport <- file.path(tempdir(), "report_BIOMASS.Rmd")
       file.copy(
-        from = system.file("inst/Rmarkdown", "report_BIOMASS.Rmd", package = "BIOMASSapp"),
+        from = system.file("Rmarkdown", "report_BIOMASS.Rmd", package = "BIOMASSapp"),
         tempReport,
         overwrite = TRUE
       )
@@ -1035,7 +1035,8 @@ function(input, output, session) {
       }
 
       out <- data.table(rv$inv_h_pred)
-      setnames(out, old = c("plot",input$sel_DIAMETER), new = c("Plot_ID","D"))
+      if( ! "Plot_ID" %in% names(out)) setnames(out, old = "plot", new = "Plot_ID")
+      if( ! "D" %in% names(out)) setnames(out, old = input$sel_DIAMETER, new = "D")
 
       # Adding Lat_cnt and Lon_cnt if exists
       if(!is.null(input$rad_coord) && input$rad_coord != "coord_none") {
