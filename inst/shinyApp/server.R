@@ -1,9 +1,7 @@
 function(input, output, session) {
 
   # stop the serveur in the end of the session
-  session$onSessionEnded(function() {
-    stopApp()
-  })
+  autoCloseApp() # version compatible local/server
 
   observe({
     # hide few menu at the begining
@@ -12,23 +10,42 @@ function(input, output, session) {
     hideMenuItem("tab_AGB")
   })
 
+  # Reactive values:
+  rv <- reactiveValues(
+    inv = NULL, # forest inventory data-frame (created when clicking on 'Continue' in 'Load dataset' item)
+    df_h_sup = NULL, # supplementary height data-frame (e.g NouraguesHD)
+    df_coord = NULL, # supplementary plot coordinates data-frame (e.g NouraguesCoord)
+    wd = NULL, # output of getWoodDensity()
+    taxo = NULL, # output of correctTaxo()
+    hd_data = NULL, # data-table containing height and diameter data to build local HD model(s)
+    hd_model = NULL, # output of modelHD() for the method which has the lowest RMSE
+    coord = NULL, # data.table containing plotID and the coordinates of each tree used in AGB item
+    coord_plot = NULL, # data.table containing the unique coordinates of the plot(s)
+    region = NULL, # a data-frame containing 2 columns : plot and Feldpausch's region
+    feld_already_ticked = FALSE, # when selecting a method in Height item, used to not re-execute the code when another box is ticked (HDlocal or Chave)
+    chave_already_ticked = FALSE, # same as above but with the Chave method
+    E = NULL, # a vector of E parameter for each plot
+    AGB_sum = list(), # output of summaryByPlot()
+    AGB_res = list(), # output of AGB_predict() (in global.R)
+    inv_h_pred = NULL, # data-frame containing tree-level results to download
+    removedPlot = NULL, #removedPlot will contain plots that don't have enough height measurements when building a model stand/region specific or those with diameter not well distributed
+    plot_hd = NULL # reactive value to access the plot for the report
+  )
+  # Preparing forest_inv to receive input$file_DATASET thanks to <<-
+  forest_inv <- NULL
 
   # LOAD DATASET ---------------------------------------------------------------
 
-  inv <- reactiveVal(label = "data frame")
   ## Forest inventory file actions ----
-  observeEvent(ignoreInit = T, {
-    input$file_DATASET
-    input$rad_decimal
-    #input$num_skip_line
-  }, {
+  observeEvent(ignoreInit = TRUE,
+               list(input$file_DATASET, input$rad_decimal), {
     # Read forest inventory upload
-    inv(fread(
+    forest_inv <<- fread(
       file = req(input$file_DATASET)$datapath,
       #skip = ifelse(is.na(input$num_skip_line) || input$num_skip_line == 0, "__auto__", input$num_skip_line),
-      data.table = F,
+      data.table = FALSE,
       dec = input$rad_decimal
-    ))
+    )
 
     # show the box
     showElement("box_FIELDS")
@@ -36,52 +53,54 @@ function(input, output, session) {
     showElement("box_COORD")
 
     # show forest inventory content
-    output$table_DATASET <- renderDT(inv(), options = list(scrollX = TRUE))
+    output$table_DATASET <- renderDT(forest_inv, options = list(scrollX = TRUE))
 
     # update the values of the select inputs with the column names
-    int_num_col <- names(inv())[ sapply(inv(), class) %in% c("integer", "numeric")]
+    int_num_col <- names(forest_inv)[ sapply(forest_inv, class) %in% c("integer", "numeric")]
     for (id in c("sel_DIAMETER", "sel_WD")) {
       updateSelectInput(session, id, choices = c("<unselected>", int_num_col))
     }
-    char_col <- names(inv())[ sapply(inv(), class) %in% "character" ]
+    char_col <- names(forest_inv)[ sapply(forest_inv, class) %in% "character" ]
     for (id in c("sel_GENUS", "sel_SPECIES")) {
       updateSelectInput(session, id, choices = c("<unselected>", char_col))
     }
+    updateSelectInput(session, "sel_PLOT", choices = c("<unselected>", names(forest_inv)))
   })
 
-  # Plot's IDs selection when several plots
-  observeEvent({
-    input$rad_several_plots
-    input$file_DATASET
-  },{
+  # Show plot's IDs selection when several plots
+  observeEvent(input$rad_several_plots, {
     toggleElement("sel_PLOT", condition = req(input$rad_several_plots) == "several_plots")
-    updateSelectInput(session, "sel_PLOT", choices = c("<unselected>", names(inv())))
+    updateSelectInput(session, "sel_PLOT", choices = c("<unselected>", names(forest_inv)))
   })
 
-  # Hide/Show "information required" message
-  observe(
-    if( (req(input$rad_several_plots) == "single_plot") | (req(input$rad_several_plots) =="several_plots" & ! req(input$sel_PLOT) %in% c("<unselected>","")) ) {
+  ## Warnings ----
+
+  # Hide/Show "information required" message for several plots
+  observe({
+    req(input$rad_several_plots, input$sel_PLOT)
+    if( (input$rad_several_plots == "single_plot") | (input$rad_several_plots =="several_plots" & ! input$sel_PLOT %in% c("<unselected>","")) ) {
       hideElement("msg_several_plots")
     } else {
       showElement("msg_several_plots")
     }
-  )
+  })
 
-  # Set the plot column that contains plotID
-  observe(
-    if(!is.null(inv())) {
-      inv_plot <- inv()
-      if(req(input$rad_several_plots) == "several_plots" && req(input$sel_PLOT) != "<unselected>" ) {
-        inv_plot$plot <- as.character(inv_plot[,input$sel_PLOT])
-        inv(inv_plot)
-      } else if (req(input$rad_several_plots) == "single_plot") {
-        inv_plot$plot <- ""
-        inv(inv_plot)
-      }
-    }
-  )
+  # If the diameter is unselected => red box
+  observeEvent(input$sel_DIAMETER, {
+    feedbackDanger("sel_DIAMETER",
+                   show = input$sel_DIAMETER == "<unselected>",
+                   text = "Compulsory argument" )
+  })
+  # if the wd or genus not selected (but not both)
+  observe({
+    toggleElement("msg_wd",
+                  condition =
+                    !xor(input$sel_WD == "<unselected>", input$sel_GENUS == "<unselected>") )
+  })
+
 
   ## WD ----
+  # Show the setting of errWD when the user provides the wood density
   observeEvent(input$sel_WD, {
     toggleElement("id_set_errWD",
                   condition = input$sel_WD != "<unselected>")
@@ -90,33 +109,32 @@ function(input, output, session) {
   ## Height ----
   ### height radio button actions ----
   observeEvent(input$rad_height, {
-    int_num_col <- names(inv())[ sapply(inv(), class) %in% c("integer", "numeric")]
+    int_num_col <- names(forest_inv)[ sapply(forest_inv, class) %in% c("integer", "numeric")]
     updateSelectInput(session, "sel_H", choices = c("<unselected>", int_num_col))
-    updateSelectInput(session, "sel_HDmodel_by", choices = c("<unselected>", names(inv())))
+    updateSelectInput(session, "sel_HDmodel_by", choices = c("<unselected>", names(forest_inv)))
     toggleElement("id_sel_h",
                   condition = input$rad_height %in% c("h_each_tree","h_some_tree"))
     toggleElement("id_set_errH",
                   condition = input$rad_height == "h_each_tree")
     toggleElement("id_sel_HDmodel_by", # stand-specific local HD models only if height of some tree in the same dataset and several plots
-                  condition = (input$rad_height == "h_some_tree" & input$rad_several_plots == "several_plots") )
+                  condition = (input$rad_height == "h_some_tree" & req(input$rad_several_plots) == "several_plots") )
     toggleElement("id_file_h_sup",
                   condition = input$rad_height == "h_sup_data")
   })
   ### height file actions ----
-  rv_h_sup <- reactiveVal(label = "data frame")
   observeEvent(input$file_h_sup, {
     # Read HD supplementary dataset
-    rv_h_sup(fread(
+    rv$df_h_sup <- fread(
       file = req(input$file_h_sup)$datapath,
-      data.table = F))
+      data.table = FALSE)
 
     # show coordinates table content
-    output$table_h_sup <- renderDT(rv_h_sup(),
+    output$table_h_sup <- renderDT(rv$df_h_sup,
                                    options = list(scrollX = TRUE))
     toggleElement("box_h_sup_preview", condition = input$rad_height == "h_sup_data")
 
     # Update Diameter & Height seletions
-    int_num_col <- names(rv_h_sup())[ sapply(rv_h_sup(), class) %in% c("integer", "numeric") ]
+    int_num_col <- names(rv$df_h_sup)[ sapply(rv$df_h_sup, class) %in% c("integer", "numeric") ]
     updateSelectInput(session, "sel_D_sup_data", choices = c("<unselected>", int_num_col))
     updateSelectInput(session, "sel_H_sup_data", choices = c("<unselected>", int_num_col))
   })
@@ -126,7 +144,7 @@ function(input, output, session) {
   observeEvent(input$rad_coord, {
     if(input$rad_coord == "coord_each_tree") {
       # Show latitude and longitude select inputs for forest inventory table
-      int_num_col <- names(inv())[ sapply(inv(), class) %in% c("integer", "numeric")]
+      int_num_col <- names(forest_inv)[ sapply(forest_inv, class) %in% c("integer", "numeric")]
       updateSelectInput(session, "sel_LAT", choices = c("<unselected>", int_num_col))
       updateSelectInput(session, "sel_LONG", choices = c("<unselected>", int_num_col))
     }
@@ -140,97 +158,91 @@ function(input, output, session) {
   })
 
   ### coordinates file actions  ----
-  rv_coord <- reactiveVal(label = "data frame")
-  observeEvent({
-    input$file_coord
-    input$rad_several_plots}, {
+  observeEvent(
+    list(input$file_coord, input$rad_several_plots), {
       # Read plot coordinates upload
-      rv_coord(fread(
+      rv$df_coord <- fread(
         file = req(input$file_coord)$datapath,
-        data.table = F))
+        data.table = FALSE)
 
       # show coordinates table content
-      output$table_coord <- renderDT(rv_coord(),
+      output$table_coord <- renderDT(rv$df_coord,
                                      options = list(scrollX = TRUE))
       toggleElement("box_coord_preview", condition = input$rad_coord == "coord_plot")
 
       # Update latitude & longitude & plot's IDs selections
-      int_num_col <- names(rv_coord())[ sapply(rv_coord(), class) %in% c("integer", "numeric") ]
+      int_num_col <- names(rv$df_coord)[ sapply(rv$df_coord, class) %in% c("integer", "numeric") ]
       updateSelectInput(session, "sel_LAT_sup_coord", choices = c("<unselected>", int_num_col))
       updateSelectInput(session, "sel_LONG_sup_coord", choices = c("<unselected>", int_num_col))
-      updateSelectInput(session, "sel_plot_coord", choices = c("<unselected>", names(rv_coord())))
+      updateSelectInput(session, "sel_plot_coord", choices = c("<unselected>", names(rv$df_coord)))
     })
 
+  ## Reaction to 'Continue' button ----
+  observeEvent(input$btn_DATASET_LOADED, ignoreInit = TRUE, {
+    print("Reaction to btn_DATASET_LOADED")
 
-  ## Errors management when clicking on continue ----
-  error <- reactiveVal()
-  observeEvent(input$btn_DATASET_LOADED, {
-    print("Reaction to btn_DATASET_LOADED -> error management")
-    error(F)
+    ### Error management ----
+    error_occured <- FALSE
     if ( is.null(input$file_DATASET) ) {
       # if no dataset is provided
-      error(T)
+      error_occured <- TRUE
       shinyalert("Oops!", "You need to load a forest inventory file !", type = "error")
     } else if ( is.null(input$rad_several_plots) ) {
       # if the number of plot is not provide
-      error(T)
+      error_occured <- TRUE
       shinyalert("Oops!", "You need to answer to the question : Does your dataset contain several plots?", type = "error")
     } else if (input$rad_several_plots =="several_plots" && input$sel_PLOT == "<unselected>" ) {
       # if the column corresponding to the plot IDs is unselected
-      error(T)
+      error_occured <- TRUE
       shinyalert("Oops!", "The column containing the plots IDs is unselected", type = "error")
     } else if (input$sel_DIAMETER == "<unselected>") { # if diameter is not selected
-      error(T)
+      error_occured <- TRUE
       shinyalert("Oops!", "D is unselected", type = "error")
     } else if (!xor(input$sel_WD == "<unselected>", input$sel_GENUS == "<unselected>")) {
       # if the wd is not selected or genus not selected but not the two
-      error(T)
+      error_occured <- TRUE
       shinyalert("Oops!", "To estimate the Above Ground Biomass, you either need the wood density or the taxonomy of the trees", type = "error")
     } else if (is.null(input$rad_height)) {
       # if the H radio button has not been ticked
-      error(T)
+      error_occured <- TRUE
       shinyalert("Oops!", "Height information has not been provided", type = "error")
     } else if ( input$rad_height %in% c("h_each_tree","h_some_tree") && input$sel_H == "<unselected>" ) {
       # if the H column is unselected
-      error(T)
+      error_occured <- TRUE
       shinyalert("Oops!", "Height column is unselected", type = "error")
     } else if ( input$rad_height == "h_sup_data" && is.null(input$file_h_sup)){
       # if the H-D relationship is in another dataset which have not been loaded
-      error(T)
+      error_occured <- TRUE
       shinyalert("Oops!", "The dataset containing a subset of well-measured trees has not been loaded", type = "error")
     } else if ( input$rad_height == "h_sup_data" && (input$sel_H_sup_data == "<unselected>" | input$sel_D_sup_data == "<unselected>") ){
       # if the H or D column (of the sup dataset containing H-D relationship) are unselected
-      error(T)
+      error_occured <- TRUE
       shinyalert("Oops!", "Diameter and/or Height column(s) of the dataset containing a subset of well-measured trees is/are unselected ", type = "error")
     } else if (input$rad_height == "h_none" && (is.null(input$rad_coord) || input$rad_coord %in% c("","coord_none"))  ) {
       # if no height measurements and no coordinates
-      error(T)
+      error_occured <- TRUE
       shinyalert("Oops!", "To estimate tree heights, you either need a subset of well-measured trees or the coordinates of the plots", type = "error")
     } else if (!is.null(input$rad_coord) && input$rad_coord == "coord_each_tree" & (input$sel_LONG == "<unselected>" | input$sel_LAT == "<unselected>")) {
       # if the coordinates of each tree is ticked but one of the two (long or lat) is not selected
-      error(T)
+      error_occured <- TRUE
       shinyalert("Oops!", "Tree's longitude and/or latitude is/are unselected", type = "error")
     } else if (!is.null(input$rad_coord) && input$rad_coord == "coord_plot" & is.null(input$file_coord) ) {
       # if the coordinates of the plots (in another dataset) is ticked but the dataset has not been loaded
-      error(T)
+      error_occured <- TRUE
       shinyalert("Oops!", "The dataset containing the coordinates of the plot(s) has not been loaded", type = "error")
     } else if (!is.null(input$rad_coord) && input$rad_coord == "coord_plot" & (input$sel_LAT_sup_coord == "<unselected>" | input$sel_LAT_sup_coord == "<unselected>") ) {
       # if the Latitude or Longitude column (of the sup dataset containing plot's coordinates) are unselected
-      error(T)
+      error_occured <- TRUE
       shinyalert("Oops!", "Latitude and/or Longitude column(s) of the dataset containing the coordinates of the plot(s) is/are unselected ", type = "error")
     } else if (!is.null(input$rad_coord) && input$rad_coord == "coord_plot" & input$rad_several_plots == "several_plots" & input$sel_plot_coord == "<unselected>") {
       # if the plots IDs column for sup coord is unselected
-      error(T)
+      error_occured <- TRUE
       shinyalert("Oops!", "Plots IDs of the dataset containing the coordinates of the plot(s) is unselected ", type = "error")
     } else if (input$sel_WD == "<unselected>") {
       # if the WD is not selected then show the tab TAXO
-      updateCheckboxGroupInput(session, inputId = "chkgrp_HEIGHT", #reset HD models
-                               selected = character(0) )
       showMenuItem("tab_TAXO")
       updateTabItems(session, "mnu_MENU", "tab_TAXO")
     } else { # If no error and WD already exists
-      updateCheckboxGroupInput(session, inputId = "chkgrp_HEIGHT", #reset HD models
-                               selected = character(0) )
       if (input$rad_height == "h_each_tree") { # if heights are not to estimate
         showMenuItem("tab_AGB")
         updateTabItems(session, "mnu_MENU", "tab_AGB")
@@ -241,38 +253,84 @@ function(input, output, session) {
       }
     }
 
-    if (!error()) {
-      newData <- inv()
-      if (input$sel_DIAMETER != "<unselected>") {
-        newData[,input$sel_DIAMETER] <- conv_unit(newData[,input$sel_DIAMETER], input$rad_units_diameter, "cm")
-      }
-      if (input$sel_H != "<unselected>") {
-        newData[,input$sel_H] <- conv_unit(newData[,input$sel_H], input$rad_units_height, "m")
-      }
-      inv(newData)
-    }
-  })
+    ## Reset the "Choose the HD model" button and result boxes (used if the user go back to the Load dataset after Retrieving tree heights) ----
+    updateCheckboxGroupInput(session, inputId = "chkgrp_HEIGHT",
+                             choices = c("Local HD model" = "HDloc","Feldpausch" = "feld","Chave" = "chave"),
+                             selected = NULL, inline = T)
+    hideElement("box_RESULT_HDMOD")
+    hideElement("box_RESULT_FELD")
+    hideElement("box_result_chave")
 
-  ## Warnings ----
-  # If the diameter is unselected => red box
-  observeEvent(input$sel_DIAMETER, {
-    feedbackDanger("sel_DIAMETER",
-                   show = input$sel_DIAMETER == "<unselected>",
-                   text = "Compulsory argument"
-    )
-  })
-  # if the wd or genus not selected (but not both)
-  observe({
-    toggleElement("msg_wd",
-                  condition =
-                    !xor(input$sel_WD == "<unselected>", input$sel_GENUS == "<unselected>")
-    )
-  })
+    ## Setting rv$inv ----
+    if(!error_occured) {
+
+      rv$inv <- forest_inv
+
+      ### Setting the plot column that contains plotID
+      if(input$rad_several_plots == "several_plots" && input$sel_PLOT != "<unselected>" ) {
+        rv$inv$plot <- as.character(rv$inv[,input$sel_PLOT])
+      } else if (input$rad_several_plots == "single_plot") {
+        rv$inv$plot <- ""
+      }
+
+      ### Unit conversions
+      # Diameter
+      rv$inv[,input$sel_DIAMETER] <- conv_unit(rv$inv[,input$sel_DIAMETER], input$rad_units_diameter, "cm")
+      # WD (note that errWD unit will be changed when clicking on the 'Go on' button for AGB calculation)
+      if (input$sel_WD != "<unselected>") {
+        if(input$rad_units_wd == "kg.m-3") {
+          rv$inv[,input$sel_WD] <- rv$inv[,input$sel_WD] / 1000
+        }
+      }
+      # Height (note that errH unit will be changed when clicking on the 'Go on' button for AGB calculation)
+      if (input$sel_H != "<unselected>") {
+        rv$inv[,input$sel_H] <- conv_unit(rv$inv[,input$sel_H], input$rad_units_height, "m")
+      }
+      # diameter and height for sup data
+      if (!is.null(input$file_h_sup)) {
+        rv$df_h_sup[,input$sel_D_sup_data] <- conv_unit(rv$df_h_sup[,input$sel_D_sup_data], input$rad_units_D_sup, "cm")
+        rv$df_h_sup[,input$sel_H_sup_data] <- conv_unit(rv$df_h_sup[,input$sel_H_sup_data], input$rad_units_H_sup, "m")
+      }
+    }
+
+    ## Formatting coordinates for Feldpausch and Chave methods -------------------
+    req(input$rad_coord)
+
+    # If coordinates of each trees:
+    if( input$rad_coord == "coord_each_tree") {
+      rv$coord <- data.table(rv$inv[, c(input$sel_LONG, input$sel_LAT,"plot")]) # coord is simply the inventory dataset
+      setnames(rv$coord, c(input$sel_LONG, input$sel_LAT), c("long","lat"))
+      rv$coord_plot <- rv$coord # coord_plot will be averaging by plot above
+    }
+
+    # If plot's coordinates in another dataset:
+    if( input$rad_coord == "coord_plot") {
+
+      rv$coord_plot <- data.table(rv$df_coord[, c(input$sel_LONG_sup_coord, input$sel_LAT_sup_coord)]) # coord_plot is simply the coordinates sup dataset
+      setnames(rv$coord_plot, names(rv$coord_plot), c("long","lat"))
+
+      if(input$rad_several_plots == "several_plots") {
+        rv$coord_plot[, plot := as.character(rv$df_coord[,input$sel_plot_coord])]
+      } else {
+        rv$coord_plot[, plot := ""]
+      }
+    }
+
+    if(input$rad_coord != "coord_none") { # when rad_coord = coord_each_tree or coord_plot
+      # get the median coordinates of each/the plot
+      rv$coord_plot <- rv$coord_plot[, .(long = median(long, na.rm = TRUE), lat = median(lat, na.rm = TRUE)), by = plot]
+      # remove all NA and take the unique coordinates
+      rv$coord_plot <- unique(na.omit(rv$coord_plot))
+    }
+
+    if(input$rad_coord == "coord_plot") {
+      rv$coord <- merge(rv$inv , rv$coord_plot)[c("long","lat","plot")]
+    }
+
+  }) # end of "reaction to 'Continue' button
 
 
   # TAXONOMY -------------------------------------------------------------------
-
-  wd <- reactiveVal(NULL, label = "wood density")
 
   observeEvent(input$btn_TAXO_RESULT, {
     showElement("box_RESULT_TAXO")
@@ -281,60 +339,70 @@ function(input, output, session) {
       # if the users have selected the correct taxo + get wd
       if (input$rad_WD == "corr") {
         # correct the taxo and catch the error if there is error
-        taxo <- tryCatch({
+        rv$taxo <- tryCatch({
           correctTaxo(
-            genus = inv()[, input$sel_GENUS],
-            species = if (input$sel_SPECIES != "<unselected>") inv()[, input$sel_SPECIES],
+            genus = rv$inv[, input$sel_GENUS],
+            species = if (input$sel_SPECIES != "<unselected>") rv$inv[, input$sel_SPECIES],
             useCache = TRUE
           )
         }, error = function(e) e)
 
         # if there is an error display it
-        if (!is.data.frame(taxo)) {
+        if (!is.data.frame(rv$taxo)) {
           output$out_taxo_error <- renderPrint({
-            taxo$message
+            rv$taxo$message
           })
-        } else { # if not a message will appear
+        } else {
           output$out_taxo_error <- renderPrint({
             cat("Summary of taxonomy corrections (in number of trees):\n")
-            taxo_display <- factor(taxo$nameModified,
+            taxo_display <- factor(rv$taxo$nameModified,
                                    levels = c("FALSE","SpNotFound","TaxaNotFound","TRUE"),
                                    labels = c("Correct spelling of taxa (unmodified)","Species not found (unmodified)","Taxa not found (unmodified)","Taxa found and corrected (modified)"))
-            print(table(taxo_display, dnn = ""))
+            table(taxo_display, dnn = "")
           })
         }
         # update the progression
         incProgress(1 / 2, detail = "Taxonomy correction completed", message = "Extracting wood density values")
-        genus <- taxo$genusCorrected
-        species <- taxo$speciesCorrected
+
+        genus <- rv$taxo$genusCorrected
+        species <- rv$taxo$speciesCorrected
+
+        # add genusCorrected and speciesCorrected to inv for the download of the tree level results
+        rv$inv$genusCorrected <- rv$taxo$genusCorrected
+        rv$inv$speciesCorrected <- rv$taxo$speciesCorrected
+
       } else {
         # if the users do not choose the correct taxo
-        genus <- inv()[, input$sel_GENUS]
+        genus <- rv$inv[, input$sel_GENUS]
         if (input$sel_SPECIES == "<unselected>") {
           split <- tstrsplit_NA(genus)
           genus <- split[[1]]
           species <- split[[2]]
         } else {
-          species <- inv()[, input$sel_SPECIES]
+          species <- rv$inv[, input$sel_SPECIES]
         }
         hideSpinner(id = "out_taxo_error")
       }
-      wd(tryCatch(getWoodDensity(genus, species, stand = if (input$sel_PLOT != "<unselected>") inv()[, input$sel_PLOT]),
+      rv$wd <- tryCatch(getWoodDensity(genus, species, stand = if (input$sel_PLOT != "<unselected>") rv$inv[, input$sel_PLOT]),
                   error = function(e) e,
                   warning = function(e) e
-      ))
+      )
 
       # if there is an error display it
-      if (!is.data.frame(wd())) {
+      if (!is.data.frame(rv$wd)) {
         output$out_wd_error <- renderPrint({
-          taxo$message
+          rv$taxo$message
         })
-        wd(NULL)
-      } else { # if not a message will appear
+        rv$wd <- NULL
+      } else { # if not display the results
+
+        # add WD and sdWD columns to inv for the download of the tree level results
+        rv$inv$WD <- rv$wd$meanWD
+        rv$inv$sd_WD = rv$wd$sdWD
 
         output$out_wd_error <- renderPrint({
           cat("Taxonomic levels at which wood density was attributed to trees (in %):\n")
-          levelswd <- 100 * table(wd()$levelWD) / nrow(wd())
+          levelswd <- 100 * table(rv$wd$levelWD) / nrow(rv$wd)
           if (input$sel_PLOT != "<unselected>") {
             data.frame(
               "Species level" = round(levelswd["species"], 1),
@@ -356,12 +424,12 @@ function(input, output, session) {
       incProgress(1, detail = "Wood density extraction completed")
     })
 
-    show(id = "btn_TAXO_DONE")
+    showElement(id = "btn_TAXO_DONE")
   })
 
   # when the taxo is done
   observeEvent(input$btn_TAXO_DONE, {
-    if (!is.data.frame(wd())) {
+    if (!is.data.frame(rv$wd)) {
       shinyalert("Oops", "Somethings went wrong, please check this", type = "error")
     } else {
       if (input$rad_height == "h_each_tree") { # if heights are not to estimate
@@ -378,24 +446,26 @@ function(input, output, session) {
 
   # HEIGHT ---------------------------------------------------------------------
 
+  # Reset the "Choose the HD model" button (used if the user go back to the Load dataset after Retrieving tree heights)
+  observeEvent(
+    list(input$btn_TAXO_DONE,
+         input$sel_H, input$sel_H_sup_data, input$sel_D_sup_data,
+         input$sel_DIAMETER, input$sel_PLOT, input$sel_HDmodel_by, input$btn_DATASET_LOADED), ignoreInit = TRUE , priority = 10, {
+
+           print("Reset chkgrp_HEIGHT radio buttons")
+           updateCheckboxGroupInput(session, inputId = "chkgrp_HEIGHT",
+                                    choices = c("Local HD model" = "HDloc","Feldpausch" = "feld","Chave" = "chave"),
+                                    selected = NULL, inline = T)
+
+  })
+
+
   ## HD local models -----------------------------------------------------------
-  hd_data <- reactiveVal(label = "HD data")
 
-  observeEvent({
-    input$chkgrp_HEIGHT
-    # List of event that can modify data and affecting model fitting:
-    input$sel_DIAMETER
-    input$sel_H
-    input$sel_D_sup_data
-    input$sel_H_sup_data
-    input$sel_HDmodel_by
-  }, ignoreNULL = F, ignoreInit = T, {
-
+  observeEvent( input$chkgrp_HEIGHT, ignoreNULL = TRUE, ignoreInit = TRUE, priority = 10, {
+    # priority = 10 to format hd_data before any other observeEvent on chkgrp_HEIGHT
     if ("HDloc" %in% input$chkgrp_HEIGHT) {
 
-      print("HD local models --------")
-
-      if(input$sel_H == "<unselected>" & (input$sel_H_sup_data == "<unselected>" | is.null(input$sel_H_sup_data))) return() #if the height column isn't selected (possible if the user go back to the 'Load dataset' Item)
       if (input$rad_height == "h_none") { # if no height at all, not possible
         shinyalert("Oops", "Local HD model cannot be build if no height measurements have been provided.", type = "error")
         updateCheckboxGroupInput(session, inputId = "chkgrp_HEIGHT",
@@ -403,28 +473,32 @@ function(input, output, session) {
         return()
       }
 
+      print("Building HD local models")
+
       ### Formatting hd_data which will be used to build the models ------------
 
       if (input$rad_height == "h_some_tree") { # if height of some trees in the same dataset
 
-        hd_data(setDT(inv()[, c(input$sel_DIAMETER, input$sel_H)]))
+        rv$hd_data <- data.table(rv$inv[, c(input$sel_DIAMETER, input$sel_H)])
+        # Setting D and H column names of rv$hd_data
+        setnames(rv$hd_data, names(rv$hd_data)[1:2], c("D", "H"))
 
         if(input$sel_HDmodel_by != "<unselected>"){ # if one model by plot or region or whatever
-          hd_data()[, model_for := as.character(inv()[[input$sel_HDmodel_by]])]
-          new_hd_data <- hd_data()
+          rv$hd_data[, model_for := as.character(rv$inv[[input$sel_HDmodel_by]])]
+          new_hd_data <- rv$hd_data
           # remove all the plots with less than 15 non NA value
-          removedPlot <- unique(new_hd_data[, .(nbNonNA = sum(!is.na(H))), by = model_for][nbNonNA < 15, model_for])
-          new_hd_data <- new_hd_data[!model_for %in% removedPlot]
-          # remove plots for which D is not well distributed --> WHY ???
+          rv$removedPlot <- unique(new_hd_data[, .(nbNonNA = sum(!is.na(H))), by = model_for][nbNonNA < 15, model_for])
+          new_hd_data <- new_hd_data[!model_for %in% rv$removedPlot]
+          # remove plots for which D is not well distributed
           new_hd_data <- new_hd_data[, quantile := findInterval(D, c(-1, quantile(D, probs = c(0.5, 0.75)), max(D) + 1)), by = model_for]
-          removedPlot <- c(removedPlot, unique(new_hd_data[, .N, by = .(model_for, quantile)][N < 3, model_for]))
-          hd_data(new_hd_data[!model_for %in% removedPlot])
+          rv$removedPlot <- c(rv$removedPlot, unique(new_hd_data[, .N, by = .(model_for, quantile)][N < 3, model_for]))
+          rv$hd_data <- new_hd_data[!model_for %in% rv$removedPlot]
 
           # if there is a least one plot in the removed plot -> warning message
-          if (length(removedPlot) != 0) {
+          if (length(rv$removedPlot) != 0) {
             shinyalert("Be carefull !", paste(
               "Local HD model cannot be built for:",
-              paste(removedPlot, collapse = ", "),
+              paste(rv$removedPlot, collapse = ", "),
               "\n either:",
               "\n\t - there are not enough local height measurements",
               "\n\t - height measurements are likely not representative of tree size distribution",
@@ -432,240 +506,186 @@ function(input, output, session) {
             ), type = "warning")
           }
         } else { # if one model for the whole dataset
-          hd_data()[, model_for := 'all']
+          rv$hd_data$model_for <- "all"
         }
       }
 
       if (input$rad_height == "h_sup_data") { # if height in another dataset
-        print("Est-ce que ça recréé bien la colonne model_for ???")
-        hd_data(setDT(rv_h_sup()[, c(req(input$sel_D_sup_data), req(input$sel_H_sup_data))]))
-        hd_data()[, model_for := 'all']
-        print("hd_data()")
-        print(head(hd_data()))
+        rv$hd_data <- data.table(rv$df_h_sup[, c(input$sel_D_sup_data, input$sel_H_sup_data)])
+        rv$hd_data$model_for <- "all"
+        # Setting D and H column names of rv$hd_data
+        setnames(rv$hd_data, old = c(input$sel_D_sup_data, input$sel_H_sup_data), new = c("D", "H"))
       }
 
-      # Setting D and H column names of hd_data()
-      setnames(hd_data(), names(hd_data())[1:2], c("D", "H"))
 
       ## Building and compare the 4 local HD models ----------------------------
-      tab_modelHD <- modelHD(
-        D = hd_data()$D,
-        H = hd_data()$H,
-        plot = hd_data()$model_for
-      )
+      tab_modelHD <- tryCatch({
+        modelHD(
+          D = rv$hd_data$D,
+          H = rv$hd_data$H,
+          plot = rv$hd_data$model_for
+        )
+      }, error = function(e) NULL)
 
-      # render the table
-      if (input$sel_HDmodel_by == "<unselected>"){
-        output$out_tab_HD <- renderTable(tab_modelHD[, -3], digits = 4)
-      } else { # If one model per plot/region/whatever, compute the mean of RMSE and Average_bias over all models
-        tab_modelHD <- do.call(rbind,tab_modelHD)
-        tab_modelHD <- data.table(tab_modelHD[,-3])
-        tab_modelHD <- tab_modelHD[, lapply(.SD, mean) , by = method]
-        output$out_tab_HD <- renderTable(tab_modelHD, digits = 4)
+      if(is.null(tab_modelHD)) { # if models cannot be built
+        shinyalert("Oops !", "Local H-D models cannot be built. You should check your data, in particular the units of your diameter and height values (if provided)", type = "error")
+        # Reset the checkbox
+        updateCheckboxGroupInput(session, inputId = "chkgrp_HEIGHT",
+                                 choices = c("Local HD model" = "HDloc","Feldpausch" = "feld","Chave" = "chave"),
+                                 selected = NULL, inline = T)
+        return()
+      } else {
+        # render the table
+        if (input$sel_HDmodel_by == "<unselected>"){
+          output$out_tab_HD <- renderTable(tab_modelHD[, -3], digits = 4)
+        } else { # If one model per plot/region/whatever, compute the mean of RMSE and Average_bias over all models
+          tab_modelHD <- do.call(rbind,tab_modelHD)
+          tab_modelHD <- data.table(tab_modelHD[,-3])
+          tab_modelHD <- tab_modelHD[, lapply(.SD, mean) , by = method]
+          output$out_tab_HD <- renderTable(tab_modelHD, digits = 4)
+        }
+
+        # update the radio button with the method and choose the minimum of the RSE
+        # (we first need to reset rad_HDMOD in case user changed settings in 'Load dataset' but the min RSE method remains the same)
+        print("Updating radio button for HD model")
+        updateRadioButtons(session, inputId = "rad_HDMOD", choices = tab_modelHD$method, selected =character(0), inline = TRUE)
+        updateRadioButtons(session, inputId = "rad_HDMOD", choices = tab_modelHD$method,
+                           selected = tab_modelHD$method[which.min(tab_modelHD$RSE)], inline = TRUE)
+
+        ### Show the box containing the result of hd_model
+        showElement("box_RESULT_HDMOD")
       }
-
-      # update the radio button with the method and choose the minimum of the RSE
-      print("Updating radio button for HD model")
-      updateRadioButtons(session,
-                         inputId = "rad_HDMOD",
-                         choices = tab_modelHD$method,
-                         selected = tab_modelHD$method[which.min(tab_modelHD$RSE)],
-                         inline = T)
-
-      ### Show the box containing the result of hd_model
-      showElement("box_RESULT_HDMOD")
-
-    } else {
+    } else { # if ("HDloc" not in input$chkgrp_HEIGHT)
       hideElement("box_RESULT_HDMOD")
     }
   })
 
   ### Building lowest RMSE local HD model or the one chosen by the user --------
-  hd_model <- reactiveVal(label = "HD lowest RSE local model")
-  observeEvent(input$rad_HDMOD, ignoreNULL = T, ignoreInit = T, {
-    ######## Problem: I thought that the following code would be executed when updateRadioButtons(session,inputId = "rad_HDMOD") was called, but no... Guillaume ??
+  observeEvent(input$rad_HDMOD, ignoreNULL = TRUE, ignoreInit = TRUE, priority = 9, {
+    # priority = 9 to build hd_model before any other observeEvent on chkgrp_HEIGHT but after formatting hd_data (priority = 10)
+
     print("Building HD lowest RSE local model")
-    hd_model(tryCatch({
+
+    rv$hd_model <- tryCatch({
       modelHD(
-        D = hd_data()$D,
-        H = hd_data()$H,
+        D = rv$hd_data$D,
+        H = rv$hd_data$H,
         method = input$rad_HDMOD,
-        plot = hd_data()$model_for,
-        useWeight = T
+        plot = rv$hd_data$model_for,
+        useWeight = TRUE
       )
-    }, error = function(e) NULL, warning = function(e) NULL, message = function(e) NULL))
+    }, error = function(e) NULL, warning = function(e) NULL, message = function(e) NULL)
   })
-
-
-  ## Formatting coordinates for Feldpausch and Chave methods -------------------
-
-  coord <- reactiveVal() # data.table containing the coordinates of each tree used in AGB item and the plotID
-  coord_plot <- reactiveVal() # data.table containing the unique coordinates of the plot(s) used in height-diameter item (to display height predictions by plot/region)
-
-  observeEvent(
-    input$btn_DATASET_LOADED,
-    ignoreInit = TRUE, {
-
-      if(!error() && req(input$rad_coord != "coord_none")) {
-
-        print("Reaction to input$btn_DATASET_LOADED for formatting coordinates dataset ")
-
-        # If coordinates of each trees:
-        if(req(input$rad_coord) == "coord_each_tree") {
-          coord(setDT(inv()[, c(input$sel_LONG, input$sel_LAT,"plot")])) # coord is simply the inventory dataset
-          setnames(coord(), c(input$sel_LONG, input$sel_LAT), c("long","lat"))
-          coord_plot(coord()) # coord_plot will be averaging by plot above
-        }
-
-        # If plot's coordinates in another dataset:
-        if(req(input$rad_coord) == "coord_plot") {
-          coord_plot(setDT(rv_coord()[, c(input$sel_LONG_sup_coord, input$sel_LAT_sup_coord)])) # coord_plot is simply the coordinates sup dataset
-          setnames(coord_plot(), names(coord_plot()), c("long","lat"))
-          if(input$rad_several_plots == "several_plots") {
-            coord_plot()[, plot := as.character(rv_coord()[,input$sel_plot_coord])]
-          } else {
-            coord_plot()[, plot := ""]
-          }
-        }
-
-        # get the median coordinates of each/the plot
-        coord_plot(coord_plot()[, .(long = median(long, na.rm = T), lat = median(lat, na.rm = T)), by = plot])
-
-        # remove all NA and take the unique coordinates
-        coord_plot(unique(na.omit(coord_plot())))
-
-        if(req(input$rad_coord) == "coord_plot") {
-          coord(merge(inv() , coord_plot())[c("long","lat","plot")])
-        }
-      }
-    }
-
-  )
-
 
 
   ## Feldpausch method -------
 
-  region <- reactiveVal() # a data-frame containing 2 columns : plot and Feldpausch's region
-
-  feld_already_ticked <- reactiveVal(F) # in order to not re-execute the code when another box is ticked (HDlocal or Chave)
-
-  observeEvent( {
-    input$chkgrp_HEIGHT
-    input$btn_DATASET_LOADED # if the user go back to the Load dataset item
-  },
-  ignoreNULL = FALSE, ignoreInit = TRUE, {
+  observeEvent(input$chkgrp_HEIGHT,
+  ignoreNULL = TRUE, ignoreInit = TRUE, priority = 10, {
 
     if ("feld" %in% input$chkgrp_HEIGHT) {
-      print("Observing chkrgrp_HEIGHT for Feldpausch/Chave method")
-      print(paste("feld_already_ticked: ", feld_already_ticked()))
-      print(paste("chave_already_ticked: ", chave_already_ticked()))
+      print("Observing chkrgrp_HEIGHT for Feldpausch method")
 
       # Skip if Feldpausch/Chave button were already ticked
-      if( feld_already_ticked() ) { # if Feldpausch was already ticked
+      if( rv$feld_already_ticked ) { # if Feldpausch was already ticked
         return() # don't do anything
       } else {
 
-        print("Feldpausch method ! ")
+        print("Feldpausch method:")
 
-        feld_already_ticked(T)
+        rv$feld_already_ticked <- TRUE
 
         # If there is no coordinates: error
         if(is.null(input$rad_coord) || input$rad_coord == "coord_none") {
           shinyalert("Oops", "You need to provide tree's or plot's coordinates to access to region-specific model proposed by Feldpausch et al. (2012)", type = "error")
           updateCheckboxGroupInput(session, inputId = "chkgrp_HEIGHT",
-                                   selected = input$chkgrp_HEIGHT[input$chkgrp_HEIGHT != "feld"] )
+                                   choices = c("Local HD model" = "HDloc","Feldpausch" = "feld","Chave" = "chave"),
+                                   selected = input$chkgrp_HEIGHT[input$chkgrp_HEIGHT != "feld"],
+                                   inline = T)
+
           return()
-        }
 
-        ### Compute Feldspausch regions for coord_plot()
-        region(
-          data.frame(
-            plot = as.character(isolate(coord_plot()[["plot"]])),
-            feld_region = computeFeldRegion(isolate(coord_plot()[, c("long", "lat")]))
+        } else {
+
+          ### Compute Feldspausch regions for rv$coord_plot
+          rv$region <- data.frame(
+            plot = as.character(isolate(rv$coord_plot$plot)),
+            feld_region = computeFeldRegion(isolate(rv$coord_plot[, c("long", "lat")]))
           )
-        )
-        # Advert user if some coordinates don't fall in Feldpausch regions
-        if( "Pantropical" %in% region()$feld_region) {
-          shinyalert("Mhhh",
-                     text = paste(
-                       ifelse(nrow(region())==1,
-                              yes = "The plot doesn't",
-                              no = paste(c("Plots",isolate(coord_plot()$plot[region()$feld_region!="Pantropical"]),"don't"), collapse=" ")),
-                       "fall within the regions defined in Feldpausch et al. (2012), the whole pantropical region will be used."),
-                     type = "warning")
+          # Advert user if some coordinates don't fall in Feldpausch regions
+          if( "Pantropical" %in% rv$region$feld_region) {
+            shinyalert("Mhhh",
+                       text = paste(
+                         ifelse(nrow(rv$region)==1,
+                                yes = "The plot doesn't",
+                                no = paste(c("Plots",isolate(rv$coord_plot$plot[rv$region$feld_region!="Pantropical"]),"don't"), collapse=" ")),
+                         "fall within the regions defined in Feldpausch et al. (2012), the whole pantropical region will be used."),
+                       type = "warning")
+          }
+
+          # print the list of regions in data-frame format
+          render_region <- rv$region
+          names(render_region)[2] <- "Feldpausch region"
+          output$out_tab_feld <- renderTable(render_region, digits = 4, align = "l")
+
+          showElement("box_RESULT_FELD")
         }
-
-        # print the list of regions
-        render_region <- region()
-        names(render_region)[2] <- "Feldpausch region"
-        output$out_tab_feld <- renderTable(render_region, digits = 4)
-
       }
-      showElement("box_RESULT_FELD")
 
     } else { # if "feld" not in input$chkgrp_HEIGHT
-      feld_already_ticked(F)
+      rv$feld_already_ticked <- FALSE
       hideElement("box_RESULT_FELD")
     }
   })
 
 
   ## Chave method -------
-  # create a layer of borders
-  mapWorld <- reactiveVal(borders("world", colour = "gray50", fill = "gray50"))
-  E <- reactiveVal() # a vector of E parameters for each plot
-  chave_already_ticked <- reactiveVal(F) # in order to not re-execute the code when another box is ticked (HDlocal or Feldpausch)
-
-  observeEvent( {
-    input$chkgrp_HEIGHT
-    input$btn_DATASET_LOADED # if the user go back to the Load dataset item
-  },
-  ignoreNULL = FALSE, ignoreInit = TRUE, {
-
-    showElement("box_result_chave")
+  observeEvent(input$chkgrp_HEIGHT, ignoreNULL = TRUE, ignoreInit = TRUE, priority = 10, {
 
     if ("chave" %in% input$chkgrp_HEIGHT) {
 
-      if( chave_already_ticked() ) { # if Chave was already ticked
+      print("Observing chkrgrp_HEIGHT for Chave method")
+
+      if( rv$chave_already_ticked ) { # if Chave was already ticked
         return() # don't do anything
       } else {
 
-        chave_already_ticked(T)
+        print("Chave's method:")
 
-        output$plot_MAP <- renderLeaflet({
-          addCircleMarkers(addProviderTiles(leaflet(data = coord_plot()), "OpenStreetMap.Mapnik"), lng = ~long, lat = ~lat, color = "#10A836")
-          })
+        rv$chave_already_ticked <- TRUE
 
-        showElement("box_MAP")
+        # If there is no coordinates: error
+        if(is.null(input$rad_coord) || input$rad_coord == "coord_none") {
+          shinyalert("Oops", "You need to provide tree's or plot's coordinates to access to generic H-D model proposed by Chave et al. (2014)", type = "error")
+          updateCheckboxGroupInput(session, inputId = "chkgrp_HEIGHT",
+                                   choices = c("Local HD model" = "HDloc","Feldpausch" = "feld","Chave" = "chave"),
+                                   selected = input$chkgrp_HEIGHT[input$chkgrp_HEIGHT != "chave"],
+                                   inline = T)
+          return()
 
-        # Compute bioclimatic parameter E for each plot
-        E(tryCatch(computeE(coord_plot()[, c("long", "lat")]), error = function(e) e))
+        } else {
+          output$plot_MAP <- renderLeaflet({
+            addCircleMarkers(addProviderTiles(leaflet(data = rv$coord_plot), "OpenStreetMap.Mapnik"), lng = ~long, lat = ~lat, color = "#10A836")
+            })
 
-        print("E() :")
-        print(E())
+          showElement("box_MAP")
 
-        # print "E parameter of Chave et al. (2014): ..."
-        output$txt_chave <- renderText({
-          if (!is.list(E())) {
-            if (length(unique(E())) > 1) {
-              paste(
-                "E parameter of Chave et al. (2014):",
-                paste(round(range(E()), digits = 3), collapse = " to ")
-              )
-            } else {
-              paste(
-                "E parameter of Chave et al. (2014):",
-                round(unique(E()), digits = 3)
-              )
-            }
-          } else {
-            "E cannot be retrieved for those coordinates"
-          }
-        })
+          # Compute bioclimatic parameter E for each plot
+          rv$E <- tryCatch(computeE(isolate(rv$coord_plot[, c("long", "lat")])), error = function(e) e)
+
+          # print the list of E parameters in data-frame format
+          render_E <- data.frame(plot = as.character(isolate(rv$coord_plot$plot)),
+                                 E =  rv$E)
+          names(render_E)[2] <- "Bioclimatic predictor E"
+          output$out_tab_chave <- renderTable(render_E, digits = 4, align = "l")
+
+          print("End of Chave's method !")
+
+          showElement("box_result_chave")
+        }
       }
     } else { # if "Chave" not in input$chkgrp_HEIGHT
-      chave_already_ticked(F)
+      rv$chave_already_ticked <- FALSE
       hideElement("box_result_chave")
       hideElement("box_MAP")
     }
@@ -673,20 +693,20 @@ function(input, output, session) {
 
 
   ## Plotting height predictions --------------
+  D <- NULL # D will contain increasing values from 1 to D_max, used to plot line predictions for all methods
+
+  ### Basic plot for HD-methods comparison ----
   observeEvent({
-    coord()
-    hd_model()
-    input$chkgrp_HEIGHT
-    input$rad_HDMOD
-    input$btn_DATASET_LOADED
-  }, ignoreNULL = T, ignoreInit = T, {
-    print("Creating basic plot")
+    list(input$chkgrp_HEIGHT, input$rad_HDMOD)
+  }, ignoreNULL = TRUE, ignoreInit = TRUE, priority = 10, {
+
+    print("Plotting basic plot")
     toggleElement("box_plot_comparison", condition = !is.null(input$chkgrp_HEIGHT))
 
-    D <- seq(1, max( c( inv()$D, hd_data()$D) ) )
+    D_max <- max(rv$inv$D, ifelse(test = is.null(rv$df_h_sup), yes = 0, no = max(rv$df_h_sup[,input$sel_D_sup_data])))
+    D <<- 1:D_max
 
-    ### Basic plot for HD-methods comparison ----
-    plot <- ggplot(data = NULL, aes(x = D)) +
+    rv$plot_hd <- ggplot(data = NULL, aes(x = D)) +
       xlab("Diameter (cm)") +
       ylab("Height (m)") +
       #scale_fill_manual(name = "model confidence interval", values = c("local HD model" = "#619CFF", Feldpausch = "#00BA38", Chave = "#F8766D")) +
@@ -701,72 +721,75 @@ function(input, output, session) {
         legend.key.width = unit(3, "line") ) +
       guides(color = guide_legend(override.aes = list(lwd = 1)),
              shape = guide_legend(override.aes = list(size = 3)))
+  })
 
+  observeEvent(input$rad_HDMOD, ignoreNULL = TRUE, ignoreInit = TRUE, priority = 8, {
 
-    ## Including HD local model in comparison ----
+    ### Including HD local model in comparison ----
     if ("HDloc" %in% input$chkgrp_HEIGHT) {
-      if ( !is.null(hd_model()) ) {
+      print("Plotting HD local model")
+
+      if ( !is.null(rv$hd_model) ) {
         if (input$sel_HDmodel_by == "<unselected>"){
-          plot <- plot +
-            geom_point(data = hd_data(), mapping = aes(x = D, y = H), size=1.5) + # measured trees
-            geom_line(aes(y = retrieveH(D, model = hd_model())$H, colour = "local HD model"), lwd=1.2) + # HD model
-            ylim( c(0, max(hd_data()$H, na.rm = T) + 5))
+          rv$plot_hd <- rv$plot_hd +
+            geom_point(data = rv$hd_data, mapping = aes(x = D, y = H), size=1.5) + # measured trees
+            geom_line(aes(y = retrieveH(D, model = rv$hd_model)$H, colour = "local HD model"), lwd=1.2) + # HD model
+            ylim( c(0, max(rv$hd_data$H, na.rm = TRUE) + 5))
         } else {
           # creating model lines for each plots/regions/...
-          df_lines <- do.call(rbind, lapply(names(hd_model()), function(x) {
+          df_lines <- do.call(rbind, lapply(names(rv$hd_model), function(x) {
             data.frame( D = D,
-                        H_pred = retrieveH(D, model = hd_model()[[x]])$H,
+                        H_pred = retrieveH(D, model = rv$hd_model[[x]])$H,
                         model_for = x)
           }))
-          plot <- plot +
-            geom_point(data = hd_data(), mapping = aes(x = D, y = H, shape = model_for), size=1.5) + # measured trees
+          rv$plot_hd <- rv$plot_hd +
+            geom_point(data = rv$hd_data, mapping = aes(x = D, y = H, shape = model_for), size=1.5) + # measured trees
             geom_line(data = df_lines, mapping = aes(x = D, y = H_pred, colour = "local HD model", lty = model_for), lwd=1.2) + #HD model for each plots/regions..
-            ylim( c(0, max(hd_data()$H, na.rm = T) + 5))
+            ylim( c(0, max(rv$hd_data$H, na.rm = TRUE) + 5))
         }
       }
     }
 
-
-    ## Including Feldpausch's model in comparison ----
+    ### Including Feldpausch's model in comparison ----
     if ("feld" %in% input$chkgrp_HEIGHT) {
-      # creating model prediction lines for each plots/regions/...
-      df_lines <- do.call(rbind, lapply(unique(region()$feld_region), function(x) {
-        data.frame( D = D,
-                    H_pred = retrieveH(D, region = x)$H,
-                    model_for = x)
-      }))
-      if(length(unique(df_lines$model_for)) == 1 ) { # if one single region
-        plot <- plot + geom_line(data = df_lines, mapping = aes(x = D, y = H_pred, colour = "Feldpausch"), lwd=1.2)
-      } else {
-        plot <- plot + geom_line(data = df_lines, mapping = aes(x = D, y = H_pred, colour = "Feldpausch", lty=model_for), lwd=1.2)
+      print("Plotting Feldpausch's model")
+      if(!is.null(rv$region)) {
+        # creating model prediction lines for each plots/regions/...
+        df_lines <- do.call(rbind, lapply(unique(rv$region$feld_region), function(x) {
+          data.frame( D = D,
+                      H_pred = retrieveH(D, region = x)$H,
+                      model_for = x)
+        }))
+        if(length(unique(df_lines$model_for)) == 1 ) { # if one single region
+          rv$plot_hd <- rv$plot_hd + geom_line(data = df_lines, mapping = aes(x = D, y = H_pred, colour = "Feldpausch"), lwd=1.2)
+        } else {
+          rv$plot_hd <- rv$plot_hd + geom_line(data = df_lines, mapping = aes(x = D, y = H_pred, colour = "Feldpausch", lty=model_for), lwd=1.2)
+        }
       }
     }
 
-    ## Including Chave's model in comparison ----
+    ### Including Chave's model in comparison ----
     if ("chave" %in% input$chkgrp_HEIGHT) {
-
+      print("Plotting Chave's model")
       # creating model prediction lines for each plots/regions/...
-      if (!is.list(E())) { # E is a list if an error was caught
-        df_lines <- do.call(rbind, lapply(1:length(E()), function(x) {
+      if (!is.null(rv$E) && !is.list(rv$E)) { # E is a list if an error was caught
+        df_lines <- do.call(rbind, lapply(1:length(rv$E), function(x) {
           logD <- log(D)
-          logH <- 0.893 - E()[x] + 0.760 * logD - 0.0340 * I(logD^2) # eq 6a Chave et al. 2014
+          logH <- 0.893 - rv$E[x] + 0.760 * logD - 0.0340 * I(logD^2) # eq 6a Chave et al. 2014
           RSE <- 0.243
           data.frame(
             D = D,
             H_pred = as.numeric(exp(logH + 0.5 * RSE^2)),
-            model_for = as.character(coord_plot()[x,"plot"])
+            model_for = as.character(rv$coord_plot[x,"plot"])
           )
         }))
-
-        plot <- plot +
+        rv$plot_hd <- rv$plot_hd +
           geom_line(data = df_lines, mapping = aes(x=D, y=H_pred, colour = "Chave", lty = model_for), lwd=1.2)
       }
     }
 
-    #if (!is.null(input$chkgrp_HEIGHT)) {
-      # show the plot of the comparison of the methods
-      output$out_plot_comp <- renderPlot(plot)
-    #}
+    # Render the plot
+    output$out_plot_comp <- renderPlot(rv$plot_hd)
   })
 
   ## Done button actions -------------------------------------------------------
@@ -779,6 +802,8 @@ function(input, output, session) {
     } else {
       showMenuItem("tab_AGB")
       updateTabItems(session, "mnu_MENU", "tab_AGB")
+      hideElement("box_AGB_res") # if user has already calculate AGBs
+      hideElement("box_AGB_Report")
     }
   })
 
@@ -786,50 +811,53 @@ function(input, output, session) {
 
   # AGB ----
 
-  AGB_sum <- reactiveVal(list(), label = "summary by plot")
   observeEvent(input$btn_AGB_DONE, {
 
     print("Reaction to 'Go on' button for AGB calculation")
 
-    ## Retrieving and checking parameters ----
+    ## Reset the individual tree results (created when downloading results)
+    if(!is.null(rv$inv_h_pred)) rv$inv_h_pred <- NULL
+
+    ### Retrieving and checking parameters ----
 
     # AGB only or with error propagation
     AGBmod <- input$rad_AGB_MOD
 
     # Retrieve diameters
-    D <- inv()[, input$sel_DIAMETER]
+    D <- rv$inv[, input$sel_DIAMETER]
 
     # Retrieve WD and its uncertainties
-    if (is.data.frame(wd())) {
-      WD <- wd()[, "meanWD"]
-      errWD <- wd()[, "sdWD"]
+    if (is.data.frame(rv$wd)) {
+      WD <- rv$wd[, "meanWD"]
+      errWD <- rv$wd[, "sdWD"]
     } else {
-      WD <- inv()[, input$sel_WD]
+      WD <- rv$inv[, input$sel_WD]
       errWD <- rep(input$set_errWD, length(WD))
+      if(input$rad_units_wd == "kg.m-3") errWD <- errWD / 1000
     }
 
     # Retrieve heights (and its uncertainties if heights provided by the user)
     if (input$sel_H != "<unselected>") {
-      H <- inv()[, input$sel_H]
+      H <- rv$inv[, input$sel_H]
     }
     if(input$rad_height == "h_each_tree") {
       errH = conv_unit(input$set_errH, from = input$rad_units_height, to = "m")
     }
 
-    # Get the number of height estimation's methods
-    length_progression <- length(input$chkgrp_HEIGHT)
+    # Add BA (basal area) to inv for the download of the tree level results
+    rv$inv$BA <- (pi * (D / 2)^2) / 10000
 
+    # Get the number of height estimation's methods
+    length_progression <- length(input$chkgrp_HEIGHT)*2
 
     # Set method's color
     color <- c("local HD model" = "#619CFF", Feldpausch = "#F8766D", Chave = "#00BA38", height = "black")
+
 
     # Calculation of AGB ----
 
     withProgress(message = "AGB calculation", value = 0, {
       newValue <- list()
-
-      print("input$sel_HDmodel_by :")
-      print(input$sel_HDmodel_by)
 
       ## Heights provided by the user ----
       if(input$rad_height == "h_each_tree") {
@@ -839,59 +867,78 @@ function(input, output, session) {
           you may construct a height-diameter model to overcome that issue.",
                      type = "warning")
         }
-        AGB_res <- AGB_predict(AGBmod, D = D, WD = WD, errWD = errWD, H = H, errH = errH)
-        newValue[[names(color)[4]]] <- summaryByPlot(AGB_res, plot = inv()[["plot"]] )
+        rv$AGB_res[[names(color)[4]]] <- AGB_predict(AGBmod, D = D, WD = WD, errWD = errWD, H = H, errH = errH)
+        newValue[[names(color)[4]]] <- summaryByPlot(rv$AGB_res[[names(color)[4]]], plot = rv$inv$plot)
       }
+
 
       ## Heights from HD local model ----
       if ("HDloc" %in% input$chkgrp_HEIGHT) {
 
         print("AGB calculation for HD local model: ")
+        incProgress(1 / length_progression, detail = "AGB using HD local: Calculating...")
 
         if( input$sel_HDmodel_by != "<unselected>" ) { # if stand-specific models
-          AGB_res <- AGB_predict(AGBmod, D = hd_data()$D,
-                                 WD = WD[inv()$plot %in% hd_data()$model_for],
-                                 errWD = errWD[inv()$plot %in% hd_data()$model_for],
-                                 HDmodel = hd_model(), model_by =  hd_data()$model_for)
-          newValue[[names(color)[1]]] <- summaryByPlot(AGB_res, plot = hd_data()$model_for )
+          rv$AGB_res[[names(color)[1]]] <- AGB_predict(AGBmod, D = rv$hd_data$D,
+                                                       WD = WD[rv$inv$plot %in% rv$hd_data$model_for],
+                                                       errWD = errWD[rv$inv$plot %in% rv$hd_data$model_for],
+                                                       HDmodel = rv$hd_model, model_by =  rv$hd_data$model_for)
+          newValue[[names(color)[1]]] <- summaryByPlot(rv$AGB_res[[names(color)[1]]], plot = rv$hd_data$model_for)
         } else {
-          AGB_res <- AGB_predict(AGBmod, D, WD, errWD, HDmodel = hd_model())
-          newValue[[names(color)[1]]] <- summaryByPlot(AGB_res, plot = inv()[["plot"]])
+          rv$AGB_res[[names(color)[1]]] <- AGB_predict(AGBmod, D, WD, errWD, HDmodel = rv$hd_model)
+          newValue[[names(color)[1]]] <- summaryByPlot(rv$AGB_res[[names(color)[1]]], plot = rv$inv$plot)
         }
-
         incProgress(1 / length_progression, detail = "AGB using HD local: Done")
-        print("AGB using HD local: Done")
       }
+
 
       ## Heights from Feldpausch model ----
       if ("feld" %in% input$chkgrp_HEIGHT) {
-        print("AGB calculation for Feldpausch method: ")
-        AGB_res <- AGB_predict(AGBmod, D, WD, errWD, region = region()[match(inv()[["plot"]] , table = region()$plot) , "feld_region"])
-        newValue[[names(color)[2]]] <- summaryByPlot(AGB_val = AGB_res, plot = inv()[["plot"]])
+
+        print("AGB calculation for Feldpausch's method: ")
+        incProgress(1 / length_progression, detail = "AGB using Feldpausch region: Calculating...")
+
+        rv$AGB_res[[names(color)[2]]] <- AGB_predict(AGBmod, D, WD, errWD, region = rv$region[match(rv$inv$plot , table = rv$region$plot) , "feld_region"])
+        newValue[[names(color)[2]]] <- summaryByPlot(AGB_val = rv$AGB_res[[names(color)[2]]], plot = rv$inv$plot)
+
         incProgress(1 / length_progression, detail = "AGB using Feldpausch region: Done")
       }
 
       # Heights from Chave model ----
       if ("chave" %in% input$chkgrp_HEIGHT) {
+
+        print("AGB calculation for Chave's method: ")
+        incProgress(1 / length_progression, detail = "AGB using Chave E: Calculating...")
+
         if (AGBmod == "agb") {
-          df_E <- data.frame(plot = coord_plot()$plot, E = E())
-          AGB_res <- AGB_predict(AGBmod, D, WD, errWD, E_vec = df_E[match(inv()[["plot"]] , table = df_E$plot) , "E"])
+          df_E <- data.frame(plot = rv$coord_plot$plot, E = rv$E)
+          rv$AGB_res[[names(color)[3]]] <- AGB_predict(AGBmod, D, WD, errWD, E_vec = df_E[match(rv$inv$plot , table = df_E$plot) , "E"])
         }
         if (AGBmod == "agbe") {
-          AGB_res <- AGB_predict(AGBmod, D, WD, errWD, coord = coord()[c("long","lat")])
+          rv$AGB_res[[names(color)[3]]] <- AGB_predict(AGBmod, D=D, WD=WD, errWD=errWD, coord = isolate(rv$coord[,c("long","lat")]))
         }
 
-        newValue[[names(color)[3]]] <- summaryByPlot(AGB_res, inv()[["plot"]])
+        newValue[[names(color)[3]]] <- summaryByPlot(AGB_val = rv$AGB_res[[names(color)[3]]], plot = rv$inv$plot)
+
         incProgress(1 / length_progression, detail = "AGB using Chave E: Done")
       }
 
-      AGB_sum(newValue)
+      # Fill Cred_2.5 and Cred_97.5 with NA's if no error propagation
+      if(AGBmod == "agb") {
+        newValue <- lapply(newValue , function(x) { # x = AGB_sum$`local HD model`
+          x[,c("Cred_2.5","Cred_97.5")] <- NA
+          return(x)
+        })
+      }
+
+      rv$AGB_sum <- newValue
+
     })
 
     ## Render AGB plot's ----
     # plot the output
     output$out_plot_AGB <- renderPlot({
-      plot_list(AGB_sum(), color, AGBmod = AGBmod)
+      plot_list(rv$AGB_sum, color, AGBmod = AGBmod, removedPlot = rv$removedPlot)
     })
 
     showElement(id = "box_AGB_res")
@@ -902,17 +949,18 @@ function(input, output, session) {
 
   # Download part -----------------------------------------------------------
 
-
-  ##### download the report
+  ## Report ----
   output$dwl_report <- downloadHandler(
     filename = function() {
-      paste0("Report_", Sys.Date(), ".html")
+      paste0("BIOMASS_report_", Sys.Date(), ".html")
     },
     content = function(file) {
-      tempReport <- file.path(tempdir(), "report.Rmd")
-      file.copy(system.file("Rmardown", "report_BIOMASS.Rmd", package = "BIOMASSapp"),
-                tempReport,
-                overwrite = TRUE
+      # Copy the report file to a temporary directory before processing it, in case we don't have write permissions to the current working dir (which can happen when deployed).
+      tempReport <- file.path(tempdir(), "report_BIOMASS.Rmd")
+      file.copy(
+        from = system.file("Rmarkdown", "report_BIOMASS.Rmd", package = "BIOMASSapp"),
+        tempReport,
+        overwrite = TRUE
       )
 
       if (file.exists(file)) {
@@ -925,117 +973,130 @@ function(input, output, session) {
   )
 
 
-  #### download the file FOS like
-  output$dwl_file <- downloadHandler(
+  ## Tree level results ----
+
+  output$dwl_tree_file <- downloadHandler(
     filename = function() {
-      paste0("file_", Sys.Date(), ".csv")
+      paste0("tree_level_results_", Sys.Date(), ".csv")
     },
     content = function(file) {
-      if (file.exists(file)) {
-        file.remove(file)
+
+      # Display a message to reassure users if the download is not immediate
+      showModal(modalDialog("Loading... (can take a moment for Chave's height predictions if you have a poor connexion)", footer=NULL))
+      on.exit(removeModal())
+
+      # Setting H and D
+      if (input$sel_H != "<unselected>") {
+        H <- rv$inv[, input$sel_H]
+      } else {
+        H <- NULL
+      }
+      D <- rv$inv[, input$sel_DIAMETER]
+
+      if(is.null(rv$inv_h_pred)) { # rv$inv_h_pred can also be created in plot level results (see below) and is reset when clicking on "Go on" AGB button
+
+        rv$inv_h_pred <- indiv_pred(inv = rv$inv, rad_height = input$rad_height, H = H, AGB_res = rv$AGB_res,
+                                      chkgrp_HEIGHT = input$chkgrp_HEIGHT, sel_HDmodel_by = input$sel_HDmodel_by,
+                                      hd_data = rv$hd_data, hd_model = rv$hd_model, D = D, region = rv$region, coord = rv$coord)
       }
 
-      # create a temporary file to use to copy the file
-      tempFile <- tempfile(fileext = ".csv")
+      out <- rv$inv_h_pred
 
-      # select the column we need
-      selectColumn <- c(
-        input$sel_PLOT, input$sel_DIAMETER,
-        input$sel_H, input$sel_LONG, input$sel_LAT
-      )
-      selectedColumn <- selectColumn != "<unselected>"
+      # Round sd_WD (if exists) and BA columns
+      if(!is.null(out$sd_WD)) out$sd_WD <- round(out$sd_WD, 4)
+      out$BA <- round(out$BA, 4)
 
-      # create a database with those data
-      data <- as.data.table(inv()[, selectColumn[selectedColumn]])
-      setnames(data, names(data), c(
-        "plot", "D",
-        "H", "longitude", "latitude"
-      )[selectedColumn])
+      # Remove the "plot" column to leave the original name
+      n_plot_col <- match("plot", names(out))[length(match("plot", names(out)))] # column number of the plot columnn (use of [length(...)] in case user has already a "plot" column)
+      # Remove the Lorey"s height columns (used in plot level results but not in tree level ones)
+      n_lorey_col <- grep("H_Lorey", names(out)) # column number of the plot columnn (use of [length(...)] in case user has already a "plot" column)
 
-      # create the output data
-      out <- data.table(
-        plot = if ("plot" %in% names(data)) data$plot else rep("plot", nrow(data)),
-        longitude = if ("longitude" %in% names(data)) data$longitude else rep(input$num_LONG, nrow(data)),
-        latitude = if ("latitude" %in% names(data)) data$latitude else rep(input$num_LAT, nrow(data))
-      )
+      write.csv(as.data.frame(out[,-c(n_plot_col,n_lorey_col)]), file, row.names = FALSE)
+    },
+    contentType = "text/csv"
+  )
 
-      # select the H we need
-      if (is.null(input$chkgrp_HEIGHT)) {
-        out[, H := data$H]
+
+  ## Plot level results (FOS like csv) ----
+  output$dwl_plot_file <- downloadHandler(
+    filename = function() {
+      paste0("plot_level_results_", Sys.Date(), ".csv")
+    },
+    content = function(file) {
+
+      # Display a message to reassure users if the download is not immediate
+      showModal(modalDialog("Loading... (may take a moment for Chave's height predictions if you have a poor connexion)", footer=NULL))
+      on.exit(removeModal())
+
+      ### results will contain for each plot (if the column exists):
+      # Plot_ID, Ndens, Lat_cnt, Lon_cnt, MinDBH, MaxDBH, BA, Wood density(mean), H_Lorey_..., H_max_..., AGB_..., AGB_..._Cred_2.5, AGB_..._Cred_97.5
+
+      # Setting H and D
+      if (input$sel_H != "<unselected>") {
+        H <- rv$inv[, input$sel_H]
+      } else { H <- NULL }
+      D <- rv$inv[, input$sel_DIAMETER]
+
+      # If inv_h_pred is NULL, it means the user didn't download the tree level results, so we need to create it
+      #  rv$inv_h_pred is reset when clicking on "Go on" AGB button
+      if(is.null(rv$inv_h_pred)) {
+        rv$inv_h_pred <- indiv_pred(inv = rv$inv, rad_height = input$rad_height, H = H, AGB_res = rv$AGB_res,
+                                      chkgrp_HEIGHT = input$chkgrp_HEIGHT, sel_HDmodel_by = input$sel_HDmodel_by,
+                                      hd_data = rv$hd_data, hd_model = rv$hd_model, D = D, region = rv$region, coord = rv$coord)
       }
 
-      if ("HDloc" %in% input$chkgrp_HEIGHT) {
-        model_multi <- length(model()[[1]]) != 2
+      out <- data.table(rv$inv_h_pred)
+      if( ! "Plot_ID" %in% names(out)) setnames(out, old = "plot", new = "Plot_ID")
+      if( ! "D" %in% names(out)) setnames(out, old = input$sel_DIAMETER, new = "D")
 
-        if (model_multi) {
-          H <- rep(NA_real_, nrow(data))
-          index_plot_model <- data[plot %in% names(model()), .I]
-          H[index_plot_model] <- data[index_plot_model, retrieveH(D, model = model(), plot = plot)$H]
+      # Adding Lat_cnt and Lon_cnt if exists
+      if(!is.null(input$rad_coord) && input$rad_coord != "coord_none") {
+        out <- merge(x = out, y = rv$coord_plot, by.x = "Plot_ID", by.y = "plot")
+        setnames(out, old = c("long","lat"), new = c("Lon_cnt","Lat_cnt"))
+      }
+
+      # Add Ndens (number of tree)
+      out[, Ndens := .N , by=Plot_ID]
+
+      # Add MinDBH and maxDBH (cannot deal with two columns named "D" when summarizing by plot (line code below))
+      out[, MinDBH := D]
+      out[, MaxDBH := D]
+
+      ## Summarize by plot: Ndens, MinDBH, BA (sum of individual BA), Wood density (mean), H_Lorey_...(sum) and H_... (max)
+      list_fun <- list("Ndens" = min, "MinDBH" = min, "MaxDBH" = max,
+                       "BA" = function(x) {round(sum(x), 2)}, "WD" = function(x) {round(mean(x), 4)},
+                       "H_Lorey_mes" = sum,"H_Lorey_local_model" = sum, "H_Lorey_Feldpausch" = sum, "H_Lorey_Chave" = sum,
+                       "H_mes" = max,"H_local_model" = max, "H_Chave" = max, "H_Feldpausch" = max)
+      list_fun <- list_fun[ names(list_fun)[names(list_fun) %in% names(out)] ]
+
+      # Apply each function to each column:
+      out <- out[, mapply(function(fun, var) { fun(.SD[[var]]) }, list_fun, names(list_fun), SIMPLIFY = FALSE), by=Plot_ID]
+      setnames(out, old = "WD", new = "MeanWD")
+
+      # Dividing Lorey's column by BA to get the correct Lorey's heights
+      for(x in grep("H_Lorey_", names(out), value = TRUE)) out[[x]] <- round(out[[x]] / out$BA, 2)
+
+      ## Adding AGB's columns by merging  rv$AGB_sum (and rename H_... by H_max_...)
+      for(method in names(rv$AGB_sum)) { # method = "local HD model"
+        # get the AGB summary for the current height estimation method
+        res <- data.frame(rv$AGB_sum[[method]])
+        # round the results to 1 digit
+        res[,c("AGB", "Cred_2.5", "Cred_97.5")] <- round(res[,c("AGB", "Cred_2.5", "Cred_97.5")], 1)
+        # rename "local HD model" to "local_model" to match the FOS names
+        if(method == "local HD model") method <- "local_model"
+        # Rename columns depending on the method
+        if(method != "height") { # if x == height, it means that heights were provided by the user, so the column renaming is different
+          setnames(res, old = c("AGB","Cred_2.5","Cred_97.5"), new = c(paste0("AGB_",method), paste0("AGB_",method,"_Cred_2.5"), paste0("AGB_",method,"_Cred_97.5")))
+          out <- merge(x = out, y = res, by.x = "Plot_ID", by.y = "plot")
+          setnames(out, old = paste0("H_",method), new = paste0("H_max_",method))
         } else {
-          H <- data[, retrieveH(D, model = model())$H]
-        }
-
-        out[, H_local := H]
-      }
-
-      if ("feld" %in% input$chkgrp_HEIGHT) {
-        out[, H_feld := retrieveH(data$D, region = computeFeldRegion(cbind(longitude, latitude)))$H]
-      }
-
-      if ("chave" %in% input$chkgrp_HEIGHT) {
-        out[, H_chave := retrieveH(data$D, coord = if (.N != 1) cbind(longitude, latitude) else c(longitude, latitude))$H ]
-      }
-
-      # create the Lorey database whith the lorey height
-      Lorey <- suppressWarnings(out[, c(1, grep("^H", names(out))), with = F][, ":="(D = data$D, plot = out$plot)])
-      Lorey[, BAm := (pi * (D / 2)^2) / 10000]
-      Lorey <- Lorey[, lapply(.SD, function(x) {
-        sum(x * BAm, na.rm = T) / sum(BAm, na.rm = T)
-      }), .SDcols = patterns("^H"), by = plot]
-      Lorey[Lorey == 0] <- NA
-      setnames(Lorey, names(Lorey), gsub("^H", "LoreyH", names(Lorey)))
-
-      # take the data for reduction by plot
-      out <- suppressWarnings(out[, lapply(.SD, max, na.rm = T), .SDcols = patterns("^H"), by = plot][
-        out[, .(
-          Long_cnt = mean(longitude),
-          Lat_cnt = mean(latitude)
-        ), by = plot],
-        on = "plot"
-      ])
-      setnames(out, names(out), gsub("^H", "H_max", names(out)))
-
-      # merge the AGB
-      for (i in names(AGB_sum())) {
-        a <- ncol(out)
-        tab <- AGB_sum()[[i]]
-        out <- merge(out, setDT(tab), by = "plot", all.x = T)
-        name <- names(out)[(a + 1):ncol(out)]
-        if (i == "local HD model") {
-          i <- "local"
-        }
-        if (i != "height") {
-          setnames(out, name, paste(name, i, sep = "_"))
+          out <- merge(x = out, y = res, by.x = "Plot_ID", by.y = "plot")
+          setnames(out, old = "H_mes", new = "H_mes_max")
         }
       }
 
+      write.csv(as.data.frame(out), file, row.names = FALSE)
 
-      # Merge the Lorey table
-      out <- out[Lorey, on = "plot"]
-
-
-      # Few manipulation on the dataset
-      setnames(out, "plot", "Plot_ID")
-      setnames(out, names(out), sub("^Cred", "AGB_Cred", names(out)))
-      setcolorder(out, c("Plot_ID", "Long_cnt", "Lat_cnt"))
-      out[out == -Inf] <- NA
-      out[out == Inf] <- NA
-
-      # write the file
-      fwrite(out, tempFile)
-
-      # copy the file in the file for this purpose
-      file.copy(tempFile, file, overwrite = T)
     },
     contentType = "text/csv"
   )
