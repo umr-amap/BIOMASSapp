@@ -946,10 +946,10 @@ function(input, output, session) {
       paste0("BIOMASS_report_", Sys.Date(), ".html")
     },
     content = function(file) {
-      tempReport <- file.path(tempdir(), "BIOMASS_report.Rmd")
+      # Copy the report file to a temporary directory before processing it, in case we don't have write permissions to the current working dir (which can happen when deployed).
+      tempReport <- file.path(tempdir(), "report_BIOMASS.Rmd")
       file.copy(
-        #from = system.file("Rmarkdown", "BIOMASS_report.Rmd", package = "BIOMASSapp"),
-        from = "~/BIOMASSapp/inst/Rmarkdown/report_BIOMASS.Rmd",
+        from = system.file("inst/Rmarkdown", "report_BIOMASS.Rmd", package = "BIOMASSapp"),
         tempReport,
         overwrite = TRUE
       )
