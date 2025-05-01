@@ -1,38 +1,49 @@
-library(shiny)
-library(shinydashboard)
-library(shinycssloaders)
-library(data.table)
-library(ggplot2)
-library(leaflet)
-library(shinyjs)
-library(shinyalert)
-library(shinyFeedback)
-library(rmarkdown)
-library(measurements)
-library(DT)
-#library(BIOMASS)
+suppressPackageStartupMessages({
+  library(shiny)
+  library(shinydashboard)
+  library(shinycssloaders)
+  library(data.table)
+  library(ggplot2)
+  library(leaflet)
+  library(shinyjs)
+  library(shinyalert)
+  library(shinyFeedback)
+  library(rmarkdown)
+  library(measurements)
+  library(DT)
+  library(BIOMASS)
+})
+
 devtools::load_all("~/BIOMASS/")
 
 # set maximum input file size (here 30Mo)
 options(shiny.maxRequestSize = 30 * 1024^2)
 
-# add an id to a box so that it can be shown/hidden (instead of wrap the box() on a div() )
-boxWithId <- function(..., title = NULL, footer = NULL, status = NULL,
-                      solidHeader = FALSE, background = NULL, width = 6, height = NULL,
-                      collapsible = FALSE, collapsed = FALSE, id = NULL) {
-  b <- match.call(expand.dots = TRUE)
-  bid <- id
-  b$id <- NULL
-  b[[1]] <- as.name("box")
-  b <- eval(b, parent.frame())
-  b$attribs$id <- bid
-  b
+# SERVER auto close application when session ends
+# only if run locally (ie not on a remote server)
+autoCloseApp <- function(session=getDefaultReactiveDomain()) {
+  isLocal <- Sys.getenv("SHINY_PORT") == ""
+  if(isLocal) {
+    session$onSessionEnded(function() {
+      stopApp()
+    })
+  }
 }
 
+# UI add an id to a tag
+setId <- function(tag, id) {
+  htmltools::tagAppendAttributes(tag, id=id)
+}
+
+# add an id to a box so that it can be shown/hidden easily
+boxWithId <- function(..., id=NULL) {
+  box(...) |> setId(id)
+}
+
+# hide/show menu item
 hideMenuItem <- function(tabName) {
   shinyjs::hide(selector = sprintf("a[data-value='%s']", tabName))
 }
-
 showMenuItem <- function(tabName) {
   shinyjs::show(selector = sprintf("a[data-value='%s']", tabName))
 }

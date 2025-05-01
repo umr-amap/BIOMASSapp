@@ -1,9 +1,7 @@
 function(input, output, session) {
 
   # stop the serveur in the end of the session
-  session$onSessionEnded(function() {
-    stopApp()
-  })
+  autoCloseApp() # version compatible local/server
 
   observe({
     # hide few menu at the begining
@@ -185,61 +183,61 @@ function(input, output, session) {
     print("Reaction to btn_DATASET_LOADED")
 
     ### Error management ----
-    error <- FALSE
+    error_occured <- FALSE
     if ( is.null(input$file_DATASET) ) {
       # if no dataset is provided
-      error <- TRUE
+      error_occured <- TRUE
       shinyalert("Oops!", "You need to load a forest inventory file !", type = "error")
     } else if ( is.null(input$rad_several_plots) ) {
       # if the number of plot is not provide
-      error <- TRUE
+      error_occured <- TRUE
       shinyalert("Oops!", "You need to answer to the question : Does your dataset contain several plots?", type = "error")
     } else if (input$rad_several_plots =="several_plots" && input$sel_PLOT == "<unselected>" ) {
       # if the column corresponding to the plot IDs is unselected
-      error <- TRUE
+      error_occured <- TRUE
       shinyalert("Oops!", "The column containing the plots IDs is unselected", type = "error")
     } else if (input$sel_DIAMETER == "<unselected>") { # if diameter is not selected
-      error <- TRUE
+      error_occured <- TRUE
       shinyalert("Oops!", "D is unselected", type = "error")
     } else if (!xor(input$sel_WD == "<unselected>", input$sel_GENUS == "<unselected>")) {
       # if the wd is not selected or genus not selected but not the two
-      error <- TRUE
+      error_occured <- TRUE
       shinyalert("Oops!", "To estimate the Above Ground Biomass, you either need the wood density or the taxonomy of the trees", type = "error")
     } else if (is.null(input$rad_height)) {
       # if the H radio button has not been ticked
-      error <- TRUE
+      error_occured <- TRUE
       shinyalert("Oops!", "Height information has not been provided", type = "error")
     } else if ( input$rad_height %in% c("h_each_tree","h_some_tree") && input$sel_H == "<unselected>" ) {
       # if the H column is unselected
-      error <- TRUE
+      error_occured <- TRUE
       shinyalert("Oops!", "Height column is unselected", type = "error")
     } else if ( input$rad_height == "h_sup_data" && is.null(input$file_h_sup)){
       # if the H-D relationship is in another dataset which have not been loaded
-      error <- TRUE
+      error_occured <- TRUE
       shinyalert("Oops!", "The dataset containing a subset of well-measured trees has not been loaded", type = "error")
     } else if ( input$rad_height == "h_sup_data" && (input$sel_H_sup_data == "<unselected>" | input$sel_D_sup_data == "<unselected>") ){
       # if the H or D column (of the sup dataset containing H-D relationship) are unselected
-      error <- TRUE
+      error_occured <- TRUE
       shinyalert("Oops!", "Diameter and/or Height column(s) of the dataset containing a subset of well-measured trees is/are unselected ", type = "error")
     } else if (input$rad_height == "h_none" && (is.null(input$rad_coord) || input$rad_coord %in% c("","coord_none"))  ) {
       # if no height measurements and no coordinates
-      error <- TRUE
+      error_occured <- TRUE
       shinyalert("Oops!", "To estimate tree heights, you either need a subset of well-measured trees or the coordinates of the plots", type = "error")
     } else if (!is.null(input$rad_coord) && input$rad_coord == "coord_each_tree" & (input$sel_LONG == "<unselected>" | input$sel_LAT == "<unselected>")) {
       # if the coordinates of each tree is ticked but one of the two (long or lat) is not selected
-      error <- TRUE
+      error_occured <- TRUE
       shinyalert("Oops!", "Tree's longitude and/or latitude is/are unselected", type = "error")
     } else if (!is.null(input$rad_coord) && input$rad_coord == "coord_plot" & is.null(input$file_coord) ) {
       # if the coordinates of the plots (in another dataset) is ticked but the dataset has not been loaded
-      error <- TRUE
+      error_occured <- TRUE
       shinyalert("Oops!", "The dataset containing the coordinates of the plot(s) has not been loaded", type = "error")
     } else if (!is.null(input$rad_coord) && input$rad_coord == "coord_plot" & (input$sel_LAT_sup_coord == "<unselected>" | input$sel_LAT_sup_coord == "<unselected>") ) {
       # if the Latitude or Longitude column (of the sup dataset containing plot's coordinates) are unselected
-      error <- TRUE
+      error_occured <- TRUE
       shinyalert("Oops!", "Latitude and/or Longitude column(s) of the dataset containing the coordinates of the plot(s) is/are unselected ", type = "error")
     } else if (!is.null(input$rad_coord) && input$rad_coord == "coord_plot" & input$rad_several_plots == "several_plots" & input$sel_plot_coord == "<unselected>") {
       # if the plots IDs column for sup coord is unselected
-      error <- TRUE
+      error_occured <- TRUE
       shinyalert("Oops!", "Plots IDs of the dataset containing the coordinates of the plot(s) is unselected ", type = "error")
     } else if (input$sel_WD == "<unselected>") {
       # if the WD is not selected then show the tab TAXO
@@ -265,7 +263,7 @@ function(input, output, session) {
     hideElement("box_result_chave")
 
     ## Setting rv$inv ----
-    if(!error) {
+    if(!error_occured) {
 
       rv$inv <- forest_inv
 
