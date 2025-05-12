@@ -1,12 +1,12 @@
 Package: BIOMASSapp
 Type: Package
 Title: The shiny application of BIOMASS
-Version: 1.0
+Version: 1.1
 Authors@R: c(
-	person("Maxime", "Réjou-Méchain", email = "maxime.rejou@gmail.com", role = c("aut", "cre", "dtc")),
+	person("Arthur", "Bailly", email = "arthur.bailly@ird.fr ", role = c("aut"))
 	person("Arthur", "Pere", email = "arthur.pere@cirad.fr", role = c("aut")),
 	person("Guillaume","Cornu", email = "gcornu@cirad.fr", role = c("aut"), comment = c(ORCID="0000-0002-7523-5176")),
-	person("Arthur", "Bailly", email = "arthur.bailly@ird.fr ", role = c("aut"))
+	person("Maxime", "Réjou-Méchain", email = "maxime.rejou@gmail.com", role = c("aut", "cre", "dtc")),
   )
 Description: BIOMASSapp is the Shiny version of the R BIOMASS package.
 License: GPL-2
@@ -16,14 +16,15 @@ BugReports: https://github.com/umr-amap/BIOMASSapp/issues
 Imports:
 	shiny,
 	shinydashboard,
-	data.table (>= 1.9.8),
+	shinycssloaders,
 	shinyjs,
 	shinyalert,
 	shinyFeedback,
-	BIOMASS (>= 2.1),
+	data.table (>= 1.9.8),
+	ggplot2,
+	leaflet,
 	rmarkdown,
 	knitr,
-	ggplot2,
-	maps,
 	measurements,
-	httr
+	DT,
+	BIOMASS (>= 2.2.4)

@@ -1,0 +1,432 @@
+---
+title: "Report BIOMASS"
+date: '`r invisible( Sys.setlocale("LC_TIME", "C") ); format(Sys.Date(), "%B %d, %Y")`'
+output:
+  html_document:
+    number_sections: yes
+    theme: united
+    toc: yes
+    toc_depth: 5
+    toc_float: yes
+    self_contained: yes
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(echo = FALSE, comment = NA, fig.align = "center")
+# Allow to include inline R expressions in asis chunks
+knit_engines$set(asis = function(options) {
+  if (options$echo && options$eval) knit_child(text = options$code)
+})
+```
+
+# Forest inventory dataset
+
+```{asis, echo = (input$rad_several_plots == "single_plot")}
+<font size="4.5">
+The forest inventory dataset contains one plot for `r nrow(rv$inv)` trees
+</font>
+```
+
+```{asis, echo = (input$rad_several_plots == "several_plots")}
+<font size="4.5">
+The forest inventory dataset contains `r nrow(rv$inv)` trees over `r length(unique(rv$inv[["plot"]]))` plots: 
+</font>
+`r 
+tree_plot_df <- data.table(table(rv$inv[["plot"]]))
+kable(tree_plot_df, col.names = c("plot","Number of trees"), align = "c")
+`
+```
+
+<font size="4.5">
+Below is an overview of the forest inventory dataset, showing the columns that will be used for the rest of the analysis: 
+</font>
+
+```{r forest_inventory_overview, message=FALSE}
+#selectColumn <- c("Genus", "Species", "D", "<unselected>")
+selectColumn <- c(input$sel_GENUS, input$sel_SPECIES, input$sel_DIAMETER, input$sel_WD)
+selectedColumn <- selectColumn != "<unselected>"
+selectColumn <- selectColumn[selectedColumn]
+
+if(input$rad_height %in% c("h_each_tree","h_some_tree")) {
+  # selectColumn <- c(selectColumn,"H")
+  selectColumn <- c(selectColumn,input$sel_H)
+}
+if(!is.null(input$rad_coord) && input$rad_coord == "coord_each_tree") {
+  # selectColumn <- c(selectColumn,"Long","Lat")
+  selectColumn <- c(selectColumn,input$sel_LONG, input$sel_LAT)
+}
+
+#data <- setDT(rv$inv[, selectColumn[selectedColumn]])
+#setnames(data, names(data), c("genus", "species","D","WD","H", "longitude","latitude")[selectedColumn])
+
+#kable(head(inv[,selectColumn]), digits = 3, caption = "Head of the forest inventory dataset")
+kable(head(rv$inv[,selectColumn]), digits = 3, caption = "Head of the forest data table", align = "c")
+
+summary(rv$inv[,selectColumn])
+```
+
+
+
+```{r}
+# Display (or not) the section called Plot's location
+disp_plot_location <- !is.null(input$rad_coord) && input$rad_coord %in% c("coord_each_tree","coord_plot")
+```
+
+```{asis, echo = disp_plot_location}
+# Plot's location
+```
+
+```{r}
+# Display (or not) the plot's median coordinates coming from the supplementary coordinates datset
+disp_coord_plot <- (!is.null(input$rad_coord) && input$rad_coord == "coord_plot")
+```
+```{asis, echo = disp_coord_plot}
+<font size="4.5">
+A dataset containing plot's coordinates has been provided (`r input$file_coord$name`). Here are the location of the plot's median coordinates: 
+</font>
+```
+```{r, eval = disp_coord_plot}
+  kable(rv$coord_plot, digits = 3, align = "c")
+```
+
+```{r localisation, eval = disp_plot_location, fig.width=12, fig.height=7}
+ggplot(rv$coord_plot) +
+  borders("world", colour = "gray50", fill = "gray50") +
+  geom_point(aes(x = long, y = lat), color = "red", size = 3) + 
+  xlab("longitude") + ylab("latitude") + ylim(c(-60,90)) +
+  theme_minimal()
+
+```
+
+
+# Wood density
+
+```{asis, echo = (input$sel_WD != "<unselected>")}
+<font size="4.5">
+Individual wood density values have been provided, with an assumed error measurement of `r input$set_errWD`.
+</font>
+```
+
+```{asis, echo = (input$sel_GENUS != "<unselected>")}
+<font size="4.5">
+Wood density values have been estimated from tree taxonomy, using the [global wood density database](https://datadryad.org/stash/dataset/doi:10.5061/dryad.234) as a reference.
+</font>
+```
+
+
+```{r}
+# Display (or not) the sub-section called "Checking for misspelling in the taxonomy"
+disp_check_missp <- input$sel_WD == "<unselected>" && !is.null(input$rad_WD) && input$rad_WD == "corr"
+```
+
+```{asis, echo = disp_check_missp}
+## Checking for misspelling in the taxonomy
+```
+
+```{asis, echo = disp_check_missp}
+<font size="4.5">
+Spelling errors in the taxonomy have been corrected, yielding to the following results: 
+</font>
+```
+
+```{r correctTaxo, message=F, eval = disp_check_missp}
+taxo_display <- factor(rv$taxo$nameModified,
+                       levels = c("FALSE","SpNotFound","TaxaNotFound","TRUE"),
+                       labels = c("Correct spelling of taxa (unmodified)","Species not found (unmodified)","Taxa not found (unmodified)","Taxa found and corrected (modified)"))
+kable(data.frame(table(taxo_display)) , align = "c", col.names = c("","number of trees"))
+```
+
+```{r}
+# Display (or not) the sub-section called "Extracting wood density values"
+disp_extr_wd <- input$sel_GENUS != "<unselected>"
+```
+
+```{asis, echo = disp_extr_wd}
+## Extracting wood density values
+
+<font size="4.5">
+By default, BIOMASS assigned to each taxon a species- or genus-level average if at least one wood density value of the same species or genus is available in the reference database. For unidentified trees or if the genus is missing in the reference database, the stand-level mean wood density is assigned to the tree.
+
+Here are the taxonomic levels at which wood density values were attributed to trees (in %): 
+</font>
+```
+
+
+```{r, message=FALSE, eval = disp_extr_wd}
+levelswd <- 100 * table(rv$wd$levelWD) / nrow(rv$wd)
+if (input$sel_PLOT != "<unselected>") {
+  render_wd <- data.frame(
+    "Species level" = round(levelswd["species"], 1),
+    "Genus level" = round(levelswd["genus"], 1),
+    "Plot level" = round(sum(levelswd[!names(levelswd) %in% c("dataset", "genus", "species")]), 1),
+    "User dataset level" = round(levelswd["dataset"], 1),
+    check.names = FALSE
+  )
+} else {
+  render_wd <- data.frame(
+    "Species level" = round(levelswd["species"], 1),
+    "Genus level" = round(levelswd["genus"], 1),
+    "User dataset level" = round(levelswd["dataset"], 1),
+    check.names = FALSE
+  )
+}
+kable(render_wd, digits = 1, align = "l")
+```
+
+
+# Height
+
+```{asis, echo = (input$rad_height == "h_each_tree")}
+<font size="4.5">
+Individual tree heights have been provided, with an assumed error measurement of `r input$set_errH`.
+</font>
+```
+
+```{r}
+# Display (or not) the local HD model parts
+disp_HD_loc <- !is.null(input$chkgrp_HEIGHT) && "HDloc" %in% input$chkgrp_HEIGHT
+```
+
+```{asis, echo = disp_HD_loc}
+## Estimating tree heights by building local Height-Diameter model
+```
+
+```{asis, echo = (disp_HD_loc && input$rad_height == "h_some_tree" && input$sel_HDmodel_by != "<unselected>") }
+<font size="4.5">
+Four local Height-Diameter models have been built for each category of the `r input$sel_HDmodel_by` variable, based on the available heights present in the forest inventory dataset.
+</font>
+```
+
+```{asis, echo = (disp_HD_loc && input$rad_height == "h_some_tree" && input$sel_HDmodel_by == "<unselected>") }
+<font size="4.5">
+Four local Height-Diameter models have been built, based on the available heights present in the forest inventory dataset.
+</font>
+```
+
+```{asis, echo = (disp_HD_loc && input$rad_height == "h_sup_data") }
+<font size="4.5">
+Four local Height-Diameter models have been built, using a dataset containing a subset of well-measured trees in the studied region (`r input$file_h_sup$name`).
+</font>
+```
+
+```{asis, echo = disp_HD_loc}
+<font size="4.5">
+Below is the model comparison with the RSE and the average bias for each model: 
+</font>
+```
+
+
+```{r local HD model, warning=TRUE, message=FALSE, eval = disp_HD_loc}
+# Build and compare the 4 local HD models
+tab_modelHD <- modelHD(
+  D = rv$hd_data$D,
+  H = rv$hd_data$H,
+  plot = rv$hd_data$model_for
+)
+
+# Render the table
+if (input$sel_HDmodel_by == "<unselected>"){
+  out_tab_HD <- tab_modelHD[, -3]
+} else { # If one model per plot/region/whatever, compute the mean of RMSE and Average_bias over all models
+  tab_modelHD <- do.call(rbind,tab_modelHD)
+  tab_modelHD <- data.table(tab_modelHD[,-3])
+  out_tab_HD <- tab_modelHD[, lapply(.SD, mean) , by = method]
+}
+
+kable(out_tab_HD, digits = 4, align = "l")
+
+```
+
+```{asis, echo = disp_HD_loc }
+<font size="4.5">
+The selected local Height-Diameter model was a `r input$rad_HDMOD` model of the form:
+</font>
+```
+
+```{asis, echo = (disp_HD_loc && input$rad_HDMOD =="log1") }
+$$ H = exp(a + b \cdot log(D)) $$
+```
+
+```{asis, echo = (disp_HD_loc && input$rad_HDMOD =="log2") }
+$$ H = exp(a + b \cdot log(D) + c \cdot log(D)^2) $$
+```
+
+```{asis, echo = (disp_HD_loc && input$rad_HDMOD =="michaelis") }
+$$ H= a \cdot \dfrac{D}{b+D} $$
+```
+
+```{asis, echo = (disp_HD_loc && input$rad_HDMOD =="weibull") }
+$$H=a  \cdot (1-exp(-(D/b)^c))$$
+<font size="4.5">
+where *a* represents the asymptotic height of trees.
+</font>
+```
+
+```{r}
+# Display (or not) the Feldpausch model parts
+disp_feld <- !is.null(input$chkgrp_HEIGHT) && "feld" %in% input$chkgrp_HEIGHT
+```
+
+```{asis, echo = disp_feld}
+## Estimating tree heights using the region-speciﬁc H–D model (Feldpausch et al. 2012)
+```
+
+```{asis, echo = (disp_feld && input$rad_several_plots == "single_plot") }
+<font size="4.5">
+The `r rv$region` region was used to estimate tree heights from the model of Feldpausch et al. 2012.
+</font>
+```
+
+```{asis, echo = (disp_feld && input$rad_several_plots == "several_plots") }
+<font size="4.5">
+The following regions were used to estimate tree heights from the model of Feldpausch et al. 2012:
+</font>
+```
+
+```{r feldpausch region, eval = (disp_feld && input$rad_several_plots == "several_plots")}
+render_region <- rv$region
+names(render_region)[2] <- "Feldpausch region"
+kable(render_region, align = "l")
+```
+
+```{asis, echo = disp_feld}
+<font size="4.5">
+Reference:  
+*Feldpausch et al. Tree height integrated into pantropical forest biomass estimates. Biogeosciences (2012): 3381-3403.*
+</font>
+```
+
+
+```{r}
+# Display (or not) the Chave model parts
+disp_chave <- !is.null(input$chkgrp_HEIGHT) && "chave" %in% input$chkgrp_HEIGHT
+```
+
+```{asis, echo = disp_chave}
+## Estimating tree heights using the the generic H–D model based on a bioclimatic predictor (Chave et al. 2014)
+
+```{asis, echo = (disp_chave && input$rad_several_plots == "single_plot") }
+<font size="4.5">
+The bioclimatic predictor E from Chave et al. (2014) used to estimate tree heights was `r rv$E`.
+</font>
+```
+
+```{asis, echo = (disp_chave && input$rad_several_plots == "several_plots") }
+<font size="4.5">
+The following values of the bioclimatic predictor E were used to estimate tree heights from the model of Chave et al. 2014 (eqn 6a):
+</font>
+```
+
+```{r, eval = (disp_chave && input$rad_several_plots == "several_plots") }
+render_E <- data.frame(plot = as.character(rv$coord_plot$plot),
+                       E =  rv$E)
+names(render_E)[2] <- "Bioclimatic predictor E"
+kable(render_E, digits = 4, align = "l")
+```
+
+```{asis, echo = disp_chave}
+<font size="4.5">
+Reference:  
+*Chave et al. (2014) Improved allometric models to estimate the aboveground biomass of tropical trees, Global Change Biology, 20 (10), 3177-3190*
+</font>
+```
+
+```{asis, echo = (input$rad_height != "h_each_tree") }
+## Visualisation of height prediction models
+
+```
+
+```{r, eval = (input$rad_height != "h_each_tree"), fig.width=12, fig.height=7, message=FALSE, warning=FALSE}
+rv$plot_hd
+```
+
+```{asis, echo = (input$rad_height %in% c("h_some_tree", "h_sup_data")) }
+<font size="4.5">
+In the graph above, the points represent measured tree heights and the line(s) represent model predictions based on diameter values.
+</font>
+```
+
+```{asis, echo = (input$rad_height == "h_none") }
+<font size="4.5">
+In the graph above, the line(s) represent model predictions based on diameter values.
+</font>
+```
+
+
+
+# Above Ground Biomass estimates
+
+```{asis, echo = (input$rad_AGB_MOD == "agb") }
+<font size="4.5">
+Estimates of AGB were calculated without confidence intervals as no error propagation was requested. Below are the results of the estimates at plot level (in Mg):
+</font>
+```
+
+```{asis, echo = (input$rad_AGB_MOD == "agbe") }
+<font size="4.5">
+Estimates of AGB were calculated with 95% confidence intervals, using error propagation with the following uncertainties: 
+
+* uncertainty about the **model parameters** of the AGB allometric equation (Chave et al. 2014)
+* uncertainty about the **diameter** values using the implemented example of Chave et al. 2004 where small errors are applied on 95% of the trees and large errors to the remaining 5%
+</font>
+```
+
+```{asis, echo = (input$sel_WD != "<unselected>") }
+<font size="4.5">
+
+* uncertainty about the **wood density** values of `r input$set_errWD` 
+</font>
+```
+
+```{asis, echo = (input$sel_GENUS != "<unselected>") }
+<font size="4.5">
+
+* uncertainty about the **wood density** values using the mean standard deviation of the [global wood density database](https://datadryad.org/stash/dataset/doi:10.5061/dryad.234) at the species, genus and family levels.
+</font>
+```
+
+```{asis, echo = (input$rad_height == "h_each_tree") }
+<font size="4.5">
+
+* uncertainty about the **height** values of `r input$set_errH` 
+</font>
+```
+
+```{asis, echo = (!is.null(input$chkgrp_HEIGHT)) }
+<font size="4.5">
+
+* uncertainty about the **height** values predicted by H-D models (local, Feldpausch or Chave ones) using the RSE of the models.
+</font>
+```
+
+```{asis, echo = (input$rad_AGB_MOD == "agbe") }
+<font size="4.5">
+
+Below are the results of the estimates at plot level (in Mg):
+</font>
+```
+
+
+
+```{r plot biomass, echo=FALSE, fig.align='center', fig.width=12, fig.height=7, message=FALSE, warning=FALSE}
+
+rv$AGB_sum
+
+color <- c("local HD model" = "#619CFF", Feldpausch = "#F8766D", Chave = "#00BA38", height = "black")
+
+plot_list(list = rv$AGB_sum, color = color, AGBmod = input$rad_AGB_MOD)
+
+```
+
+
+```{r }
+
+
+citation("BIOMASS")
+```
+
+
+
+
+
