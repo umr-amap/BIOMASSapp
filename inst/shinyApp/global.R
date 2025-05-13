@@ -5,6 +5,7 @@ suppressPackageStartupMessages({
   library(shinyjs)
   library(shinyalert)
   library(shinyFeedback)
+  library(shinyhelper)
   library(data.table)
   library(ggplot2)
   library(leaflet)

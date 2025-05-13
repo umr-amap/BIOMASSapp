@@ -3,6 +3,8 @@ function(input, output, session) {
   # stop the serveur in the end of the session
   autoCloseApp() # version compatible local/server
 
+  observe_helpers(help_dir = "../../helpfiles")
+
   observe({
     # hide few menu at the begining
     hideMenuItem("tab_TAXO")
@@ -407,15 +409,16 @@ function(input, output, session) {
             data.frame(
               "Species level" = round(levelswd["species"], 1),
               "Genus level" = round(levelswd["genus"], 1),
-              "Plot level" = round(sum(levelswd[!names(levelswd) %in% c("dataset", "genus", "species")]), 1),
-              "User dataset level" = round(levelswd["dataset"], 1),
+              "Plot level" = round(sum(levelswd[!names(levelswd) %in% c("genus", "species")]), 1),
+              #"User dataset level" = round(levelswd["dataset"], 1),
               check.names = FALSE
             )
           } else {
             data.frame(
               "Species level" = round(levelswd["species"], 1),
               "Genus level" = round(levelswd["genus"], 1),
-              "User dataset level" = round(levelswd["dataset"], 1),
+              "Plot level" = round(levelswd["dataset"], 1),
+              #"User dataset level" = round(levelswd["dataset"], 1),
               check.names = FALSE
             )
           }

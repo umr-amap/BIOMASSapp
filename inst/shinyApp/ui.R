@@ -20,6 +20,14 @@ dashboardPage(
       tabItem(
         "tab_LOAD",
         fluidRow(
+          column(12,
+                 p("  To estimate the ", strong("above ground biomass (AGB)"), " of a forest inventory, ", strong("3 parameters"), " are required:"),
+                 p("- The ", strong("diameter")),
+                 p("- The ", strong("wood density"), " (a method for estimating this parameter based on taxonomy is proposed when wood density data are not available)"),
+                 p("- The ", strong("height"), " (three methods for estimating this parameter are proposed when height data are not available)"),
+                 br()
+        )),
+        fluidRow(
           column(6,
                  box( # Forest inventory file's box
                    title = h3("Forest inventory file"), width = 12,
@@ -34,13 +42,15 @@ dashboardPage(
                    div("information required", id = "msg_several_plots", style = "color:red;"),
                    hidden(selectInput("sel_PLOT", "Which column contains the plots IDs?", choices = NULL))
                  ),
-                 hidden(boxWithId( # Coordinate's box
+                 ## Coordinate's box ----
+                 hidden(boxWithId(
                    id = "box_COORD", title = h3("Geographic coordinates (optional)"), width = 12,
                    radioButtons("rad_coord", "Do you have:",
                                 choices = c("the columns corresponding to the coordinates of each tree" = "coord_each_tree",
                                             "the coordinates of the plot(s) in another dataset (see below for an overview)" = "coord_plot",
                                             "no coordinates" = "coord_none"),
-                                selected = character(0)),
+                                selected = character(0)) |>
+                     helper(colour = "#158A0C", content = "rad_coord"),
                    # If coordinates of each tree
                    hidden(div(id = "id_sel_coord",
                               selectInput("sel_LAT", "Latitude", choices = NULL),
@@ -70,7 +80,7 @@ dashboardPage(
                    column(3, radioButtons("rad_units_diameter", "Unit:", choices = c("mm", "cm", "m"), selected = "cm")),
                    hr(), hr(), hr(), #just to get one horizontal row
 
-                   ## Wood density or taxonmy (compulsory) ----
+                   ## Wood density or taxonomy (compulsory) ----
                    hr(), hr(), hr(),
                    h4("Wood density or taxonomy"),
                    column(9,
@@ -80,7 +90,8 @@ dashboardPage(
                                           selected = "g.cm-3")),
                    column(12, hidden(div(id = "id_set_errWD",
                                          numericInput("set_errWD", label = "What is the assumed error associated with the wood densities measurements ?",
-                                                      value = 0.07, min = 0)))),
+                                                      value = 0.07, min = 0) |>
+                                           helper(colour = "#158A0C", content = "set_errWD")))),
                    h5("or"),
                    column(12, selectInput("sel_GENUS", "Genus (e.g. Terminalia) or scientific name (e.g. Terminalia superba or Terminalia superba Engl. & Diels)", choices = NULL)), # column to keep the same layout than Diameter and Wood density selections
                    column(12, selectInput("sel_SPECIES", "Species (e.g. superba)", choices = NULL)),
@@ -95,7 +106,8 @@ dashboardPage(
                                                        "The height of some trees in the same dataset" = "h_some_tree",
                                                        "A subset of well-measured trees in another dataset (see below for an overview)" = "h_sup_data",
                                                        "No height measurements (use coordinates to estimate height)" = "h_none"),
-                                           selected = character(0))),
+                                           selected = character(0)) |>
+                            helper(colour = "#158A0C", content = "rad_height")),
                    # If height of each tree or some trees
                    hidden(div(id = "id_sel_h",
                               column(9 , selectInput("sel_H", "Select height column", choices = NULL)),
@@ -115,9 +127,9 @@ dashboardPage(
                    hidden(div(id = "id_file_h_sup",
                               column(12, fileInput("file_h_sup", "Choose a CSV file",
                                                    accept = c("text/csv", "text/comma-separated-values,text/plain",".csv"))),
-                              column(9 , selectInput("sel_D_sup_data", "Diameter", choices = NULL)),
+                              column(9 , selectInput("sel_D_sup_data", "Select diameter column:", choices = NULL)),
                               column(3, radioButtons("rad_units_D_sup", "Unit:", choices = c("mm","cm", "m"), selected = "cm")),
-                              column(9 , selectInput("sel_H_sup_data", "Height", choices = NULL)),
+                              column(9 , selectInput("sel_H_sup_data", "Select height column: ", choices = NULL)),
                               column(3, radioButtons("rad_units_H_sup", "Unit:", choices = c("cm", "m"), selected = "m"))
                    ))
                  )))),
@@ -177,8 +189,11 @@ dashboardPage(
               verbatimTextOutput("out_taxo_error"),
               type = getOption("spinner.type", default = 5),
               color = getOption("spinner.color", default = "#158A0C")),
+            p(""),
             hr(),
-            verbatimTextOutput("out_wd_error")
+            verbatimTextOutput("out_wd_error"),
+            p("Wood density values are assigned to each taxon by averaging the wood density values present in the reference database at species- or genus-level only if at least one wood density value is available."),
+            p("For unidentified trees or if the genus is missing in the reference database, the plot-level mean wood density is assigned to the tree.")
           ))
         ),
         fluidRow(
