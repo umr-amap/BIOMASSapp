@@ -27,4 +27,4 @@ Imports:
 	knitr,
 	measurements,
 	DT,
-	BIOMASS (>= 2.2.4)
+	BIOMASS (>= 2.2.3)
