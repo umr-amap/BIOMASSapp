@@ -949,29 +949,29 @@ function(input, output, session) {
 
   # Download part -----------------------------------------------------------
 
-  ## Report ----
-  output$dwl_report <- downloadHandler(
-    filename = function() {
-      paste0("BIOMASS_report_", Sys.Date(), ".html")
-    },
-    content = function(file) {
-      # Copy the report file to a temporary directory before processing it, in case we don't have write permissions to the current working dir (which can happen when deployed).
-      tempReport <- file.path(tempdir(), "report_BIOMASS.Rmd")
-      file.copy(
-        from = system.file("Rmarkdown", "report_BIOMASS.Rmd", package = "BIOMASSapp"),
-        tempReport,
-        overwrite = TRUE
-      )
-
-      if (file.exists(file)) {
-        file.remove(file)
-      }
-
-      rmarkdown::render(tempReport, output_file = file)
-    },
-    contentType = "text/html"
-  )
-
+  # ## Report ----
+  # output$dwl_report <- downloadHandler(
+  #   filename = function() {
+  #     paste0("BIOMASS_report_", Sys.Date(), ".html")
+  #   },
+  #   content = function(file) {
+  #     # Copy the report file to a temporary directory before processing it, in case we don't have write permissions to the current working dir (which can happen when deployed).
+  #     tempReport <- file.path(tempdir(), "report_BIOMASS.Rmd")
+  #     file.copy(
+  #       from = system.file("Rmarkdown", "report_BIOMASS.Rmd", package = "BIOMASSapp"),
+  #       tempReport,
+  #       overwrite = TRUE
+  #     )
+  #
+  #     if (file.exists(file)) {
+  #       file.remove(file)
+  #     }
+  #
+  #     rmarkdown::render(tempReport, output_file = file)
+  #   },
+  #   contentType = "text/html"
+  # )
+  #
 
   ## Tree level results ----
 
