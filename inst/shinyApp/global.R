@@ -5,6 +5,7 @@ suppressPackageStartupMessages({
   library(shinyjs)
   library(shinyalert)
   library(shinyFeedback)
+  library(shinyhelper)
   library(data.table)
   library(ggplot2)
   library(leaflet)
@@ -14,8 +15,6 @@ suppressPackageStartupMessages({
   library(DT)
   library(BIOMASS)
 })
-
-devtools::load_all("~/BIOMASS/")
 
 # set maximum input file size (here 30Mo)
 options(shiny.maxRequestSize = 30 * 1024^2)

@@ -1,0 +1,1 @@
+If the name of the latitude column is not on the list, this means that the column is recognised as containing text. Please ensure that your latitude/longitude coordinates are expressed in decimal degrees, and that your raw dataset does not contain any non-numeric data in these columns.
