@@ -1,0 +1,1 @@
+Checking "Correct taxonomy and extract WD" will match all genus and species names against the TNRS to identify **spelling errors, but not for synonymy issues**. For example, the genus "Bertholetia" will be corrected to "Bertholletia".

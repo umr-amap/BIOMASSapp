@@ -1,0 +1,1 @@
+If the name of the diameter column is not on the list, this means that this column is recognised as containing text. Please check that your raw dataset does not contain any non-numeric data in this column.
