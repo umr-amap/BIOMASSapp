@@ -9,7 +9,7 @@ Authors@R: c(
 	person("Dominique", "Lamonica", email = "dominique.lamonica@ird.fr", role = c("cre")),
 	person("Maxime", "Réjou-Méchain", email = "maxime.rejou@gmail.com", role = c("aut", "dtc"))
   )
-Description: BIOMASSapp is the Shiny version of the R BIOMASS package.
+Description: BIOMASSapp is the Shiny version of the R BIOMASS package. It allows the user to estimate above-ground biomass and its uncertainty in tropical forests. This application  allows to (1) retrieve and correct tree taxonomy, (2) estimate wood density and its uncertainty, (3) build height-diameter models, (4) estimate above-ground biomass at stand level with associated uncertainty. To cite ‘BIOMASS’, please use citation(‘BIOMASS’). For more information, see Réjou-Méchain et al. (2017) <doi:10.1111/2041-210X.12753>.
 URL: https://github.com/umr-amap/BIOMASSapp
 License: GPL-2
 Encoding: UTF-8
