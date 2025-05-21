@@ -39,14 +39,12 @@ function(input, output, session) {
   # LOAD DATASET ---------------------------------------------------------------
 
   ## Forest inventory file actions ----
-  observeEvent(ignoreInit = TRUE,
-               list(input$file_DATASET, input$rad_decimal), {
+  observeEvent(input$file_DATASET, ignoreInit = TRUE, {
     # Read forest inventory upload
     forest_inv <<- fread(
       file = req(input$file_DATASET)$datapath,
       #skip = ifelse(is.na(input$num_skip_line) || input$num_skip_line == 0, "__auto__", input$num_skip_line),
-      data.table = FALSE,
-      dec = input$rad_decimal
+      data.table = FALSE
     )
 
     # show the box
@@ -228,15 +226,15 @@ function(input, output, session) {
       # if the coordinates of each tree is ticked but one of the two (long or lat) is not selected
       error_occured <- TRUE
       shinyalert("Oops!", "Tree's longitude and/or latitude is/are unselected", type = "error")
-    } else if (!is.null(input$rad_coord) && input$rad_coord == "coord_plot" & is.null(input$file_coord) ) {
+    } else if (!is.null(input$rad_coord) && input$rad_coord == "coord_plot" && is.null(input$file_coord) ) {
       # if the coordinates of the plots (in another dataset) is ticked but the dataset has not been loaded
       error_occured <- TRUE
       shinyalert("Oops!", "The dataset containing the coordinates of the plot(s) has not been loaded", type = "error")
-    } else if (!is.null(input$rad_coord) && input$rad_coord == "coord_plot" & (input$sel_LAT_sup_coord == "<unselected>" | input$sel_LAT_sup_coord == "<unselected>") ) {
+    } else if (!is.null(input$rad_coord) && input$rad_coord == "coord_plot" && (input$sel_LAT_sup_coord == "<unselected>" | input$sel_LONG_sup_coord == "<unselected>") ) {
       # if the Latitude or Longitude column (of the sup dataset containing plot's coordinates) are unselected
       error_occured <- TRUE
       shinyalert("Oops!", "Latitude and/or Longitude column(s) of the dataset containing the coordinates of the plot(s) is/are unselected ", type = "error")
-    } else if (!is.null(input$rad_coord) && input$rad_coord == "coord_plot" & input$rad_several_plots == "several_plots" & input$sel_plot_coord == "<unselected>") {
+    } else if (!is.null(input$rad_coord) && input$rad_coord == "coord_plot" && input$rad_several_plots == "several_plots" & input$sel_plot_coord == "<unselected>") {
       # if the plots IDs column for sup coord is unselected
       error_occured <- TRUE
       shinyalert("Oops!", "Plots IDs of the dataset containing the coordinates of the plot(s) is unselected ", type = "error")
@@ -293,42 +291,42 @@ function(input, output, session) {
         rv$df_h_sup[,input$sel_D_sup_data] <- conv_unit(rv$df_h_sup[,input$sel_D_sup_data], input$rad_units_D_sup, "cm")
         rv$df_h_sup[,input$sel_H_sup_data] <- conv_unit(rv$df_h_sup[,input$sel_H_sup_data], input$rad_units_H_sup, "m")
       }
-    }
 
-    ## Formatting coordinates for Feldpausch and Chave methods -------------------
-    req(input$rad_coord)
+      ## Formatting coordinates for Feldpausch and Chave methods -------------------
+      req(input$rad_coord)
 
-    # If coordinates of each trees:
-    if( input$rad_coord == "coord_each_tree") {
-      rv$coord <- data.table(rv$inv[, c(input$sel_LONG, input$sel_LAT,"plot")]) # coord is simply the inventory dataset
-      setnames(rv$coord, c(input$sel_LONG, input$sel_LAT), c("long","lat"))
-      rv$coord_plot <- rv$coord # coord_plot will be averaging by plot above
-    }
-
-    # If plot's coordinates in another dataset:
-    if( input$rad_coord == "coord_plot") {
-
-      rv$coord_plot <- data.table(rv$df_coord[, c(input$sel_LONG_sup_coord, input$sel_LAT_sup_coord)]) # coord_plot is simply the coordinates sup dataset
-      setnames(rv$coord_plot, names(rv$coord_plot), c("long","lat"))
-
-      if(input$rad_several_plots == "several_plots") {
-        rv$coord_plot[, plot := as.character(rv$df_coord[,input$sel_plot_coord])]
-      } else {
-        rv$coord_plot[, plot := ""]
+      # If coordinates of each trees:
+      if( input$rad_coord == "coord_each_tree") {
+        rv$coord <- data.table(rv$inv[, c(input$sel_LONG, input$sel_LAT,"plot")]) # coord is simply the inventory dataset
+        setnames(rv$coord, c(input$sel_LONG, input$sel_LAT), c("long","lat"))
+        rv$coord_plot <- rv$coord # coord_plot will be averaging by plot above
       }
-    }
 
-    if(input$rad_coord != "coord_none") { # when rad_coord = coord_each_tree or coord_plot
-      # get the median coordinates of each/the plot
-      rv$coord_plot <- rv$coord_plot[, .(long = median(long, na.rm = TRUE), lat = median(lat, na.rm = TRUE)), by = plot]
-      # remove all NA and take the unique coordinates
-      rv$coord_plot <- unique(na.omit(rv$coord_plot))
-    }
+      # If plot's coordinates in another dataset:
+      if( input$rad_coord == "coord_plot") {
 
-    if(input$rad_coord == "coord_plot") {
-      rv$coord <- merge(rv$inv , rv$coord_plot)[c("long","lat","plot")]
-    }
+        rv$coord_plot <- data.table(rv$df_coord[, c(input$sel_LONG_sup_coord, input$sel_LAT_sup_coord)]) # coord_plot is simply the coordinates sup dataset
+        setnames(rv$coord_plot, names(rv$coord_plot), c("long","lat"))
 
+        if(input$rad_several_plots == "several_plots") {
+          rv$coord_plot[, plot := as.character(rv$df_coord[,input$sel_plot_coord])]
+        } else {
+          rv$coord_plot[, plot := ""]
+        }
+      }
+
+      if(input$rad_coord != "coord_none") { # when rad_coord = coord_each_tree or coord_plot
+        # get the median coordinates of each/the plot
+        rv$coord_plot <- rv$coord_plot[, .(long = median(long, na.rm = TRUE), lat = median(lat, na.rm = TRUE)), by = plot]
+        # remove all NA and take the unique coordinates
+        rv$coord_plot <- unique(na.omit(rv$coord_plot))
+      }
+
+      if(input$rad_coord == "coord_plot") {
+        rv$coord <- merge(rv$inv , rv$coord_plot)[c("long","lat","plot")]
+      }
+
+    } # end of if(!error_occured)
   }) # end of "reaction to 'Continue' button
 
 
@@ -699,9 +697,8 @@ function(input, output, session) {
   D <- NULL # D will contain increasing values from 1 to D_max, used to plot line predictions for all methods
 
   ### Basic plot for HD-methods comparison ----
-  observeEvent({
-    list(input$chkgrp_HEIGHT, input$rad_HDMOD)
-  }, ignoreNULL = TRUE, ignoreInit = TRUE, priority = 10, {
+  observeEvent( list(input$chkgrp_HEIGHT, input$rad_HDMOD),
+                ignoreNULL = TRUE, ignoreInit = TRUE, priority = 10, {
 
     print("Plotting basic plot")
     toggleElement("box_plot_comparison", condition = !is.null(input$chkgrp_HEIGHT))
