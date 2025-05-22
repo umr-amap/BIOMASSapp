@@ -22,7 +22,7 @@ dashboardPage(
         fluidRow(
           column(12,
                  p("  To estimate the ", strong("above ground biomass (AGB)"), " of a forest inventory, ", strong("3 parameters"), " are required:"),
-                 p("- The ", strong("diameter"), "(DBH: Diameter at Breast Height for trees > 15 cm)"),
+                 p("- The ", strong("diameter"), "(DBH: Diameter at Breast Height for trees > 10 cm)"),
                  p("- The ", strong("wood density"), " (a method for estimating this parameter based on taxonomy is proposed when wood density data are not available)"),
                  p("- The ", strong("height"), " (three methods for estimating this parameter are proposed when height data are not available)"),
                  br()
@@ -123,9 +123,8 @@ dashboardPage(
                                      selectInput("sel_HDmodel_by", "", choices = NULL))
                    )),
                    hidden(div(id = "id_set_errH",
-                              p("ON MET COMBIEN PAR DEFAUT ???"),
-                              column(12, numericInput("set_errH", label = "What is the assumed error associated with the individual height measurements ?",
-                                                      value = 4.22, min = 0)|>
+                              column(9, numericInput("set_errH", label = "What is the assumed relative error (in %) associated with individual height measurements ?",
+                                                      value = 10, min = 0)|>
                                        helper(colour = "#158A0C", content = "set_errH")),
                    )),
                    # If height in another dataset
@@ -150,6 +149,7 @@ dashboardPage(
 
         # Inventory data preview
         fluidRow(
+          br(),
           hidden(boxWithId(
             id = "box_DATASET", title = "Preview of forest inventory data", width = 12,
             DT::DTOutput("table_DATASET")

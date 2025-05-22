@@ -282,7 +282,7 @@ function(input, output, session) {
           rv$inv[,input$sel_WD] <- rv$inv[,input$sel_WD] / 1000
         }
       }
-      # Height (note that errH unit will be changed when clicking on the 'Go on' button for AGB calculation)
+      # Height
       if (input$sel_H != "<unselected>") {
         rv$inv[,input$sel_H] <- conv_unit(rv$inv[,input$sel_H], input$rad_units_height, "m")
       }
@@ -841,7 +841,7 @@ function(input, output, session) {
       H <- rv$inv[, input$sel_H]
     }
     if(input$rad_height == "h_each_tree") {
-      errH = conv_unit(input$set_errH, from = input$rad_units_height, to = "m")
+      errH = conv_unit(rv$inv[, input$sel_H] * input$set_errH / 100, from = input$rad_units_height, to = "m")
     }
 
     # Add BA (basal area) to inv for the download of the tree level results
