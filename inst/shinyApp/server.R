@@ -114,8 +114,8 @@ function(input, output, session) {
     updateSelectInput(session, "sel_HDmodel_by", choices = c("<unselected>", names(forest_inv)))
     toggleElement("id_sel_h",
                   condition = input$rad_height %in% c("h_each_tree","h_some_tree"))
-    toggleElement("id_set_errH",
-                  condition = input$rad_height == "h_each_tree")
+    # toggleElement("id_set_errH",
+    #               condition = input$rad_height %in% c("h_each_tree","h_some_tree"))
     toggleElement("id_sel_HDmodel_by", # stand-specific local HD models only if height of some tree in the same dataset and several plots
                   condition = (input$rad_height == "h_some_tree" & req(input$rad_several_plots) == "several_plots") )
     toggleElement("id_file_h_sup",
@@ -840,7 +840,7 @@ function(input, output, session) {
     if (input$sel_H != "<unselected>") {
       H <- rv$inv[, input$sel_H]
     }
-    if(input$rad_height == "h_each_tree") {
+    if(input$rad_height %in% c("h_each_tree","h_some_tree")) {
       errH = conv_unit(rv$inv[, input$sel_H] * input$set_errH / 100, from = input$rad_units_height, to = "m")
     }
 
@@ -883,9 +883,23 @@ function(input, output, session) {
                                                        WD = WD[rv$inv$plot %in% rv$hd_data$model_for],
                                                        errWD = errWD[rv$inv$plot %in% rv$hd_data$model_for],
                                                        HDmodel = rv$hd_model, model_by =  rv$hd_data$model_for)
+
+          # if incomplete heights have been provided, for these heights, we need to replace the AGB estimates calculated with HDmodel by the AGB estimates calculated directly with H and errH
+          if( input$rad_height == "h_some_tree") {
+              AGB_user_H <- suppressWarnings(AGB_predict(AGBmod, D = rv$hd_data$D, WD = WD[rv$inv$plot %in% rv$hd_data$model_for], errWD = errWD[rv$inv$plot %in% rv$hd_data$model_for], H = rv$hd_data$H, errH = errH))
+              rv$AGB_res[[names(color)[1]]]$AGB_pred[!is.na(AGB_user_H$AGB_pred)] <- AGB_user_H$AGB_pred[!is.na(AGB_user_H$AGB_pred)]
+          }
+
           newValue[[names(color)[1]]] <- summaryByPlot(rv$AGB_res[[names(color)[1]]], plot = rv$hd_data$model_for)
-        } else {
+        } else { # if not stand-specific
           rv$AGB_res[[names(color)[1]]] <- AGB_predict(AGBmod, D, WD, errWD, HDmodel = rv$hd_model)
+
+          # for incomplete heights provided
+          if( input$rad_height == "h_some_tree") {
+            AGB_user_H <- suppressWarnings(AGB_predict(AGBmod, D = rv$hd_data$D, WD = WD, errWD = errWD, H = rv$hd_data$H, errH = errH))
+            rv$AGB_res[[names(color)[1]]]$AGB_pred[!is.na(AGB_user_H$AGB_pred)] <- AGB_user_H$AGB_pred[!is.na(AGB_user_H$AGB_pred)]
+          }
+
           newValue[[names(color)[1]]] <- summaryByPlot(rv$AGB_res[[names(color)[1]]], plot = rv$inv$plot)
         }
         incProgress(1 / length_progression, detail = "AGB using HD local: Done")
