@@ -115,8 +115,8 @@ dashboardPage(
                    hidden(div(id = "id_sel_h",
                               column(9 , selectInput("sel_H", "Select height column", choices = NULL)),
                               column(3, radioButtons("rad_units_height", "Unit:", choices = c("cm", "m"), selected = "m")),
-                              column(9, numericInput("set_errH", label = "What is the assumed relative error (in %) associated with individual height measurements ?", value = 10)) |>
-                                helper(colour = "#158A0C", content = "set_errH"),
+                              column(9, numericInput("set_errH", label = helper(shiny_tag = "What is the assumed relative error (in %) associated with individual height measurements ?",colour = "#158A0C", content = "set_errH"), value = 10))
+                                ,
                               column(3, p(""))
                    )),
                    # hidden(div(id = "id_set_errH",
