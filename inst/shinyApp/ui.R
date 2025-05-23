@@ -22,7 +22,7 @@ dashboardPage(
         fluidRow(
           column(12,
                  p("  To estimate the ", strong("above ground biomass (AGB)"), " of a forest inventory, ", strong("3 parameters"), " are required:"),
-                 p("- The ", strong("diameter"), "(DBH: Diameter at Breast Height for trees > 15 cm)"),
+                 p("- The ", strong("diameter"), "(DBH: Diameter at Breast Height for trees > 10 cm)"),
                  p("- The ", strong("wood density"), " (a method for estimating this parameter based on taxonomy is proposed when wood density data are not available)"),
                  p("- The ", strong("height"), " (three methods for estimating this parameter are proposed when height data are not available)"),
                  br()
@@ -53,12 +53,12 @@ dashboardPage(
                    # If coordinates of each tree
                    hidden(div(id = "id_sel_coord",
                               selectInput("sel_LAT", "Latitude", choices = NULL),
-                              selectInput("sel_LONG", "Longitude", choices = NULL),
+                              selectInput("sel_LONG", "Longitude", choices = NULL)
                    )),
                    # If coordinates of plot(s)
                    hidden(div(id = "id_file_coord",
                               fileInput("file_coord", "Choose a CSV file (see below for a preview)",
-                                        accept = c("text/csv", "text/comma-separated-values,text/plain",".csv")),
+                                        accept = c("text/csv", "text/comma-separated-values,text/plain",".csv"))
                    )),
                    hidden(div(id = "id_sel_coord_plot",
                               selectInput("sel_LAT_sup_coord", "Latitude", choices = NULL) |>
@@ -114,19 +114,22 @@ dashboardPage(
                    # If height of each tree or some trees
                    hidden(div(id = "id_sel_h",
                               column(9 , selectInput("sel_H", "Select height column", choices = NULL)),
-                              column(3, radioButtons("rad_units_height", "Unit:", choices = c("cm", "m"), selected = "m"))
+                              column(3, radioButtons("rad_units_height", "Unit:", choices = c("cm", "m"), selected = "m")),
+                              column(9, numericInput("set_errH", label = helper(shiny_tag = "What is the assumed relative error (in %) associated with individual height measurements ?",colour = "#158A0C", content = "set_errH"), value = 10))
+                                ,
+                              column(3, p(""))
                    )),
+                   # hidden(div(id = "id_set_errH",
+                   #            column(9, numericInput("set_errH", label = "What is the assumed relative error (in %) associated with individual height measurements ?",
+                   #                                    value = 10, min = 0)|>
+                   #                     helper(colour = "#158A0C", content = "set_errH")),
+                   #            column(3, p(""))
+                   # )),
                    hidden(div(id = "id_sel_HDmodel_by",
                               column(12,
                                      h5("The heights of non-measured trees will be estimated using Height-Diameter relationships on measured trees."),
                                      h5("If you want to create a Height-Diameter model by plot (or by any category), please specify the column corresponding to the plot (or category) IDs:"),
                                      selectInput("sel_HDmodel_by", "", choices = NULL))
-                   )),
-                   hidden(div(id = "id_set_errH",
-                              p("ON MET COMBIEN PAR DEFAUT ???"),
-                              column(12, numericInput("set_errH", label = "What is the assumed error associated with the individual height measurements ?",
-                                                      value = 4.22, min = 0)|>
-                                       helper(colour = "#158A0C", content = "set_errH")),
                    )),
                    # If height in another dataset
                    hidden(div(id = "id_file_h_sup",
@@ -150,6 +153,7 @@ dashboardPage(
 
         # Inventory data preview
         fluidRow(
+          br(),
           hidden(boxWithId(
             id = "box_DATASET", title = "Preview of forest inventory data", width = 12,
             DT::DTOutput("table_DATASET")
@@ -230,18 +234,7 @@ dashboardPage(
                 "Feldpausch" = "feld",
                 "Chave" = "chave"
               )
-            ),
-
-            # checkboxGroupInput(
-            #   "chkgrp_HEIGHT", "Choose the HD model:",
-            #   inline = T,
-            #   c(
-            #     "Local HD model" = "HDloc",
-            #     "Feldpausch" = "feld",
-            #     "Chave" = "chave"
-            #   )
-            # ) |>
-            #   helper(colour = "#158A0C", content = "HD_model"),
+            )
           )),
         fluidRow(
           column( 4 ,
@@ -263,7 +256,7 @@ dashboardPage(
                     #textOutput("txt_feld")
                     p("See below for the region(s) used in Feldpausch model:"),
                     tableOutput("out_tab_feld") |>
-                      helper(colour = "#158A0C", content = "feld_region"),
+                      helper(colour = "#158A0C", content = "feld_region")
                   ))
           ),
           column( 4 ,

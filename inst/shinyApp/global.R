@@ -70,6 +70,10 @@ AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, e
     WD <- WD[valid_plots]
     errWD <- if (!is.null(errWD)) errWD[valid_plots]
     model_by <- model_by[valid_plots]
+
+    if(length(D) != length(sapply(HDmodel, function(x) x$input$H))) {
+
+    }
   }
 
   # AGB without error propagation
@@ -158,8 +162,18 @@ indiv_pred <- function(inv, rad_height, H, AGB_res, chkgrp_HEIGHT, sel_HDmodel_b
   if ("HDloc" %in% chkgrp_HEIGHT) {
     if( !is.null(sel_HDmodel_by) && sel_HDmodel_by != "<unselected>" ) { # if stand-specific models
       inv_h_pred$H_local_model <- round(retrieveH(hd_data$D, hd_model, plot = hd_data$model_for)$H, 2)
+
+      # if some tree heights have been provided, we need to replace the estimated height by the measured heights
+      if( rad_height == "h_some_tree") {
+        inv_h_pred$H_local_model[!is.na(hd_data$H)] <- round(hd_data$H[!is.na(hd_data$H)], 2)
+      }
+
     } else {
       inv_h_pred$H_local_model <- round(retrieveH(D, hd_model)$H, 2)
+        if( rad_height == "h_some_tree") {
+          # if some tree heights have been provided, we need to replace the estimated height by the measured heights
+          inv_h_pred$H_local_model[!is.na(hd_data$H)] <- round(hd_data$H[!is.na(hd_data$H)], 2)
+        }
     }
     inv_h_pred$H_Lorey_local_model <- inv_h_pred$H_local_model * inv_h_pred$BA
     inv_h_pred$AGB_local_model <- round(as.vector(AGB_res[["local HD model"]]$AGB_pred), 3)
