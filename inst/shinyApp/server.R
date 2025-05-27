@@ -343,7 +343,7 @@ function(input, output, session) {
           correctTaxo(
             genus = rv$inv[, input$sel_GENUS],
             species = if (input$sel_SPECIES != "<unselected>") rv$inv[, input$sel_SPECIES],
-            useCache = TRUE
+            useCache = getOption("BIOMASSapp.taxoCache",FALSE)
           )
         }, error = function(e) e)
 
