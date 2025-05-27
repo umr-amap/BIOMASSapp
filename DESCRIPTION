@@ -22,6 +22,7 @@ Imports:
 	shinyjs,
 	shinyalert,
 	shinyFeedback,
+	shinyhelper,
 	leaflet,
 	rmarkdown,
 	knitr,
