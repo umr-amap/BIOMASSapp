@@ -28,4 +28,6 @@ Imports:
 	knitr,
 	measurements,
 	DT,
-	BIOMASS (>= 2.2.3)
+	BIOMASS (>= 2.2.3),
+	httr2,
+	maps
