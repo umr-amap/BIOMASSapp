@@ -340,11 +340,11 @@ function(input, output, session) {
       if (input$rad_WD == "corr") {
         # correct the taxo and catch the error if there is error
         rv$taxo <- tryCatch({
-          correctTaxo(
+          suppressMessages(correctTaxo(
             genus = rv$inv[, input$sel_GENUS],
             species = if (input$sel_SPECIES != "<unselected>") rv$inv[, input$sel_SPECIES],
             useCache = getOption("BIOMASSapp.taxoCache",FALSE)
-          )
+          ))
         }, error = function(e) e)
 
         # if there is an error display it
@@ -383,7 +383,7 @@ function(input, output, session) {
         }
         hideSpinner(id = "out_taxo_error")
       }
-      rv$wd <- tryCatch(getWoodDensity(genus, species, stand = if (input$sel_PLOT != "<unselected>") rv$inv[, input$sel_PLOT]),
+      rv$wd <- tryCatch(suppressMessages(getWoodDensity(genus, species, stand = if (input$sel_PLOT != "<unselected>") rv$inv[, input$sel_PLOT])),
                   error = function(e) e,
                   warning = function(e) e
       )
@@ -521,11 +521,11 @@ function(input, output, session) {
 
       ## Building and compare the 4 local HD models ----------------------------
       tab_modelHD <- tryCatch({
-        modelHD(
+        suppressMessages(modelHD(
           D = rv$hd_data$D,
           H = rv$hd_data$H,
           plot = rv$hd_data$model_for
-        )
+        ))
       }, error = function(e) NULL)
 
       if(is.null(tab_modelHD)) { # if models cannot be built
@@ -706,11 +706,10 @@ function(input, output, session) {
     D_max <- max(rv$inv$D, ifelse(test = is.null(rv$df_h_sup), yes = 0, no = max(rv$df_h_sup[,input$sel_D_sup_data])))
     D <<- 1:D_max
 
-    rv$plot_hd <- ggplot(data = NULL, aes(x = D)) +
+    rv$plot_hd <- ggplot(data = NULL, aes(x = D, col="measured trees")) + # col="measured_trees" to silence the warning message "No shared levels found between `names(values)` of the manual scale and the data's colour values."
       xlab("Diameter (cm)") +
       ylab("Height (m)") +
-      #scale_fill_manual(name = "model confidence interval", values = c("local HD model" = "#619CFF", Feldpausch = "#00BA38", Chave = "#F8766D")) +
-      scale_colour_manual(name = "model predictions", values = c("local HD model" = "#619CFF", Feldpausch = "#00BA38", Chave = "#F8766D")) +
+      scale_colour_manual(name = "model predictions", values = c("local HD model" = "#619CFF", "Feldpausch" = "#00BA38", "Chave" = "#F8766D", "measured trees" = "black")) +
       theme_minimal() +
       theme(
         legend.position = "bottom",
@@ -732,8 +731,8 @@ function(input, output, session) {
       if ( !is.null(rv$hd_model) ) {
         if (input$sel_HDmodel_by == "<unselected>"){
           rv$plot_hd <- rv$plot_hd +
-            geom_point(data = rv$hd_data, mapping = aes(x = D, y = H), size=1.5) + # measured trees
-            geom_line(aes(y = retrieveH(D, model = rv$hd_model)$H, colour = "local HD model"), lwd=1.2) + # HD model
+            geom_point(data = rv$hd_data, mapping = aes(x = D, y = H, col="measured trees"), size=1.5, na.rm=TRUE) + # measured trees
+            geom_line(aes(y = retrieveH(D, model = rv$hd_model)$H, col = "local HD model"), lwd=1.2) + # HD model
             ylim( c(0, max(rv$hd_data$H, na.rm = TRUE) + 5))
         } else {
           # creating model lines for each plots/regions/...
@@ -743,8 +742,8 @@ function(input, output, session) {
                         model_for = x)
           }))
           rv$plot_hd <- rv$plot_hd +
-            geom_point(data = rv$hd_data, mapping = aes(x = D, y = H, shape = model_for), size=1.5) + # measured trees
-            geom_line(data = df_lines, mapping = aes(x = D, y = H_pred, colour = "local HD model", lty = model_for), lwd=1.2) + #HD model for each plots/regions..
+            geom_point(data = rv$hd_data, mapping = aes(x = D, y = H, col = "measured trees", shape = model_for), size=1.5, na.rm=TRUE) + # measured trees
+            geom_line(data = df_lines, mapping = aes(x = D, y = H_pred, col = "local HD model", lty = model_for), lwd=1.2) + #HD model for each plots/regions..
             ylim( c(0, max(rv$hd_data$H, na.rm = TRUE) + 5))
         }
       }
@@ -761,9 +760,9 @@ function(input, output, session) {
                       model_for = x)
         }))
         if(length(unique(df_lines$model_for)) == 1 ) { # if one single region
-          rv$plot_hd <- rv$plot_hd + geom_line(data = df_lines, mapping = aes(x = D, y = H_pred, colour = "Feldpausch"), lwd=1.2)
+          rv$plot_hd <- rv$plot_hd + geom_line(data = df_lines, mapping = aes(x = D, y = H_pred, colour = "Feldpausch"), lwd=1.2, na.rm=TRUE)
         } else {
-          rv$plot_hd <- rv$plot_hd + geom_line(data = df_lines, mapping = aes(x = D, y = H_pred, colour = "Feldpausch", lty=model_for), lwd=1.2)
+          rv$plot_hd <- rv$plot_hd + geom_line(data = df_lines, mapping = aes(x = D, y = H_pred, colour = "Feldpausch", lty=model_for), lwd=1.2, na.rm=TRUE)
         }
       }
     }
@@ -784,12 +783,12 @@ function(input, output, session) {
           )
         }))
         rv$plot_hd <- rv$plot_hd +
-          geom_line(data = df_lines, mapping = aes(x=D, y=H_pred, colour = "Chave", lty = model_for), lwd=1.2)
+          geom_line(data = df_lines, mapping = aes(x=D, y=H_pred, colour = "Chave", lty = model_for), lwd=1.2, na.rm = TRUE)
       }
     }
 
     # Render the plot
-    output$out_plot_comp <- renderPlot(rv$plot_hd)
+    output$out_plot_comp <- suppressWarnings(renderPlot(rv$plot_hd))
   })
 
   ## Done button actions -------------------------------------------------------
