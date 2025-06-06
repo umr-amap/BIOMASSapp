@@ -3,7 +3,7 @@ function(input, output, session) {
   # stop the serveur in the end of the session
   autoCloseApp() # version compatible local/server
 
-  observe_helpers(help_dir = "../../helpfiles")
+  observe_helpers(help_dir = "helpfiles")
 
   observe({
     # hide few menu at the begining
