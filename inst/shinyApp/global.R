@@ -48,6 +48,16 @@ showMenuItem <- function(tabName) {
   shinyjs::show(selector = sprintf("a[data-value='%s']", tabName))
 }
 
+# suppress warnings of ggplots (essentially for "Removed x row containing missing values or values outside the scale range")
+silentPlot <- function(p) {
+  if(in_devmode()) {
+    print(p)
+  } else {
+    suppressMessages(
+      suppressWarnings(print(p))
+    )
+  }
+}
 
 # split the genus in multiple columns (genus species)
 tstrsplit_NA <- function(x, pattern = " ", count = 2) {

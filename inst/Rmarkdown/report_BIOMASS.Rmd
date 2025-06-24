@@ -70,7 +70,7 @@ summary(rv$inv[,selectColumn])
 
 ```{r}
 # Display (or not) the section called Plot's location
-disp_plot_location <- !is.null(input$rad_coord) && input$rad_coord %in% c("coord_each_tree","coord_plot")
+disp_plot_location <- !is.null(input$rad_coord) && input$rad_coord %in% c("coord_each_tree","coord_plot","coord_manually")
 ```
 
 ```{asis, echo = disp_plot_location}

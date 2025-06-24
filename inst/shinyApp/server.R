@@ -67,6 +67,14 @@ function(input, output, session) {
     updateSelectInput(session, "sel_PLOT", choices = c("<unselected>", names(forest_inv)))
   })
 
+  output$dwl_inv_ex <- downloadHandler(
+    filename = "forest_inv_exemple.csv",
+    content = function(file) {
+      write.csv(BIOMASS::NouraguesTrees, file, row.names = FALSE)
+    },
+    contentType = "text/csv"
+  )
+
   # Show plot's IDs selection when several plots
   observeEvent(input$rad_several_plots, {
     toggleElement("sel_PLOT", condition = req(input$rad_several_plots) == "several_plots")
@@ -155,6 +163,8 @@ function(input, output, session) {
                   condition = input$rad_coord == "coord_plot" &
                     !is.null(input$rad_several_plots) &&
                     input$rad_several_plots == "several_plots")
+    toggleElement("id_num_lat_long", condition = input$rad_coord == "coord_manually") # show latitude & longitude numeric input for manually given coordinates
+
   })
 
   ### coordinates file actions  ----
@@ -238,6 +248,9 @@ function(input, output, session) {
       # if the plots IDs column for sup coord is unselected
       error_occured <- TRUE
       shinyalert("Oops!", "Plots IDs of the dataset containing the coordinates of the plot(s) is unselected ", type = "error")
+    } else if (!is.null(input$rad_coord) && input$rad_coord == "coord_manually" && (is.na(input$num_lat) | is.na(input$num_long))) {
+      error_occured <- TRUE
+      shinyalert("Oops!", "The manually specified latitude/longitude are not recognised as a numerical value. Make sure that there is no space character at the beginning/end of your input.", type = "error")
     } else if (input$sel_WD == "<unselected>") {
       # if the WD is not selected then show the tab TAXO
       showMenuItem("tab_TAXO")
@@ -304,7 +317,6 @@ function(input, output, session) {
 
       # If plot's coordinates in another dataset:
       if( input$rad_coord == "coord_plot") {
-
         rv$coord_plot <- data.table(rv$df_coord[, c(input$sel_LONG_sup_coord, input$sel_LAT_sup_coord)]) # coord_plot is simply the coordinates sup dataset
         setnames(rv$coord_plot, names(rv$coord_plot), c("long","lat"))
 
@@ -315,7 +327,13 @@ function(input, output, session) {
         }
       }
 
-      if(input$rad_coord != "coord_none") { # when rad_coord = coord_each_tree or coord_plot
+      # If coordinates manually specified:
+      if( input$rad_coord == "coord_manually") {
+        rv$coord <- data.table(rv$inv)[, c("long","lat") := list(input$num_long, input$num_lat)]
+        rv$coord_plot <- data.table(long = input$num_long, lat = input$num_lat, plot = unique(rv$inv$plot))
+      }
+
+      if(input$rad_coord %in% c("coord_each_tree","coord_plot")) { # when rad_coord = coord_each_tree or coord_plot
         # get the median coordinates of each/the plot
         rv$coord_plot <- rv$coord_plot[, .(long = median(long, na.rm = TRUE), lat = median(lat, na.rm = TRUE)), by = plot]
         # remove all NA and take the unique coordinates
@@ -582,7 +600,7 @@ function(input, output, session) {
   ## Feldpausch method -------
 
   observeEvent(input$chkgrp_HEIGHT,
-  ignoreNULL = TRUE, ignoreInit = TRUE, priority = 10, {
+  ignoreNULL = FALSE, ignoreInit = TRUE, priority = 10, {
 
     if ("feld" %in% input$chkgrp_HEIGHT) {
       print("Observing chkrgrp_HEIGHT for Feldpausch method")
@@ -641,7 +659,7 @@ function(input, output, session) {
 
 
   ## Chave method -------
-  observeEvent(input$chkgrp_HEIGHT, ignoreNULL = TRUE, ignoreInit = TRUE, priority = 10, {
+  observeEvent(input$chkgrp_HEIGHT, ignoreNULL = FALSE, ignoreInit = TRUE, priority = 10, {
 
     if ("chave" %in% input$chkgrp_HEIGHT) {
 
@@ -666,7 +684,13 @@ function(input, output, session) {
 
         } else {
           output$plot_MAP <- renderLeaflet({
-            addCircleMarkers(addProviderTiles(leaflet(data = rv$coord_plot), "OpenStreetMap.Mapnik"), lng = ~long, lat = ~lat, color = "#10A836")
+            fitBounds(
+              addCircleMarkers(
+                addProviderTiles(
+                  leaflet(data = rv$coord_plot),
+                  "OpenStreetMap.Mapnik"),
+                lng = ~long, lat = ~lat, color = "#10A836"),
+              lng1 = -90, lng2 = 90, lat1 = -60, lat2 = 75)
             })
 
           showElement("box_MAP")
@@ -722,7 +746,7 @@ function(input, output, session) {
              shape = guide_legend(override.aes = list(size = 3)))
   })
 
-  observeEvent(input$rad_HDMOD, ignoreNULL = TRUE, ignoreInit = TRUE, priority = 8, {
+  observeEvent(list(input$rad_HDMOD, input$chkgrp_HEIGHT), ignoreNULL = TRUE, ignoreInit = TRUE, priority = 8, {
 
     ### Including HD local model in comparison ----
     if ("HDloc" %in% input$chkgrp_HEIGHT) {
@@ -788,7 +812,7 @@ function(input, output, session) {
     }
 
     # Render the plot
-    output$out_plot_comp <- suppressWarnings(renderPlot(rv$plot_hd))
+    output$out_plot_comp <- renderPlot(silentPlot(rv$plot_hd))
   })
 
   ## Done button actions -------------------------------------------------------
