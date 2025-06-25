@@ -38,16 +38,22 @@ dashboardPage(
                    radioButtons("rad_several_plots", "Does your dataset contain several plots?",
                                 choices = c(Yes = "several_plots", No = "single_plot"), selected = character(0)),
                    div("information required", id = "msg_several_plots", style = "color:red;"),
-                   hidden(selectInput("sel_PLOT", "Which column contains the plots IDs?", choices = NULL))
+                   hidden(selectInput("sel_PLOT", "Which column contains the plots IDs?", choices = NULL)),
+                   br(),
+                   br(),
+                   p("Do you need an example of forest inventory data? Click the button below."),
+                   downloadButton("dwl_inv_ex", label = "Download an example") |>
+                     helper(colour = "#158A0C", content = "inv_example")
                  ),
 
                  ## Coordinate's box ----
                  hidden(boxWithId(
                    id = "box_COORD", title = h3("Geographic coordinates (optional)"), width = 12,
-                   p("GPS coordinates are optional and will be used to estimate tree heights ", strong("in cases where height data is unvailable"),". These coordinates - ", strong("latitude and longitude - "), "must be expressed in ", strong("decimal degrees"),"."),
+                   p("GPS coordinates are optional and will be used to estimate tree heights ", strong("in cases where height data is unvailable"),". These coordinates - ", strong("latitude and longitude - "), "must be expressed in ", strong("decimal degrees"), ", e.g: (4.0849 ; -52.6844)."),
                    radioButtons("rad_coord", "Do you have:",
                                 choices = c("the columns corresponding to the coordinates of each tree" = "coord_each_tree",
                                             "the coordinates of the plot(s) in another dataset" = "coord_plot",
+                                            "the coordinates of the plot or region that you want to specify manually" = "coord_manually",
                                             "no coordinates" = "coord_none"),
                                 selected = character(0)),
                    # If coordinates of each tree
@@ -66,7 +72,11 @@ dashboardPage(
                               selectInput("sel_LONG_sup_coord", "Longitude", choices = NULL)
                    )),
                    # If coordinates of plots and several plots
-                   hidden(selectInput("sel_plot_coord", "Plots IDs", choices = NULL))
+                   hidden(selectInput("sel_plot_coord", "Plots IDs", choices = NULL)),
+                   # If coordinates specified manually
+                   hidden(div(id = "id_num_lat_long",
+                              numericInput("num_lat", "Latitude", value = 0, min = -90, max=90),
+                              numericInput("num_long", "Longitude", value = 0, min = -180, max=180)))
                  ))
           ),
           column(6,
