@@ -1,12 +1,13 @@
 * version 1.2
-Added help and explanations for users
+- Added help and explanations for users
+- allow the user to provide unique coordinates using two numeric inputs
+- The NouraguesTrees file can be downloaded as an example of a forest inventory
 
 * version 1.1
 BIOMASSapp now :
 - handles several plots
-- allow the user to provid its own data-frame to build H-D local model
-- allow the user to provid its own data-frame for the coordinates of the plots
-- is automatically deployed with shinylive and is available at https://umr-amap.github.io/BIOMASSapp/
+- allow the user to provide its own data-frame to build H-D local model
+- allow the user to provide its own data-frame for the coordinates of the plots
 - is more user-friendly for coordinates and height values management, and for the H-D models part
 - allows the download of results at tree-level and plot-level
 - allows the download of a Rmarkdown report
