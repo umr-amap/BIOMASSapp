@@ -16,6 +16,8 @@ suppressPackageStartupMessages({
   library(BIOMASS)
 })
 
+source("legal_notice.R")
+
 # set maximum input file size (here 30Mo)
 options(shiny.maxRequestSize = 30 * 1024^2)
 

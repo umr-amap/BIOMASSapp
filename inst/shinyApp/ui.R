@@ -1,4 +1,4 @@
-dashboardPage(
+page <- dashboardPage(
   skin="green",
   dashboardHeader(title = "BIOMASS application"),
   dashboardSidebar(
@@ -344,3 +344,5 @@ dashboardPage(
     )
   )
 )
+
+dashboardAddFooter(page, legalNotice(2025, "$$$AUTHOR$$$"))
