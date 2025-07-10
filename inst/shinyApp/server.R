@@ -5,6 +5,8 @@ function(input, output, session) {
 
   observe_helpers(help_dir = "helpfiles")
 
+  legalNoticeHandler(includeMarkdown("helpfiles/legal_notice.md"))
+
   observe({
     # hide few menu at the begining
     hideMenuItem("tab_TAXO")
