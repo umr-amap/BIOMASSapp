@@ -345,4 +345,4 @@ page <- dashboardPage(
   )
 )
 
-dashboardAddFooter(page, legalNotice(2025, "$$$AUTHOR$$$"))
+dashboardAddFooter(page, legalNotice(2025, "Arthur Bailly"))
