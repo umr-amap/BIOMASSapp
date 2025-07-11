@@ -18,7 +18,9 @@ maxime.rejou@ird.fr
 
 ## Editor
 
-The BIOMASS shiny application is developed by the [AMAP lab](https://amap.cirad.fr/en/index.php) (botAny and Modeling of Plant Architecture and vegetation).
+The BIOMASS shiny application is developed by the <a href="https://amap.cirad.fr/en/index.php" target="_blank">AMAP lab</a> (botAny and Modeling of Plant Architecture and vegetation).
+
+
 
 ## Host
 

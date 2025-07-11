@@ -73,9 +73,7 @@ function(input, output, session) {
   output$dwl_inv_ex <- downloadHandler(
     filename = "forest_inv_exemple.csv",
     content = function(file) {
-      forest_inv <- read.csv(
-        file = system.file("shinyApp/exemple_data/", "forest_inv_exemple.csv", package = "BIOMASSapp", mustWork = TRUE))
-      write.csv(forest_inv, file, row.names = FALSE)
+      file.copy("exemple_data/forest_inv_exemple.csv", file)
     },
     contentType = "text/csv"
   )

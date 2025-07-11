@@ -1,8 +1,6 @@
 This dataset contains 4 of the 12 plots of `Petit Plateau' permanent plots fifth census, 2012, Nouragues forestTree dataset (French Guiana). For educational purposes, **158 simulated heights trees have been added** in the dataset, as well as some virtual trees. Dead trees have been removed.
 
-Reference: `Petit Plateau' permanent plots fifth census, 2012, Nouragues forest, <a href="https://dataverse.cirad.fr/dataset.xhtml?persistentId=doi:10.18167/DVN1/TZ1RL9">link here</a>
-
-[https://dataverse.cirad.fr/dataset.xhtml?persistentId=doi:10.18167/DVN1/TZ1RL9](https://dataverse.cirad.fr/dataset.xhtml?persistentId=doi:10.18167/DVN1/TZ1RL9){:target="_blank"}.
+Reference: `Petit Plateau' permanent plots fifth census, 2012, Nouragues forest, <a href="https://dataverse.cirad.fr/dataset.xhtml?persistentId=doi:10.18167/DVN1/TZ1RL9" target="_blank">doi:10.18167/DVN1/TZ1RL9</a>
 
 <br>
 
