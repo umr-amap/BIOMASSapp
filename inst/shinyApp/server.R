@@ -5,7 +5,7 @@ function(input, output, session) {
 
   observe_helpers(help_dir = "helpfiles")
 
-  legalNoticeHandler(includeMarkdown("helpfiles/legal_notice.md"))
+  legalNoticeHandler(includeMarkdown("helpfiles/legal_notice.md"), size = "l")
 
   observe({
     # hide few menu at the begining
@@ -69,10 +69,13 @@ function(input, output, session) {
     updateSelectInput(session, "sel_PLOT", choices = c("<unselected>", names(forest_inv)))
   })
 
+  # Dowload button for the forest inventory example (NouraguesTrees with ~ 120 simulated heights)
   output$dwl_inv_ex <- downloadHandler(
     filename = "forest_inv_exemple.csv",
     content = function(file) {
-      write.csv(BIOMASS::NouraguesTrees, file, row.names = FALSE)
+      forest_inv <- read.csv(
+        file = system.file("shinyApp/exemple_data/", "forest_inv_exemple.csv", package = "BIOMASSapp", mustWork = TRUE))
+      write.csv(forest_inv, file, row.names = FALSE)
     },
     contentType = "text/csv"
   )
@@ -150,6 +153,16 @@ function(input, output, session) {
   })
 
   ## Coordinates ----
+
+  ###  Dowload the coordinates csv as an example (NouraguesCoord)
+  output$dwl_coord_ex <- downloadHandler(
+    filename = "plot_coordinates_exemple.csv",
+    content = function(file) {
+      write.csv(BIOMASS::NouraguesCoords, file, row.names = FALSE)
+    },
+    contentType = "text/csv"
+  )
+
   ### coordinates radio button actions ----
   observeEvent(input$rad_coord, {
     if(input$rad_coord == "coord_each_tree") {

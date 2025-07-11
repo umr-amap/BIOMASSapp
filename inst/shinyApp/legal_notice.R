@@ -27,7 +27,7 @@ legalNotice <- function(year, owner) {
   tagList(
     legalNoticeCSS(),
     tags$footer(class="legal_notice fixed-bottom",
-      span(glue::glue("Creative Commons, {year}, {owner}")),br(),
+      span(glue::glue("GPL 3 license, {year}, {owner}")),br(),
       actionLink("legal_notice", "Legal notice")
     )
   )

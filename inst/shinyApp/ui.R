@@ -43,7 +43,7 @@ page <- dashboardPage(
                    br(),
                    p("Do you need an example of forest inventory data? Click the button below."),
                    downloadButton("dwl_inv_ex", label = "Download an example") |>
-                     helper(colour = "#158A0C", content = "inv_example")
+                     helper(colour = "#158A0C", content = "inv_example", size = "l")
                  ),
 
                  ## Coordinate's box ----
@@ -76,7 +76,12 @@ page <- dashboardPage(
                    # If coordinates specified manually
                    hidden(div(id = "id_num_lat_long",
                               numericInput("num_lat", "Latitude", value = 0, min = -90, max=90),
-                              numericInput("num_long", "Longitude", value = 0, min = -180, max=180)))
+                              numericInput("num_long", "Longitude", value = 0, min = -180, max=180))),
+                   br(),
+                   br(),
+                   p("Do you need an example of coordinates data? Click the button below."),
+                   downloadButton("dwl_coord_ex", label = "Download an example") |>
+                     helper(colour = "#158A0C", content = "coord_example")
                  ))
           ),
           column(6,
