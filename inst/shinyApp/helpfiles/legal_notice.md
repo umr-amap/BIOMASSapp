@@ -2,7 +2,7 @@
 
 * Editor: UMR AMAP, IRD, F-34000 Montpellier, France
 * Version: 1.2 (based on BIOMASS package v2.2.5)
-* Author: Arthur Bailly
+* Authors: Arthur Bailly, Arthur Péré, Guillaume Cornu
 * Date: July, 10, 2025
 * Licence: GPL (>= 3)
 

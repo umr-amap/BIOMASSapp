@@ -350,4 +350,4 @@ page <- dashboardPage(
   )
 )
 
-dashboardAddFooter(page, legalNotice(2025, "Arthur Bailly"))
+dashboardAddFooter(page, legalNotice(2025, "UMR AMAP"))
