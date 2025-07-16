@@ -314,6 +314,12 @@ page <- dashboardPage(
             hidden(actionButton("btn_HD_DONE", "Continue")),
             align = "center"
           )
+        ),
+        fluidRow(
+          column(width = 12,
+                 br(),
+                 p(" "),
+                 br())
         )
       ),
 
@@ -350,4 +356,4 @@ page <- dashboardPage(
   )
 )
 
-dashboardAddFooter(page, legalNotice(2025, "Arthur Bailly"))
+dashboardAddFooter(page, legalNotice(2025, "UMR AMAP"))
