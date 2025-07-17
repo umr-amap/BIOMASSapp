@@ -10,10 +10,9 @@
 legalNoticeCSS <- function() {
   htmltools::singleton(inlineCSS("
     footer.legal_notice {
-      position:fixed;
+      position:absolute;
       bottom:0;
       width:100%;
-      //height:25px;
       color: white;
       background-color: #222d32;
         z-index: 1000;
@@ -26,7 +25,7 @@ legalNoticeCSS <- function() {
 legalNotice <- function(year, owner) {
   tagList(
     legalNoticeCSS(),
-    tags$footer(class="legal_notice fixed-bottom",
+    tags$footer(class="legal_notice",
       span(glue::glue("GPL 3 license, {year}, {owner}")),br(),
       actionLink("legal_notice", "Legal notice")
     )
@@ -34,8 +33,9 @@ legalNotice <- function(year, owner) {
 }
 
 # UI helper function to add footer to a dashboard page
-dashboardAddFooter <- function(page, footer) {
-  htmltools::tagAppendChild(page, footer, "div.wrapper")
+dashboardAddFooter <- function(page, footer, where=c("page", "sidebar")) {
+  where <- match.arg(where)
+  htmltools::tagAppendChild(page, footer, ifelse(where=="page", "div.wrapper", "div.wrapper>aside"))
 }
 
 # SERVER
