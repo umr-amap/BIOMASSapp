@@ -12,6 +12,8 @@ You can access the application at the following adress (hosted by the CIRAD inst
 
 ## Installation (development version) & Lauch
 
+In a R session: 
+
 ```r
 install.packages("remotes")
 remotes::install_github('umr-amap/BIOMASSapp')
