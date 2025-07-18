@@ -7,24 +7,15 @@ BIOMASSapp is the Shiny application of the R BIOMASS package. It allows the user
 
 You can access the application at the following adress (hosted by the CIRAD institution thanks to Guillaume CORNU): 
 
-https://fs-apps.cirad.fr/apps/biomass-app/
-
-Or via the shinylive version (using Rwasm, therefore slower) at this adress:
-
-https://umr-amap.github.io/BIOMASSapp/
+[https://fs-apps.cirad.fr/apps/biomass-app/](https://amap-apps.cirad.fr/apps/biomass-app/)
 
 
-## Installation (development version)
+## Installation (development version) & Lauch
 
 ```r
 install.packages("remotes")
 remotes::install_github('umr-amap/BIOMASSapp')
-```
 
-
-## Launch the shiny app
-
-```r
 BIOMASSapp::run_app()
 ```
 
