@@ -161,7 +161,7 @@ AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, e
   return(AGB)
 }
 
-indiv_pred <- function(inv, rad_height, H, AGB_res, chkgrp_HEIGHT, sel_HDmodel_by, hd_data, hd_model, D, region, coord){
+indiv_pred <- function(inv, rad_height, H, AGB_res, chkgrp_HEIGHT, sel_HDmodel_by, hd_data, hd_model, D, region, E, coord_plot){
 
   inv_h_pred <- inv
 
@@ -182,10 +182,10 @@ indiv_pred <- function(inv, rad_height, H, AGB_res, chkgrp_HEIGHT, sel_HDmodel_b
 
     } else {
       inv_h_pred$H_local_model <- round(retrieveH(D, hd_model)$H, 2)
-        if( rad_height == "h_some_tree") {
-          # if some tree heights have been provided, we need to replace the estimated height by the measured heights
-          inv_h_pred$H_local_model[!is.na(hd_data$H)] <- round(hd_data$H[!is.na(hd_data$H)], 2)
-        }
+      if( rad_height == "h_some_tree") {
+        # if some tree heights have been provided, we need to replace the estimated height by the measured heights
+        inv_h_pred$H_local_model[!is.na(hd_data$H)] <- round(hd_data$H[!is.na(hd_data$H)], 2)
+      }
     }
     inv_h_pred$H_Lorey_local_model <- inv_h_pred$H_local_model * inv_h_pred$BA
     inv_h_pred$AGB_local_model <- round(as.vector(AGB_res[["local HD model"]]$AGB_pred), 3)
@@ -195,14 +195,19 @@ indiv_pred <- function(inv, rad_height, H, AGB_res, chkgrp_HEIGHT, sel_HDmodel_b
                                                 region = region[ match( inv_h_pred[["plot"]] ,
                                                                         table = region$plot),
                                                                  "feld_region"]
-                                                )$H, 2)
+    )$H, 2)
     inv_h_pred$H_Lorey_Feldpausch <- inv_h_pred$H_Feldpausch * inv_h_pred$BA
     inv_h_pred$AGB_Feldpausch <- round(as.vector(AGB_res[["Feldpausch"]]$AGB_pred), 3)
   }
   if ("chave" %in% chkgrp_HEIGHT) {
-    inv_h_pred$H_Chave <- round(retrieveH(D, coord = coord[,c("long","lat")])$H, 2)
+    df_E <- data.frame(plot = coord_plot$plot, E = E)
+    logD <- log(D)
+    logH <- 0.893 - df_E[match(inv$plot , table = df_E$plot) , "E"] + 0.760 * logD - 0.0340 * I(logD^2) # eq 6a Chave et al. 2014
+    RSE <- 0.243
+    inv_h_pred$H_Chave = round(as.numeric(exp(logH + 0.5 * RSE^2)),2)
     inv_h_pred$H_Lorey_Chave <- inv_h_pred$H_Chave * inv_h_pred$BA
     inv_h_pred$AGB_Chave <- round(as.vector(AGB_res[["Chave"]]$AGB_pred), 3)
+
   }
   return(inv_h_pred)
 }

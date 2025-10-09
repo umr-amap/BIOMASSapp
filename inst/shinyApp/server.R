@@ -1124,7 +1124,8 @@ function(input, output, session) {
 
         rv$inv_h_pred <- indiv_pred(inv = rv$inv, rad_height = input$rad_height, H = H, AGB_res = rv$AGB_res,
                                     chkgrp_HEIGHT = input$chkgrp_HEIGHT, sel_HDmodel_by = input$sel_HDmodel_by,
-                                    hd_data = rv$hd_data, hd_model = rv$hd_model, D = D, region = rv$region, coord = rv$coord)
+                                    hd_data = rv$hd_data, hd_model = rv$hd_model, D = D,
+                                    region = rv$region, E=rv$E, coord_plot = rv$coord_plot)
       }
 
       out <- rv$inv_h_pred
@@ -1169,7 +1170,7 @@ function(input, output, session) {
       if(is.null(rv$inv_h_pred)) {
         rv$inv_h_pred <- indiv_pred(inv = rv$inv, rad_height = input$rad_height, H = H, AGB_res = rv$AGB_res,
                                     chkgrp_HEIGHT = input$chkgrp_HEIGHT, sel_HDmodel_by = input$sel_HDmodel_by,
-                                    hd_data = rv$hd_data, hd_model = rv$hd_model, D = D, region = rv$region, coord = rv$coord)
+                                    hd_data = rv$hd_data, hd_model = rv$hd_model, D = D, region = rv$region, E = rv$E, coord_plot = rv$coord_plot)
       }
 
       out <- data.table(rv$inv_h_pred)
