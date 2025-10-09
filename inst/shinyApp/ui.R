@@ -4,6 +4,7 @@ page <- dashboardPage(
   dashboardSidebar(
     sidebarMenu(
       id = "mnu_MENU",
+      menuItem("Spatialized metrics", tabName = "tab_SPATIALISATION"),
       menuItem("Load dataset", tabName = "tab_LOAD"),
       menuItem("Taxonomy and Wood density", tabName = "tab_TAXO"),
       menuItem("Height-diameter model", tabName = "tab_HEIGHT"),
@@ -14,6 +15,72 @@ page <- dashboardPage(
     useShinyFeedback(),
     useShinyjs(),
     tabItems(
+
+      # Spatialisation ---------------------------------------------------------
+      tabItem(
+        "tab_SPATIALISATION",
+        fluidRow(
+          column(12,
+                 p("  This tab allows you to:"),
+                 p("- calculate the projected/geographic coordinates of the plot’s corners and the trees from the relative coordinates (or local coordinates, i.e. those of the field)"),
+                 p("- validate plot’s corners and tree coordinates by visualisation."),
+                 p("- divide plot(s) into subplots"),
+                 br(),
+                 actionButton("btn_AGB_DONE", "AGB done !")
+          )),
+        fluidRow(
+          column(6,
+                 box(
+                   title = "Plot visualisation", width = 12,
+                   plotOutput("out_gg_check_plot")
+                 ),
+                 hidden( selectInput("sel_plot_display", "Plot to display", choices = NULL))
+          ),
+          column(6,
+                 box(
+                   title = h1(strong("Settings")), width = 12,
+                   h4(strong("Coordinates of plot corners")),
+                   p("Select the column corresponding to the relative coordinates of the corners:"),
+                   column(6, selectInput("sel_x_rel_corner", "relative X coordinates", choices = NULL)),
+                   column(6, selectInput("sel_y_rel_corner", "relative Y coordinates", choices = NULL)) |>
+                     helper(colour = "#158A0C", content = "sel_rel_coord_corners"),
+
+                   checkboxInput(inputId = "check_trust_GPS_corners", label = "Do you trust the GPS/projected coordinates of the plot's corners ?", value = TRUE) |>
+                     helper(colour = "#158A0C", content = "trust_GPS_corners"),
+                   hidden(div(id = "id_max_dist",
+                              numericInput("num_max_dist","Maximum distance (in meters) above which GPS measurements should be considered outliers",
+                                           value = 15, min = 0.1)|>
+                                helper(colour = "#158A0C", content = "max_dist") )),
+
+                   h4(strong("Coordinates of the trees")),
+                   p("Select the column corresponding to the relative coordinates of the trees:"),
+                   column(6, selectInput("sel_x_rel_trees", "relative X coordinates", choices = NULL)),
+                   column(6, selectInput("sel_y_rel_trees", "relative Y coordinates", choices = NULL)) |>
+                     helper(colour = "#158A0C", content = "sel_rel_coord_trees"),
+                   selectInput("sel_prop_trees", "Select a tree metric to display proportionally (optional):", choices = NULL),
+
+                   h6(strong("Raster (optional)")),
+                   fileInput("file_RASTER", "Choose a .tiff file to display", accept = ".csv") |>
+                     helper(colour = "#158A0C", content = "raster_file"),
+
+                   h4(strong("Dividing plot (optional)")),
+                   checkboxInput(inputId = "check_divide_plot", label = "Do you want to divide your plot(s) into subplots ?", value = FALSE),
+                   hidden(numericInput("num_grid_size","Grid size", value = 25, min = 1)),
+                   hidden(checkboxInput("check_centred_grid","Centre the grid ?", value = TRUE))
+
+                 )),
+        ),
+        # Coordinates data preview
+        fluidRow(
+          br(),
+          box( title = "Preview of plot's coordinates data", width = 12, DT::DTOutput("table_coord") )
+        ),
+        # Inventory data preview
+        fluidRow(
+          br(),
+          box( title = "Preview of forest inventory data", width = 12, DT::DTOutput("table_DATASET") )
+        )
+      ),
 
       # Load dataset -----------------------------------------------------------
 
@@ -134,12 +201,7 @@ page <- dashboardPage(
                                 ,
                               column(3, p(""))
                    )),
-                   # hidden(div(id = "id_set_errH",
-                   #            column(9, numericInput("set_errH", label = "What is the assumed relative error (in %) associated with individual height measurements ?",
-                   #                                    value = 10, min = 0)|>
-                   #                     helper(colour = "#158A0C", content = "set_errH")),
-                   #            column(3, p(""))
-                   # )),
+
                    hidden(div(id = "id_sel_HDmodel_by",
                               column(12,
                                      h5("The heights of non-measured trees will be estimated using Height-Diameter relationships on measured trees."),
