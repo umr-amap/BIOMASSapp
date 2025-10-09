@@ -356,4 +356,5 @@ page <- dashboardPage(
   )
 )
 
-dashboardAddFooter(page, legalNotice(2025, "UMR AMAP"))
+
+dashboardAddFooter(page, legalNotice(2025, "UMR AMAP"), where="sidebar")
