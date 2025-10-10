@@ -31,7 +31,7 @@ function(input, output, session) {
     E = NULL, # a vector of E parameter for each plot
     AGB_sum = list(), # output of summaryByPlot()
     AGB_res = list(), # output of AGB_predict() (in global.R)
-    inv_h_pred = NULL, # data-frame containing tree-level results to download
+    inv_pred = NULL, # data-frame containing tree-level results (for downloads and spatialisation)
     removedPlot = NULL, #removedPlot will contain plots that don't have enough height measurements when building a model stand/region specific or those with diameter not well distributed
     plot_hd = NULL, # reactive value to access the plot for the report
     checked_plot = NULL # the output of check_plot_coord()
@@ -40,40 +40,75 @@ function(input, output, session) {
   forest_inv <- NULL
 
 
+
+  observeEvent(input$btn_skip, {
+    rv$df_coord <- df_coord
+
+  })
+
+
+
   # SPATIALISATION -------------------------------------------------------------
+
+  observe({
+    # show coordinates table content
+    output$table_coord_spatialisation <- renderDT(rv$df_coord,
+                                                  options = list(scrollX = TRUE))
+  })
 
   observeEvent(list(input$sel_x_rel_corner, input$sel_y_rel_corner, input$check_trust_GPS_corners, input$sel_x_rel_trees, input$sel_y_rel_trees, input$sel_prop_trees, input$input$file_RASTER), ignoreInit = TRUE, {
 
-    req(input$sel_LONG_sup_coord, input$sel_LAT_sup_coord, input$sel_x_rel_corner, input$sel_y_rel_corner)
+    #req(input$sel_LONG_sup_coord, input$sel_LAT_sup_coord, input$sel_x_rel_corner, input$sel_y_rel_corner)
+    req(input$sel_x_rel_corner, input$sel_y_rel_corner)
 
     if(input$sel_x_rel_corner!="<unselected>" & input$sel_y_rel_corner!="<unselected>" & input$sel_LONG_sup_coord!="<unselected>" & input$sel_LAT_sup_coord!="<unselected>") {
-      print(head(rv$df_coord))
-      print(c(input$sel_LONG_sup_coord, input$sel_LAT_sup_coord))
-      print(c(input$sel_x_rel_corner, input$sel_y_rel_corner))
-      print(input$check_trust_GPS_corners)
+
       if(input$rad_several_plots=="several_plots") {
-        arg_plot_ID <- input$sel_PLOT
+        arg_plot_ID <- input$sel_plot_coord
       } else {
         arg_plot_ID <- NULL
       }
-      print(arg_plot_ID)
+
+      print("input$sel_prop_trees")
+      print(input$sel_prop_trees)
+
+      if(!is.null(input$sel_x_rel_trees) && !is.null(input$sel_y_rel_trees) && input$sel_x_rel_trees!="<unselected>" && input$sel_y_rel_trees != "<unselected>") {
+        arg_tree_data <- rv$inv_pred
+        arg_tree_coords <- c(input$sel_x_rel_trees, input$sel_y_rel_trees)
+        arg_tree_plot_ID <- input$sel_PLOT
+      } else {
+        arg_tree_data <- NULL
+        arg_tree_coords <- NULL
+        arg_tree_plot_ID <- NULL
+      }
+      if(!is.null(input$sel_prop_trees) && input$sel_prop_trees!="<unselected>") {
+        arg_prop_trees <- input$sel_prop_trees
+      } else {
+        arg_prop_trees <- NULL
+      }
+      print("arg_prop_trees")
+      print(arg_prop_trees)
+
       rv$checked_plot <- tryCatch({
         check_plot_coord(corner_data = rv$df_coord,
                          longlat = c(input$sel_LONG_sup_coord, input$sel_LAT_sup_coord),
                          rel_coord = c(input$sel_x_rel_corner, input$sel_y_rel_corner),
                          trust_GPS_corners = input$check_trust_GPS_corners,
-                         draw_plot = FALSE,
-                         plot_ID = arg_plot_ID)
-      }, error = function(e) NULL)
+                         draw_plot = FALSE, ask = FALSE,
+                         max_dist = input$num_max_dist,
+                         plot_ID = arg_plot_ID,
+                         tree_data = arg_tree_data, tree_coords = arg_tree_coords,
+                         tree_plot_ID = arg_tree_plot_ID, prop_tree = arg_prop_trees)
+      }, error = function(e) e$message)
 
-      if(!is.null(rv$checked_plot)) {
+      if(!is.character(rv$checked_plot)) {
         if(length(rv$checked_plot$plot_design) == 1) { # if one plot
           gg_check_plot <- rv$checked_plot$plot_design
-        } else { # if multiple plot, don't render until input$sel_plot_display
-          gg_check_plot <- NULL
+        } else { # if multiple plot, render the first plot
+          gg_check_plot <- rv$checked_plot$plot_design[[1]]
         }
       } else {
-        print("ggplot error")
+        print(rv$checked_plot)
         gg_check_plot <- ggplot() +
           annotate("text", x = 0, y = 0,
                    label = "An error occurred when creating the plot visualisation.\nEnsure that your data is entered correctly in both the settings and the 'load dataset' tab.\n(an exemple is available at the end of this tab)", size = 5,
@@ -84,9 +119,25 @@ function(input, output, session) {
       output$out_gg_check_plot <- renderPlot(silentPlot(gg_check_plot))
     }
   })
+
   observeEvent(input$sel_plot_display, ignoreInit = TRUE, {
-    if(input$sel_plot_display!="<unselected>") {
+    if(!is.null(rv$checked_plot) && !is.character(rv$checked_plot)) {
       output$out_gg_check_plot <- renderPlot(silentPlot(rv$checked_plot$plot_design[[match(input$sel_plot_display,names(rv$checked_plot$plot_design))]]))
+    }
+  })
+
+  # If check_plot_coord() with coordinates only is successful, then show the tree coordinates options
+  observeEvent(list(input$sel_x_rel_corner, input$sel_y_rel_corner), ignoreInit = TRUE, {
+    if(input$sel_x_rel_corner!="<unselected>" & input$sel_x_rel_corner!="<unselected>") {
+      if(!is.character(rv$checked_plot)) {
+        showElement("id_coord_trees")
+        int_num_col <- names(rv$inv_pred)[ sapply(rv$inv_pred, class) %in% c("integer", "numeric")]
+        for (id in c("sel_x_rel_trees", "sel_y_rel_trees","sel_prop_trees")) {
+          updateSelectInput(session, id, choices = c("<unselected>", int_num_col))
+        }
+        # show inv_pred table content
+        output$table_indiv_pred <- renderDT(rv$inv_pred, options = list(scrollX = TRUE))
+      }
     }
   })
 
@@ -273,7 +324,7 @@ function(input, output, session) {
   # Update which plot to display in spatialisation tab
   observeEvent(input$sel_plot_coord, {
     if(input$sel_plot_coord != "<unselected>") {
-      updateSelectInput(session, "sel_plot_display", choices = c("<unselected>",unique(rv$df_coord[,input$sel_plot_coord])))
+      updateSelectInput(session, "sel_plot_display", choices = unique(rv$df_coord[,input$sel_plot_coord]))
     }
   })
 
@@ -929,7 +980,7 @@ function(input, output, session) {
     print("Reaction to 'Go on' button for AGB calculation")
 
     ## Reset the individual tree results (created when downloading results)
-    if(!is.null(rv$inv_h_pred)) rv$inv_h_pred <- NULL
+    if(!is.null(rv$inv_pred)) rv$inv_pred <- NULL
 
     ### Retrieving and checking parameters ----
 
@@ -1057,9 +1108,7 @@ function(input, output, session) {
           return(x)
         })
       }
-
       rv$AGB_sum <- newValue
-
     })
 
     ## Render AGB plot's ----
@@ -1067,6 +1116,13 @@ function(input, output, session) {
     output$out_plot_AGB <- renderPlot({
       plot_list(rv$AGB_sum, color, AGBmod = AGBmod, removedPlot = rv$removedPlot)
     })
+
+    ## Calculation of individual tree metrics
+    rv$inv_pred <- indiv_pred(inv = rv$inv, D = D,
+                              rad_height = input$rad_height, chkgrp_HEIGHT = input$chkgrp_HEIGHT, H = H,
+                              sel_HDmodel_by = input$sel_HDmodel_by, hd_data = rv$hd_data, hd_model = rv$hd_model,
+                              region = rv$region, E=rv$E, coord_plot = rv$coord_plot,
+                              AGB_res = rv$AGB_res)
 
     showElement(id = "box_AGB_res")
     showElement(id = "box_AGB_Report")
@@ -1108,27 +1164,7 @@ function(input, output, session) {
     },
     content = function(file) {
 
-      # Display a message to reassure users if the download is not immediate
-      showModal(modalDialog("Loading... (can take a moment for Chave's height predictions if you have a poor connexion)", footer=NULL))
-      on.exit(removeModal())
-
-      # Setting H and D
-      if (input$sel_H != "<unselected>") {
-        H <- rv$inv[, input$sel_H]
-      } else {
-        H <- NULL
-      }
-      D <- rv$inv[, input$sel_DIAMETER]
-
-      if(is.null(rv$inv_h_pred)) { # rv$inv_h_pred can also be created in plot level results (see below) and is reset when clicking on "Go on" AGB button
-
-        rv$inv_h_pred <- indiv_pred(inv = rv$inv, rad_height = input$rad_height, H = H, AGB_res = rv$AGB_res,
-                                    chkgrp_HEIGHT = input$chkgrp_HEIGHT, sel_HDmodel_by = input$sel_HDmodel_by,
-                                    hd_data = rv$hd_data, hd_model = rv$hd_model, D = D,
-                                    region = rv$region, E=rv$E, coord_plot = rv$coord_plot)
-      }
-
-      out <- rv$inv_h_pred
+      out <- rv$inv_pred
 
       # Round sd_WD (if exists) and BA columns
       if(!is.null(out$sd_WD)) out$sd_WD <- round(out$sd_WD, 4)
@@ -1159,21 +1195,8 @@ function(input, output, session) {
       ### results will contain for each plot (if the column exists):
       # Plot_ID, Ndens, Lat_cnt, Lon_cnt, MinDBH, MaxDBH, BA, Wood density(mean), H_Lorey_..., H_max_..., AGB_..., AGB_..._Cred_2.5, AGB_..._Cred_97.5
 
-      # Setting H and D
-      if (input$sel_H != "<unselected>") {
-        H <- rv$inv[, input$sel_H]
-      } else { H <- NULL }
-      D <- rv$inv[, input$sel_DIAMETER]
 
-      # If inv_h_pred is NULL, it means the user didn't download the tree level results, so we need to create it
-      #  rv$inv_h_pred is reset when clicking on "Go on" AGB button
-      if(is.null(rv$inv_h_pred)) {
-        rv$inv_h_pred <- indiv_pred(inv = rv$inv, rad_height = input$rad_height, H = H, AGB_res = rv$AGB_res,
-                                    chkgrp_HEIGHT = input$chkgrp_HEIGHT, sel_HDmodel_by = input$sel_HDmodel_by,
-                                    hd_data = rv$hd_data, hd_model = rv$hd_model, D = D, region = rv$region, E = rv$E, coord_plot = rv$coord_plot)
-      }
-
-      out <- data.table(rv$inv_h_pred)
+      out <- data.table(rv$inv_pred)
       if( ! "Plot_ID" %in% names(out)) setnames(out, old = "plot", new = "Plot_ID")
       if( ! "D" %in% names(out)) setnames(out, old = input$sel_DIAMETER, new = "D")
 
@@ -1187,8 +1210,8 @@ function(input, output, session) {
       out[, Ndens := .N , by=Plot_ID]
 
       # Add MinDBH and maxDBH (cannot deal with two columns named "D" when summarizing by plot (line code below))
-      out[, MinDBH := D]
-      out[, MaxDBH := D]
+      out[, MinDBH := rv$inv_pred$D]
+      out[, MaxDBH := rv$inv_pred$D]
 
       ## Summarize by plot: Ndens, MinDBH, BA (sum of individual BA), Wood density (mean), H_Lorey_...(sum) and H_... (max)
       list_fun <- list("Ndens" = min, "MinDBH" = min, "MaxDBH" = max,

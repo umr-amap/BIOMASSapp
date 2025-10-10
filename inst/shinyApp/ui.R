@@ -29,14 +29,14 @@ page <- dashboardPage(
                  actionButton("btn_AGB_DONE", "AGB done !")
           )),
         fluidRow(
-          column(6,
+          column(7,
                  box(
-                   title = "Plot visualisation", width = 12,
-                   plotOutput("out_gg_check_plot")
+                   title = h3(strong("Plot visualisation")), width = 12,
+                   plotOutput("out_gg_check_plot"),
+                   hidden( selectInput("sel_plot_display", "Plot to display", choices = NULL))
                  ),
-                 hidden( selectInput("sel_plot_display", "Plot to display", choices = NULL))
           ),
-          column(6,
+          column(5,
                  box(
                    title = h1(strong("Settings")), width = 12,
                    h4(strong("Coordinates of plot corners")),
@@ -45,40 +45,45 @@ page <- dashboardPage(
                    column(6, selectInput("sel_y_rel_corner", "relative Y coordinates", choices = NULL)) |>
                      helper(colour = "#158A0C", content = "sel_rel_coord_corners"),
 
-                   checkboxInput(inputId = "check_trust_GPS_corners", label = "Do you trust the GPS/projected coordinates of the plot's corners ?", value = TRUE) |>
+                   column(12, checkboxInput(inputId = "check_trust_GPS_corners", label = "Do you trust the GPS/projected coordinates of the plot's corners ?", value = TRUE)) |>
                      helper(colour = "#158A0C", content = "trust_GPS_corners"),
-                   hidden(div(id = "id_max_dist",
-                              numericInput("num_max_dist","Maximum distance (in meters) above which GPS measurements should be considered outliers",
-                                           value = 15, min = 0.1)|>
-                                helper(colour = "#158A0C", content = "max_dist") )),
+                   column(12, numericInput("num_max_dist",
+                                           "Maximum distance (in meters) above which GPS measurements should be considered outliers",
+                                           value = 15, min = 0.1)) |>
+                     helper(colour = "#158A0C", content = "max_dist"),
 
-                   h4(strong("Coordinates of the trees")),
-                   p("Select the column corresponding to the relative coordinates of the trees:"),
-                   column(6, selectInput("sel_x_rel_trees", "relative X coordinates", choices = NULL)),
-                   column(6, selectInput("sel_y_rel_trees", "relative Y coordinates", choices = NULL)) |>
-                     helper(colour = "#158A0C", content = "sel_rel_coord_trees"),
-                   selectInput("sel_prop_trees", "Select a tree metric to display proportionally (optional):", choices = NULL),
+                   hidden(div(id = "id_coord_trees",
+                              h4(strong("Coordinates of the trees")),
+                              p("Select the column corresponding to the relative coordinates of the trees:"),
+                              column(6, selectInput("sel_x_rel_trees", "relative X coordinates", choices = NULL)),
+                              column(6, selectInput("sel_y_rel_trees", "relative Y coordinates", choices = NULL)) |>
+                                helper(colour = "#158A0C", content = "sel_rel_coord_trees"),
+                              column(12, selectInput("sel_prop_trees",
+                                                     "Select a tree metric to display proportionally (optional):", choices = NULL))
+                   )),
 
-                   h6(strong("Raster (optional)")),
-                   fileInput("file_RASTER", "Choose a .tiff file to display", accept = ".csv") |>
-                     helper(colour = "#158A0C", content = "raster_file"),
+                   hidden(div(id = "id_raster",
+                              h6(strong("Raster (optional)")),
+                              fileInput("file_RASTER", "Choose a .tiff file to display", accept = ".csv") |>
+                                helper(colour = "#158A0C", content = "raster_file"))),
 
-                   h4(strong("Dividing plot (optional)")),
-                   checkboxInput(inputId = "check_divide_plot", label = "Do you want to divide your plot(s) into subplots ?", value = FALSE),
-                   hidden(numericInput("num_grid_size","Grid size", value = 25, min = 1)),
-                   hidden(checkboxInput("check_centred_grid","Centre the grid ?", value = TRUE))
+                   hidden(div(id = "id_divide_plot",
+                              h4(strong("Dividing plot (optional)")),
+                              checkboxInput(inputId = "check_divide_plot", label = "Do you want to divide your plot(s) into subplots ?", value = FALSE),
+                              numericInput("num_grid_size","Grid size", value = 25, min = 1),
+                              checkboxInput("check_centred_grid","Centre the grid ?", value = TRUE)))
+                 )
+          )),
 
-                 )),
-        ),
         # Coordinates data preview
         fluidRow(
           br(),
-          box( title = "Preview of plot's coordinates data", width = 12, DT::DTOutput("table_coord") )
+          box( title = "Preview of plot's coordinates data", width = 12, DT::DTOutput("table_coord_spatialisation") )
         ),
         # Inventory data preview
         fluidRow(
           br(),
-          box( title = "Preview of forest inventory data", width = 12, DT::DTOutput("table_DATASET") )
+          box( title = "Preview of forest inventory data", width = 12, DT::DTOutput("table_indiv_pred") )
         )
       ),
 
@@ -93,7 +98,7 @@ page <- dashboardPage(
                  p("- The ", strong("wood density"), " (a method for estimating this parameter based on taxonomy is proposed when wood density data are not available)"),
                  p("- The ", strong("height"), " (three methods for estimating this parameter are proposed when height data are not available)"),
                  br()
-        )),
+          )),
         fluidRow(
           column(6,
                  box( # Forest inventory file's box
@@ -198,7 +203,7 @@ page <- dashboardPage(
                               column(9 , selectInput("sel_H", "Select height column", choices = NULL)),
                               column(3, radioButtons("rad_units_height", "Unit:", choices = c("cm", "m"), selected = "m")),
                               column(9, numericInput("set_errH", label = helper(shiny_tag = "What is the assumed relative error (in %) associated with individual height measurements ?",colour = "#158A0C", content = "set_errH"), value = 10))
-                                ,
+                              ,
                               column(3, p(""))
                    )),
 
