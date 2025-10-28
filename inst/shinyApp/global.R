@@ -92,8 +92,8 @@ tstrsplit_NA <- function(x, pattern = " ", count = 2) {
   split
 }
 
-
-AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, errH = NULL, region = NULL, E_vec = NULL, coord = NULL, model_by = NULL) {
+# AGB_predict() returns the output of AGB_MonteCarlo(), with an additional element representing individual estimations (rather than the median of the simulations to ensure reproducibility of the estimations).
+AGB_predict <- function(D, WD, errWD = NULL, H = NULL, HDmodel = NULL, errH = NULL, region = NULL, E_vec = NULL, coord = NULL, model_by = NULL) {
 
   # Setting parameters for stand-specific HD local model
   if (!is.null(HDmodel) && !is.null(model_by)) {
@@ -102,77 +102,49 @@ AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, e
     WD <- WD[valid_plots]
     errWD <- if (!is.null(errWD)) errWD[valid_plots]
     model_by <- model_by[valid_plots]
-
-    if(length(D) != length(sapply(HDmodel, function(x) x$input$H))) {
-
-    }
   }
 
-  # AGB without error propagation
-  # The output will be in a list format to standardise it with the error propagation output
-  if (AGBmod == "agb") {
-
-    if (!is.null(E_vec)) { # Chave method
-      # Modified Eq 7 from Chave et al. 2014 Global change biology
-      # We apply the formula instead of calling computeAGB with a coord argument (which call computeE() which is time consuming)
-      AGB <- exp(-2.023977 - 0.89563505 * E_vec + 0.92023559 * log(WD) + 2.79495823 * log(D) - 0.04606298 * (log(D)^2)) / 1000
-      return(list(AGB_pred = as.matrix(AGB)))
-    }
-
-    if (!is.null(HDmodel)) { # HD model
-      H <- retrieveH(D, model = HDmodel, plot = model_by)$H
-    }
-
-    if (!is.null(region)) { # feld region
-      H <- retrieveH(D, region = region)$H
-    }
-
-    AGB <- list(AGB_pred = as.matrix(computeAGB(D, WD, H = H)))
+  if( !is.null(errH) ) { # heights (and errH) provided by the user
+    AGB <- AGBmonteCarlo(
+      D, Dpropag = "chave2004",
+      WD, errWD,
+      H = H, errH = errH
+    )
+    AGB[["AGB_pred"]] <-  as.matrix(computeAGB(D, WD, H = H))
   }
 
-  # AGB with error
-  # We will add (to the AGB list output) the AGB_pred element containing individual AGB predictions, similarly to AGB without propagation (for the downloads)
-  if (AGBmod == "agbe") {
+  if (!is.null(region)) { # feld region
+    H <- retrieveH(D, region = region)
+    errH <- H$RSE
+    H <- H$H
+    AGB <- AGBmonteCarlo(
+      D, Dpropag = "chave2004",
+      WD, errWD,
+      H = H, errH = errH
+    )
+    AGB[["AGB_pred"]] <- as.matrix(computeAGB(D, WD, H = H))
+  }
 
-    if( !is.null(errH) ) { # heights (and errH) provided by the user
-      AGB <- AGBmonteCarlo(
-        D, Dpropag = "chave2004",
-        WD, errWD,
-        H = H, errH = errH
-      )
-      AGB[["AGB_pred"]] <- AGB_predict("agb", D, WD, errWD, H = H, errH = errH, model_by = model_by)$AGB_pred
-    }
+  if(!is.null(HDmodel)) { # HD local model
+    AGB <- AGBmonteCarlo(
+      D, Dpropag = "chave2004",
+      WD, errWD,
+      HDmodel = HDmodel
+    )
+    H <- retrieveH(D, model = HDmodel, plot = model_by)$H
+    AGB[["AGB_pred"]] <- as.matrix(computeAGB(D, WD, H = H))
+  }
 
-    if (!is.null(region)) { # feld region
-      H <- retrieveH(D, region = region)
-      errH <- H$RSE
-      H <- H$H
-      AGB <- AGBmonteCarlo(
-        D, Dpropag = "chave2004",
-        WD, errWD,
-        H = H, errH = errH
-      )
-      AGB[["AGB_pred"]] <- AGB_predict("agb", D, WD, errWD, H = H, errH = errH, model_by = model_by)$AGB_pred
-    }
-
-    if(!is.null(HDmodel)) { # HD local model
-      AGB <- AGBmonteCarlo(
-        D, Dpropag = "chave2004",
-        WD, errWD,
-        HDmodel = HDmodel
-      )
-      AGB[["AGB_pred"]] <- AGB_predict("agb", D, WD, errWD, HDmodel = HDmodel, model_by = model_by)$AGB_pred
-    }
-
-    if(!is.null(coord)) { # Chave's AGB equation
-      AGB <- AGBmonteCarlo(
-        D, Dpropag = "chave2004",
-        WD, errWD,
-        coord = coord
-      )
-      # We don't want to call back AGB_predict so we will take the mean of the 1000 simu
-      AGB[["AGB_pred"]] <- as.matrix(apply(AGB$AGB_simu,1,mean))
-    }
+  if(!is.null(coord)) { # Chave's AGB equation
+    AGB <- AGBmonteCarlo(
+      D, Dpropag = "chave2004",
+      WD, errWD,
+      coord = coord
+    )
+    # Modified Eq 7 from Chave et al. 2014 Global change biology
+    # We apply the formula instead of calling computeAGB with a coord argument (which call computeE() which is time consuming)
+    pred_AGB <- exp(-2.023977 - 0.89563505 * E_vec + 0.92023559 * log(WD) + 2.79495823 * log(D) - 0.04606298 * (log(D)^2)) / 1000
+    AGB[["AGB_pred"]] <- as.matrix(pred_AGB)
   }
 
   return(AGB)
@@ -230,11 +202,11 @@ indiv_pred <- function(inv, rad_height, H, AGB_res, chkgrp_HEIGHT, sel_HDmodel_b
 }
 
 
-plot_list <- function(list, color, AGBmod, removedPlot = NULL) {
+plot_list <- function(list, color, removedPlot = NULL) {
 
   ### Formatting the data-frame which will be used for ggplot
   df_res <- rbindlist(lapply(names(list), function(i) { # looping on methods
-    x <- list[[i]]
+    x <- list[[i]][["summary"]]
     x$method <- i
     if(!is.null(removedPlot)) {
       # Adding a row containing NA's for plots which were not in local HD model
@@ -254,13 +226,9 @@ plot_list <- function(list, color, AGBmod, removedPlot = NULL) {
     theme_minimal() +
     scale_color_manual(values = color) +
     xlab(NULL) + ylab("AGB (Mg)") +
-    theme(axis.title = element_text(size = rel(1.2)))
-
-  if(AGBmod == "agb") {
-    render_plot <- render_plot + geom_point(aes(y = AGB), size = 2, position = position_dodge(width = 0.2) )
-  } else {
-    render_plot <- render_plot + geom_errorbar(aes(ymin = Cred_2.5, ymax = Cred_97.5), position = "dodge",  width = 0.1)
-  }
+    theme(axis.title = element_text(size = rel(1.2))) +
+    geom_errorbar(aes(ymin = Cred_2.5, ymax = Cred_97.5), position = position_dodge(width = 0.1), width = 0.1) +
+    geom_point(aes(y = AGB), position = position_dodge(width=0.1))
 
   if ( length(unique(df_res$method)) != 1 ) { # if several method for estimating tree heights
     # Add a great legend

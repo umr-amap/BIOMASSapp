@@ -395,11 +395,6 @@ function(input, output, session) {
           ref_raster = rv$file_rast, raster_fun = arg_raster_fun)
       }, error = function(e) e$message)
 
-      # ICI :
-      # Executer un subplot_summary par AGB_... présent dans rv$AGB_res
-      # BIEN dire dans l'interface:
-      # Si pas de error propagation: alors par défaut on mettra comme métrique sélectionnée la première qui contient AGB_... dans rv$inv_pred avec un petit texte qui dit pourquoi
-      # Si error propagation: alors laisser unselected et dire que l'AGB est automatiquement summarisée par sous-plot, mais que si iels veulent, iels peuvent summariser une autre métrique
       if(!is.character(rv$subplot_summary_output) && input$rad_AGB_MOD=="agbde") {
         for (h_method in rv$AGB_res) {
           subplot_summary(
@@ -1321,9 +1316,6 @@ function(input, output, session) {
 
     ### Retrieving and checking parameters ----
 
-    # AGB only or with error propagation
-    AGBmod <- input$rad_AGB_MOD
-
     # Retrieve diameters
     D <- rv$inv[, input$sel_DIAMETER]
 
@@ -1358,7 +1350,7 @@ function(input, output, session) {
     # Calculation of AGB ----
 
     withProgress(message = "AGB calculation", value = 0, {
-      newValue <- list()
+      #newValue <- list()
 
       ## Heights provided by the user ----
       if(input$rad_height == "h_each_tree") {
@@ -1368,8 +1360,9 @@ function(input, output, session) {
           you may construct a height-diameter model to overcome that issue.",
                      type = "warning")
         }
-        rv$AGB_res[[names(color)[4]]] <- AGB_predict(AGBmod, D = D, WD = WD, errWD = errWD, H = H, errH = errH)
-        newValue[[names(color)[4]]] <- summaryByPlot(rv$AGB_res[[names(color)[4]]], plot = rv$inv$plot)
+        rv$AGB_res[[names(color)[4]]] <- AGB_predict(D = D, WD = WD, errWD = errWD, H = H, errH = errH)
+        rv$AGB_res[[names(color)[4]]][["summary"]] <- summaryByPlot(rv$AGB_res[[names(color)[4]]], plot = rv$inv$plot)
+        #newValue[[names(color)[4]]] <- summaryByPlot(rv$AGB_res[[names(color)[4]]], plot = rv$inv$plot)
       }
 
 
@@ -1380,28 +1373,31 @@ function(input, output, session) {
         incProgress(1 / length_progression, detail = "AGB using HD local: Calculating...")
 
         if( input$sel_HDmodel_by != "<unselected>" ) { # if stand-specific models
-          rv$AGB_res[[names(color)[1]]] <- AGB_predict(AGBmod, D = rv$hd_data$D,
+          rv$AGB_res[[names(color)[1]]] <- AGB_predict(D = rv$hd_data$D,
                                                        WD = WD[rv$inv$plot %in% rv$hd_data$model_for],
                                                        errWD = errWD[rv$inv$plot %in% rv$hd_data$model_for],
                                                        HDmodel = rv$hd_model, model_by =  rv$hd_data$model_for)
 
           # if incomplete heights have been provided, for these heights, we need to replace the AGB estimates calculated with HDmodel by the AGB estimates calculated directly with H and errH
           if( input$rad_height == "h_some_tree") {
-            AGB_user_H <- suppressWarnings(AGB_predict(AGBmod, D = rv$hd_data$D, WD = WD[rv$inv$plot %in% rv$hd_data$model_for], errWD = errWD[rv$inv$plot %in% rv$hd_data$model_for], H = rv$hd_data$H, errH = errH))
+            AGB_user_H <- suppressWarnings(AGB_predict(D = rv$hd_data$D, WD = WD[rv$inv$plot %in% rv$hd_data$model_for], errWD = errWD[rv$inv$plot %in% rv$hd_data$model_for], H = rv$hd_data$H, errH = errH))
             rv$AGB_res[[names(color)[1]]]$AGB_pred[!is.na(AGB_user_H$AGB_pred)] <- AGB_user_H$AGB_pred[!is.na(AGB_user_H$AGB_pred)]
           }
 
-          newValue[[names(color)[1]]] <- summaryByPlot(rv$AGB_res[[names(color)[1]]], plot = rv$hd_data$model_for)
+          rv$AGB_res[[names(color)[1]]][["summary"]] <- summaryByPlot(rv$AGB_res[[names(color)[1]]], plot = rv$hd_data$model_for)
+          #newValue[[names(color)[1]]] <- summaryByPlot(rv$AGB_res[[names(color)[1]]], plot = rv$hd_data$model_for)
+
         } else { # if not stand-specific
-          rv$AGB_res[[names(color)[1]]] <- AGB_predict(AGBmod, D, WD, errWD, HDmodel = rv$hd_model)
+          rv$AGB_res[[names(color)[1]]] <- AGB_predict(D, WD, errWD, HDmodel = rv$hd_model)
 
           # for incomplete heights provided
           if( input$rad_height == "h_some_tree") {
-            AGB_user_H <- suppressWarnings(AGB_predict(AGBmod, D = rv$hd_data$D, WD = WD, errWD = errWD, H = rv$hd_data$H, errH = errH))
+            AGB_user_H <- suppressWarnings(AGB_predict(D = rv$hd_data$D, WD = WD, errWD = errWD, H = rv$hd_data$H, errH = errH))
             rv$AGB_res[[names(color)[1]]]$AGB_pred[!is.na(AGB_user_H$AGB_pred)] <- AGB_user_H$AGB_pred[!is.na(AGB_user_H$AGB_pred)]
           }
 
-          newValue[[names(color)[1]]] <- summaryByPlot(rv$AGB_res[[names(color)[1]]], plot = rv$inv$plot)
+          rv$AGB_res[[names(color)[1]]][["summary"]] <- summaryByPlot(rv$AGB_res[[names(color)[1]]], plot = rv$inv$plot)
+          #newValue[[names(color)[1]]] <- summaryByPlot(rv$AGB_res[[names(color)[1]]], plot = rv$inv$plot)
         }
         incProgress(1 / length_progression, detail = "AGB using HD local: Done")
       }
@@ -1413,8 +1409,9 @@ function(input, output, session) {
         print("AGB calculation for Feldpausch's method: ")
         incProgress(1 / length_progression, detail = "AGB using Feldpausch region: Calculating...")
 
-        rv$AGB_res[[names(color)[2]]] <- AGB_predict(AGBmod, D, WD, errWD, region = rv$region[match(rv$inv$plot , table = rv$region$plot) , "feld_region"])
-        newValue[[names(color)[2]]] <- summaryByPlot(AGB_val = rv$AGB_res[[names(color)[2]]], plot = rv$inv$plot)
+        rv$AGB_res[[names(color)[2]]] <- AGB_predict(D, WD, errWD, region = rv$region[match(rv$inv$plot , table = rv$region$plot) , "feld_region"])
+        rv$AGB_res[[names(color)[2]]][["summary"]] <- summaryByPlot(AGB_val = rv$AGB_res[[names(color)[2]]], plot = rv$inv$plot)
+        #newValue[[names(color)[2]]] <- summaryByPlot(AGB_val = rv$AGB_res[[names(color)[2]]], plot = rv$inv$plot)
 
         incProgress(1 / length_progression, detail = "AGB using Feldpausch region: Done")
       }
@@ -1425,33 +1422,26 @@ function(input, output, session) {
         print("AGB calculation for Chave's method: ")
         incProgress(1 / length_progression, detail = "AGB using Chave E: Calculating...")
 
-        if (AGBmod == "agb") {
-          df_E <- data.frame(plot = rv$coord_plot$plot, E = rv$E)
-          rv$AGB_res[[names(color)[3]]] <- AGB_predict(AGBmod, D, WD, errWD, E_vec = df_E[match(rv$inv$plot , table = df_E$plot) , "E"])
-        }
-        if (AGBmod == "agbe") {
-          rv$AGB_res[[names(color)[3]]] <- AGB_predict(AGBmod, D=D, WD=WD, errWD=errWD, coord = isolate(rv$coord[,c("long","lat")]))
-        }
+        df_E <- data.frame(plot = rv$coord_plot$plot, E = rv$E)
 
-        newValue[[names(color)[3]]] <- summaryByPlot(AGB_val = rv$AGB_res[[names(color)[3]]], plot = rv$inv$plot)
+        rv$AGB_res[[names(color)[3]]] <- AGB_predict(D=D, WD=WD, errWD=errWD,
+                                                     coord = isolate(rv$coord[,c("long","lat")]),
+                                                     E_vec = df_E[match(rv$inv$plot , table = df_E$plot) , "E"])
+
+        rv$AGB_res[[names(color)[3]]][["summary"]] <- summaryByPlot(AGB_val = rv$AGB_res[[names(color)[3]]], plot = rv$inv$plot)
+        #newValue[[names(color)[3]]] <- summaryByPlot(AGB_val = rv$AGB_res[[names(color)[3]]], plot = rv$inv$plot)
 
         incProgress(1 / length_progression, detail = "AGB using Chave E: Done")
       }
 
-      # Fill Cred_2.5 and Cred_97.5 with NA's if no error propagation
-      if(AGBmod == "agb") {
-        newValue <- lapply(newValue , function(x) { # x = AGB_sum$`local HD model`
-          x[,c("Cred_2.5","Cred_97.5")] <- NA
-          return(x)
-        })
-      }
-      rv$AGB_sum <- newValue
+      #rv$AGB_sum <- newValue
     })
 
     ## Render AGB plot's ----
     # plot the output
     output$out_plot_AGB <- renderPlot({
-      plot_list(rv$AGB_sum, color, AGBmod = AGBmod, removedPlot = rv$removedPlot)
+      #plot_list(rv$AGB_sum, color, removedPlot = rv$removedPlot)
+      plot_list(rv$AGB_res, color, removedPlot = rv$removedPlot)
     })
 
     ## Calculation of individual tree metrics
@@ -1564,9 +1554,9 @@ function(input, output, session) {
       for(x in grep("H_Lorey_", names(out), value = TRUE)) out[[x]] <- round(out[[x]] / out$BA, 2)
 
       ## Adding AGB's columns by merging  rv$AGB_sum (and rename H_... by H_max_...)
-      for(method in names(rv$AGB_sum)) { # method = "local HD model"
+      for(method in names(rv$AGB_res)) { # method = "local HD model"
         # get the AGB summary for the current height estimation method
-        res <- data.frame(rv$AGB_sum[[method]])
+        res <- data.frame(rv$AGB_res[[method]][["summary"]])
         # round the results to 1 digit
         res[,c("AGB", "Cred_2.5", "Cred_97.5")] <- round(res[,c("AGB", "Cred_2.5", "Cred_97.5")], 1)
         # rename "local HD model" to "local_model" to match the FOS names
@@ -1590,8 +1580,8 @@ function(input, output, session) {
 
   # button "Continue to spatialisation"
   observeEvent( input$btn_AGB_DONE,
-    ignoreInit = TRUE, {
-      showElement("id_btn_continue_sp")
-      print(rv$AGB_res)
-    })
+                ignoreInit = TRUE, {
+                  showElement("id_btn_continue_sp")
+                  print(rv$AGB_res)
+                })
 }

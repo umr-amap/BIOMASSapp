@@ -631,25 +631,24 @@ page <- dashboardPage(
           boxWithId(
             id = "box_RESULT_TAXO",
             title = strong("Results"),
-            width = 12,
-            fluidRow(
-              column(
-                8,
+            width = 8,
+            column(
+              12,
+              fluidRow(
                 h4("Taxonomy corrections"),
                 withSpinner(
                   verbatimTextOutput("out_taxo_error"),
                   type = getOption("spinner.type", default = 5),
                   color = getOption("spinner.color", default = "#158A0C")
                 )
-              )),
-            fluidRow(
-              column(
-                8,
+              ),
+              fluidRow(
                 h4("WD extraction"),
                 verbatimTextOutput("out_wd_error"),
                 p("Wood density values are assigned to each taxon by averaging the wood density values present in the reference database at species- or genus-level only if at least one wood density value is available."),
                 p("For unidentified trees or if the genus is missing in the reference database, the plot-level mean wood density is assigned to the tree.")
-              ))
+              )
+            )
           )
         )),
         fluidRow(column(
@@ -767,18 +766,14 @@ page <- dashboardPage(
       tabItem("tab_AGB", fluidRow(
         box(
           title = strong("AGB estimation"),
-          width = 3,
-          radioButtons(
-            "rad_AGB_MOD",
-            NULL,
-            choices = c("AGB" = "agb", "AGB + error" = "agbe"),
-            inline = T
-          ) |>
-            helper(colour = "#158A0C", content = "error_prop"),
-          p(
-            "AGB + error will calculate estimates of AGB with 95% confidence intervals, using error propagation."
-          ),
-          actionButton("btn_AGB_DONE", "Go on")
+          width = 6,
+          p( "AGB and its uncertainty are estimated with error propagation of the three main parameters (diameter, wood density and height)."),
+          p("The resulting confidence intervals will represent the 2.5th and 97.5th percentiles of all error propagation simulations."),
+          column(
+            width = 12,
+            actionButton("btn_AGB_DONE", "Go on"),
+            align="center"
+          )
         ),
         hidden(
           boxWithId(
@@ -816,7 +811,8 @@ page <- dashboardPage(
                 colour = "#158A0C",
                 content = "downloads",
                 size = "l"
-              )
+              ),
+            p(" ")
           )
         ))
       )
