@@ -6,6 +6,7 @@ suppressPackageStartupMessages({
   library(shinyalert)
   library(shinyFeedback)
   library(shinyhelper)
+  library(shinyWidgets)
   library(data.table)
   library(ggplot2)
   library(leaflet)
@@ -13,10 +14,29 @@ suppressPackageStartupMessages({
   library(knitr)
   library(measurements)
   library(DT)
-  library(BIOMASS)
+  #library(BIOMASS)
+  devtools::load_all("~/BIOMASS/")
+  library(terra)
 })
 
 source("legal_notice.R")
+
+custom_theme <- theme(
+  legend.text = element_text(size=13),
+  legend.title = element_text(size=15),
+  plot.title = element_text(size=18))
+
+df_coord <- read.csv("~/NouraguesCoords.csv")
+df_inv_pred <- read.csv("~/tree_level_results_2025-10-10.csv")
+df_inv_pred$plot <- df_inv_pred$Plot
+
+# df_coord <- read.csv("~/NouraguesPlot201.csv")
+# df_inv <- read.csv("~/NouraguesTrees.csv")
+# df_inv$D[1] <- NA
+# df_inv_pred <- read.csv("~/tree_level_results_2025-10-10.csv")
+# df_inv_pred$plot <- ""
+
+available_functions <- list("mean"=mean,"sum"=sum,"median"=median,"sd"=sd,"var"=var,"count"=length)
 
 # set maximum input file size (here 30Mo)
 options(shiny.maxRequestSize = 30 * 1024^2)
@@ -118,8 +138,7 @@ AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, e
       AGB <- AGBmonteCarlo(
         D, Dpropag = "chave2004",
         WD, errWD,
-        H = H, errH = errH,
-        plot = model_by
+        H = H, errH = errH
       )
       AGB[["AGB_pred"]] <- AGB_predict("agb", D, WD, errWD, H = H, errH = errH, model_by = model_by)$AGB_pred
     }
@@ -131,8 +150,7 @@ AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, e
       AGB <- AGBmonteCarlo(
         D, Dpropag = "chave2004",
         WD, errWD,
-        H = H, errH = errH,
-        plot = model_by,
+        H = H, errH = errH
       )
       AGB[["AGB_pred"]] <- AGB_predict("agb", D, WD, errWD, H = H, errH = errH, model_by = model_by)$AGB_pred
     }
@@ -141,8 +159,7 @@ AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, e
       AGB <- AGBmonteCarlo(
         D, Dpropag = "chave2004",
         WD, errWD,
-        HDmodel = HDmodel,
-        plot = model_by
+        HDmodel = HDmodel
       )
       AGB[["AGB_pred"]] <- AGB_predict("agb", D, WD, errWD, HDmodel = HDmodel, model_by = model_by)$AGB_pred
     }
