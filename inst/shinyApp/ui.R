@@ -4,289 +4,45 @@ page <- dashboardPage(
   dashboardSidebar(
     sidebarMenu(
       id = "mnu_MENU",
-      menuItem("Spatialized metrics", tabName = "tab_SPATIALISATION"),
-      menuItem("Summarising metrics", tabName = "tab_SP_SUMMARY"),
       menuItem("Load dataset", tabName = "tab_LOAD"),
       menuItem("Taxonomy and Wood density", tabName = "tab_TAXO"),
       menuItem("Height-diameter model", tabName = "tab_HEIGHT"),
-      menuItem("AGB calculation", tabName = "tab_AGB")
+      menuItem("AGB calculation", tabName = "tab_AGB"),
+      menuItem("Spatialized metrics", tabName = "tab_SPATIALISATION"),
+      menuItem("Summarising metrics", tabName = "tab_SP_SUMMARY")
     )
   ),
   dashboardBody(
     useShinyFeedback(),
     useShinyjs(),
+
     tabItems(
-
-      # SPATIALISATION ---------------------------------------------------------
-      tabItem(
-        "tab_SPATIALISATION",
-        ## Brief introduction text ----
-        fluidRow(column(
-          12,
-          p("  This tab allows you to:"),
-          p("- calculate the projected/geographic coordinates of the plot’s corners and the trees from the relative coordinates (or local coordinates, i.e. those of the field)"),
-          p("- validate plot’s corners and tree coordinates by visualisation."),
-          p("- divide plot(s) into subplots"),
-          br(),
-          actionButton("btn_skip", "AGB done !")
-        )),
-
-        fluidRow(
-          ## Plot visualisation box ----
-          column(
-            8,
-            box(
-              title = h2(strong("Plot visualisation")),
-              width = 12,
-              plotOutput("out_gg_check_plot", height = "600px"),
-              hidden(div(
-                id = "id_sel_plot_display", column(4, selectInput("sel_plot_display", "Plot to display", choices = NULL))
-              ))
-            )),
-          ## Settings box ----
-          column(
-            4,
-            box(
-              title = h1(strong("Settings")),
-              width = 12,
-              ### Plot corners ----
-              fluidRow(
-                column(12,
-                       h3(strong("Coordinates of plot corners"))
-                )),
-              # Selection of relative corner coordinates
-              fluidRow(
-                column(12,
-                       h6(" (see below for an overview)"),
-                       p("Select the column corresponding to the relative coordinates of the corners:") ,
-                       column(4, selectInput("sel_x_rel_corner", "relative X coordinates", choices = NULL)),
-                       column(4, selectInput("sel_y_rel_corner", "relative Y coordinates", choices = NULL) |>
-                                helper(colour = "#158A0C", content = "sel_rel_coord_corners"))
-                )),
-
-              # Checkbox for trust_GPS_corners argument
-              fluidRow(
-                column( 9,
-                        checkboxInput(
-                          inputId = "check_trust_GPS_corners",
-                          label = "Do you trust the GPS coordinates of the plot's corners?",
-                          value = TRUE )|>
-                          helper(colour = "#158A0C", content = "trust_GPS_corners"))
-              ),
-              # Checkbox for repeated measurements
-              fluidRow(
-                column( 10,
-                        checkboxInput(
-                          inputId = "check_max_dist",
-                          label = "Have you taken multiple GPS measurements at each corner?",
-                          value = FALSE ))
-              ),
-              # numericInput for max_dist argument
-              hidden(div(
-                id = "id_max_dist",
-                fluidRow(
-                  column(9,
-                         numericInput( "num_max_dist",
-                                       h5("Provide the maximum distance (in meters) above which a corner should be considered outlier"),
-                                       value = 15, min = 0.1)|>
-                           helper(colour = "#158A0C", content = "max_dist"))
-                )
-              )),
-
-              ### Plot trees ----
-              hidden(div(
-                id = "id_coord_trees",
-                h3(strong("Coordinates of the trees")),
-                # Selection of relative tree coordinates
-                fluidRow(
-                  column(
-                    12,
-                    h6(" (see below for an overview)"),
-                    p("Select the column corresponding to the relative coordinates of the trees:"),
-                    column(4, selectInput("sel_x_rel_trees", "relative X coordinates", choices = NULL)),
-                    column(4, selectInput("sel_y_rel_trees", "relative Y coordinates", choices = NULL) |>
-                             helper(colour = "#158A0C", content = "sel_rel_coord_trees"))
-                  )),
-                fluidRow(
-                  column(7,
-                         tags$br(),
-                         p("Select a tree metric to display proportionally:")),
-                  column(4, selectInput("sel_prop_trees","",choices = NULL)),
-                )
-              )),
-
-              ### Raster file ----
-              hidden(div(
-                id = "id_raster",
-                fluidRow(
-                  column(6,
-                         h3(strong("Raster (optional)")) |>
-                           helper(colour = "#158A0C", content = "raster_file")
-                  )),
-
-                fluidRow(
-                  column(6, fileInput("file_RASTER", "Upload a raster file",
-                                      accept = c(".tif",".grd",".jpg",".jpeg",".png",".hgt",".vrt",".hdf",".hdf5",".adf"))),
-                  column(2,
-                         tags$br(),
-                         actionButton("btn_reset_raster", "Reset"))
-                )
-              )),
-
-              ### divide_plot settings ----
-              hidden(div(
-                id = "id_divide_plot",
-                h3(strong("Dividing plot (optional)")),
-                fluidRow(
-                  column(
-                    12,
-                    checkboxInput(
-                      inputId = "check_divide_plot",
-                      label = "Do you want to divide your plot(s) into subplots ?",
-                      value = FALSE
-                    )
-                  ))
-              )),
-              hidden(div(
-                id = "id_divide_plot_settings",
-                fluidRow(
-                  column(
-                    6,
-                    column( 12,
-                            numericInput("num_grid_size", "Grid size", value = 50, min = 1),
-                            checkboxInput("check_centred_grid", "Centre the grid ?", value = TRUE)
-                    )
-                  ))
-              ))
-            )
-          )),
-
-        ## Action button to continue ----
-        fluidRow(column(
-          width = 12,
-          actionButton("btn_check_plot_done", "Continue"),
-          align = "center"
-        )),
-
-        ## Coordinates data preview ----
-        fluidRow(
-          br(),
-          box(
-            title = "Preview of plot's coordinates data",
-            width = 12,
-            DT::DTOutput("table_coord_spatialisation")
-          )),
-
-        ### Inventory data preview ----
-        fluidRow(
-          br(),
-          box(
-            title = "Preview of forest inventory data",
-            width = 12,
-            DT::DTOutput("table_indiv_pred")
-          ))
-      ),
-
-
-      # SUMMARY OF SPATIALISED METRICS -----------------------------------------
-      tabItem(
-        "tab_SP_SUMMARY",
-        fluidRow(
-          ## Plot visualisation box ----
-          column(7,
-                 box(
-                   title = h3(strong("Plot visualisation")),
-                   width = 12,
-                   withSpinner(
-                     plotOutput("out_gg_subplot_sum", height = "600px"),
-                     type = getOption("spinner.type", default = 5),
-                     color = getOption("spinner.color", default = "#158A0C")
-                   ),
-                   hidden(div(
-                     id = "id_sel_plot_summary",
-                     column(4, selectInput("sel_plot_display_summary", "Plot to display", choices = NULL))
-                   )),
-                   hidden(div(
-                     id = "id_sel_metric_summary",
-                     column(4, selectInput("sel_metric_display_summary", "Metric to display", choices = NULL))
-                   )),
-                   hidden(div(
-                     id = "id_switch_ggplot",
-                     column(4, materialSwitch("switch_ggplot", strong("Switch plot visualisation")))
-                   ))
-                 ),
-          ),
-          ## Settings ----
-          column(5,
-                 box(
-                   title = h3(strong("Summarising tree metrics")),
-                   width = 12,
-                   p("Provide the informations to be summarised:"),
-                   column(12,
-                          column(5, selectInput("sel_first_metric", "Which metric", choices = NULL)),
-                          column(5, selectInput("sel_first_function", "Which function to apply?", choices = NULL)),
-                          column(2, checkboxInput("check_first_per_ha", "per hectare", value = TRUE))) |>
-                     helper(colour = "#158A0C", content = "summarising_metrics"),
-                   div(id = "container_selec_metric"),
-                   actionButton("btn_add_metric", "Add a metric"),
-
-                   hidden(div(
-                     id = "id_raster_function",
-                     br(),
-                     p("Which function should be applied to the values in the provided raster?"),
-                     column(5, selectInput("sel_raster_function", "select a function", choices = NULL))
-                   )),
-
-                   column(
-                     width = 12,
-                     actionButton("btn_summarise", "Summarise !"),
-                     align = "center"
-                   )
-                 )
-          )
-        ),
-
-        ## Inventory data preview ----
-        fluidRow(
-          br(),
-          box( title = "Preview of forest inventory data",
-               width = 12,
-               DT::DTOutput("table_divide_plot")
-          ))
-      ),
-
-
 
       # LOAD DATASET -----------------------------------------------------------
 
       tabItem(
         "tab_LOAD",
-        fluidRow(column(
-          12,
-          p(
-            "  To estimate the ",
-            strong("above ground biomass (AGB)"),
-            " of a forest inventory, ",
-            strong("3 parameters"),
-            " are required:"
-          ),
-          p(
-            "- The ",
-            strong("diameter"),
-            "(DBH: Diameter at Breast Height for trees > 10 cm)"
-          ),
-          p(
-            "- The ",
-            strong("wood density"),
-            " (a method for estimating this parameter based on taxonomy is proposed when wood density data are not available)"
-          ),
-          p(
-            "- The ",
-            strong("height"),
-            " (three methods for estimating this parameter are proposed when height data are not available)"
-          ),
-          br()
-        )),
+        fluidRow(
+          box(title = NULL,
+              width = 7,
+              div(
+                style = "font-size:15px; line-height:1.6;",
+                p(
+                  "  To estimate the ",
+                  strong("above ground biomass (AGB)"),
+                  " of a forest inventory, ",
+                  strong("3 parameters"),
+                  " are required:"
+                ),
+                tags$ul(
+                  tags$li( "The ", strong("diameter"), " (DBH: Diameter at Breast Height for trees > 10 cm)" ),
+                  tags$li( "The ", strong("wood density"), " (a method for estimating this parameter based on taxonomy is proposed when wood density data are not available)"),
+                  tags$li( "The ", strong("height"), " (three methods for estimating this parameter are proposed when height data are not available)")
+                )
+              )
+          )
+        ),
+
         fluidRow(column(
           6,
           box(
@@ -312,8 +68,10 @@ page <- dashboardPage(
             ),
             br(),
             br(),
-            p(
-              "Do you need an example of forest inventory data? Click the button below."
+            div(
+              style = "line-height:1;",
+              p("Do you need an example of forest inventory data?"),
+              p("Click the button below to download it, and click the green question mark to find out how to use it.")
             ),
             downloadButton("dwl_inv_ex", label = "Download an example") |>
               helper(
@@ -331,7 +89,7 @@ page <- dashboardPage(
               width = 12,
               p("GPS coordinates are optional but will be used in two cases:"),
               p("- To estimate tree heights when", strong("height data is not available"),"."),
-              p("- To obtain spatialised Above Ground Biomass",strong("Density"),"(or any other tree metric), i.e. to calculate", strong("AGB per hectare"), "for plots or subplot divisions and download the associated shapefiles."),
+              p("- To obtain spatialised Above Ground Biomass",strong("Density"),"(or any other tree metric), i.e. to calculate", strong("AGB per hectare"), "for plots or subplot divisions and download the associated shapefiles. In this case, you will need to provide", strong("the coordinates of plot's corners in another dataset.")),
               p("These coordinates - ", strong("latitude and longitude - "), "must be expressed in ", strong("decimal degrees"), ", e.g: (4.0849 ; -52.6844)."),
 
               radioButtons(
@@ -339,7 +97,7 @@ page <- dashboardPage(
                 "Do you have:",
                 choices = c(
                   "the columns corresponding to the coordinates of each tree" = "coord_each_tree",
-                  "the coordinates of the plot(s) in another dataset" = "coord_plot",
+                  "the coordinates of the plot corners in another dataset" = "coord_plot",
                   "the coordinates of the plot or region that you want to specify manually" = "coord_manually",
                   "no coordinates" = "coord_none"
                 ),
@@ -373,20 +131,8 @@ page <- dashboardPage(
               # If coordinates specified manually
               hidden(div(
                 id = "id_num_lat_long",
-                numericInput(
-                  "num_lat",
-                  "Latitude",
-                  value = 0,
-                  min = -90,
-                  max = 90
-                ),
-                numericInput(
-                  "num_long",
-                  "Longitude",
-                  value = 0,
-                  min = -180,
-                  max = 180
-                )
+                numericInput( "num_lat", "Latitude", value = 0, min = -90, max = 90),
+                numericInput( "num_long", "Longitude", value = 0, min = -180, max = 180)
               )),
               br(),
               br(),
@@ -576,7 +322,7 @@ page <- dashboardPage(
           align = "center"
         )),
 
-        # Inventory data preview
+        ## Inventory data preview ----
         fluidRow(br(), hidden(
           boxWithId(
             id = "box_DATASET",
@@ -666,7 +412,7 @@ page <- dashboardPage(
           checkboxGroupInput(
             "chkgrp_HEIGHT",
             label = helper(
-              "Choose the HD model:         ?",
+              "Choose the HD model:           ?",
               colour = "#158A0C",
               content = "HD_model",
               size = "l"
@@ -806,7 +552,7 @@ page <- dashboardPage(
             width = 2,
             downloadButton("dwl_tree_file", label = "Download tree level results"),
             downloadButton("dwl_plot_file", label = "Download plot level results"),
-            downloadButton("dwl_report", label = "Downloal report") |>
+            downloadButton("dwl_report", label = "Download report") |>
               helper(
                 colour = "#158A0C",
                 content = "downloads",
@@ -816,6 +562,261 @@ page <- dashboardPage(
           )
         ))
       )
+      ),
+
+      # SPATIALISATION ---------------------------------------------------------
+      tabItem(
+        "tab_SPATIALISATION",
+        ## Brief introduction text ----
+
+        fluidRow(
+          box(title = NULL,
+              div(
+                style = "font-size:15px; line-height:1.6; color:#2c3e50;",
+                p("This tab allows you to:"),
+                tags$ul(
+                  tags$li( "validate plot’s corners and tree coordinates by visualisation."),
+                  tags$li( "upload a raster file"),
+                  tags$li( "divide plot(s) into subplots")
+                )
+              )
+          )
+        ),
+
+        fluidRow(
+          ## Plot visualisation box ----
+          column(
+            8,
+            box(
+              title = h2(strong("Plot visualisation")),
+              width = 12,
+              plotOutput("out_gg_check_plot", height = "600px"),
+              hidden(div(
+                id = "id_sel_plot_display", column(4, selectInput("sel_plot_display", "Plot to display", choices = NULL))
+              ))
+            )),
+          ## Settings box ----
+          column(
+            4,
+            box(
+              title = h1(strong("Settings")),
+              width = 12,
+              ### Plot corners ----
+              fluidRow(
+                column(12,
+                       h3(strong("Coordinates of plot corners"))
+                )),
+              # Selection of relative corner coordinates
+              fluidRow(
+                column(12,
+                       h6(" (see below for an overview)"),
+                       p("Select the column corresponding to the relative coordinates of the corners (in meters):") ,
+                       column(4, selectInput("sel_x_rel_corner", "relative X coordinates", choices = NULL)),
+                       column(4, selectInput("sel_y_rel_corner", "relative Y coordinates", choices = NULL) |>
+                                helper(colour = "#158A0C", content = "sel_rel_coord_corners"))
+                )),
+
+              # Checkbox for trust_GPS_corners argument
+              fluidRow(
+                column( 9,
+                        checkboxInput(
+                          inputId = "check_trust_GPS_corners",
+                          label = "Do you trust the GPS coordinates of the plot's corners?",
+                          value = TRUE )|>
+                          helper(colour = "#158A0C", content = "trust_GPS_corners"))
+              ),
+              # Checkbox for repeated measurements
+              fluidRow(
+                column( 10,
+                        checkboxInput(
+                          inputId = "check_max_dist",
+                          label = "Have you taken multiple GPS measurements at each corner?",
+                          value = FALSE ))
+              ),
+              # numericInput for max_dist argument
+              hidden(div(
+                id = "id_max_dist",
+                fluidRow(
+                  column(9,
+                         numericInput( "num_max_dist",
+                                       h5("Provide the maximum distance (in meters) above which a corner should be considered outlier"),
+                                       value = 15, min = 0.1)|>
+                           helper(colour = "#158A0C", content = "max_dist"))
+                )
+              )),
+
+              ### Plot trees ----
+              hidden(div(
+                id = "id_coord_trees",
+                h3(strong("Coordinates of the trees")),
+                # Selection of relative tree coordinates
+                fluidRow(
+                  column(
+                    12,
+                    h6(" (see below for an overview)"),
+                    p("Select the column corresponding to the relative coordinates of the trees (in meters):"),
+                    column(4, selectInput("sel_x_rel_trees", "relative X coordinates", choices = NULL)),
+                    column(4, selectInput("sel_y_rel_trees", "relative Y coordinates", choices = NULL) |>
+                             helper(colour = "#158A0C", content = "sel_rel_coord_trees"))
+                  )),
+                fluidRow(
+                  column(7,
+                         tags$br(),
+                         p("Select a tree metric to display proportionally:")),
+                  column(4, selectInput("sel_prop_trees","",choices = NULL))
+                )
+              )),
+
+              ### Raster file ----
+              hidden(div(
+                id = "id_raster",
+                fluidRow(
+                  column(6,
+                         h3(strong("Raster (optional)")) |>
+                           helper(colour = "#158A0C", content = "raster_file")
+                  )),
+
+                fluidRow(
+                  column(6, fileInput("file_RASTER", "Upload a raster file",
+                                      accept = c(".tif",".grd",".jpg",".jpeg",".png",".hgt",".vrt",".hdf",".hdf5",".adf"))),
+                  column(2,
+                         tags$br(),
+                         actionButton("btn_reset_raster", "Reset"))
+                )
+              )),
+
+              ### divide_plot settings ----
+              hidden(div(
+                id = "id_divide_plot",
+                h3(strong("Dividing plot (optional)")),
+                fluidRow(
+                  column(
+                    12,
+                    checkboxInput(
+                      inputId = "check_divide_plot",
+                      label = "Do you want to divide your plot(s) into subplots ?",
+                      value = FALSE
+                    )
+                  ))
+              )),
+              hidden(div(
+                id = "id_divide_plot_settings",
+                fluidRow(
+                  column(
+                    6,
+                    column( 12,
+                            numericInput("num_grid_size", "Grid size", value = 50, min = 1),
+                            checkboxInput("check_centred_grid", "Centre the grid ?", value = TRUE)
+                    )
+                  ))
+              ))
+            )
+          )),
+
+        ## Action button to continue ----
+        fluidRow(column(
+          width = 12,
+          actionButton("btn_check_plot_done", "Continue"),
+          align = "center"
+        )),
+
+        ## Coordinates data preview ----
+        fluidRow(
+          br(),
+          box(
+            title = "Preview of plot's coordinates data",
+            width = 12,
+            DT::DTOutput("table_coord_spatialisation")
+          )),
+
+        ### Inventory data preview ----
+        fluidRow(
+          br(),
+          box(
+            title = "Preview of forest inventory data",
+            width = 12,
+            DT::DTOutput("table_indiv_pred")
+          ))
+      ),
+
+
+      # SUMMARY OF SPATIALISED METRICS -----------------------------------------
+      tabItem(
+        "tab_SP_SUMMARY",
+        fluidRow(
+          ## Plot visualisation box ----
+          column(7,
+                 box(
+                   title = h3(strong("Plot visualisation")),
+                   width = 12,
+                   withSpinner(
+                     plotOutput("out_gg_subplot_sum", height = "600px"),
+                     type = getOption("spinner.type", default = 5),
+                     color = getOption("spinner.color", default = "#158A0C")
+                   ),
+                   hidden(div(
+                     id = "id_sel_plot_summary",
+                     column(4, selectInput("sel_plot_display_summary", "Plot to display", choices = NULL))
+                   )),
+                   column(4, selectInput("sel_metric_display_summary", "Metric to display", choices = NULL)),
+                   column(4, materialSwitch("switch_ggplot", strong("Switch plot visualisation"), value = TRUE))
+                 )
+          ),
+          column(5,
+                 ## Settings ----
+                 box(
+                   title = h3(strong("Summarising tree metrics")),
+                   width = 12,
+                   p("The AGB calculated in the previous steps has been", strong(" automatically spatialised"), " (i.e. expressed in terms of ", strong("AGBD"), ": AGB per hectare and per plot division)."),
+                   p("However, you can also", strong("summarise other metrics"), "(e.g. the mean tree height per subplot)."),
+                   column(12,
+                          column(5, selectInput("sel_first_metric", "Which metric", choices = NULL)),
+                          column(5, selectInput("sel_first_function", "Which function to apply?", choices = NULL)),
+                          column(2, checkboxInput("check_first_per_ha", "per hectare", value = TRUE))) |>
+                     helper(colour = "#158A0C", content = "summarising_metrics"),
+                   div(id = "container_selec_metric"),
+                   actionButton("btn_add_metric", "Add a metric"),
+
+                   hidden(div(
+                     id = "id_raster_function",
+                     br(),
+                     p("Which function should be applied to the values in the provided raster?"),
+                     column(5, selectInput("sel_raster_function", "select a function", choices = NULL))
+                   )),
+
+                   column(
+                     width = 12,
+                     actionButton("btn_summarise", "Summarise !"),
+                     align = "center"
+                   )
+                 ),
+                 ## Download results ----
+                 box(
+                   title = h3(strong("Download results")),
+                   width = 12,
+                   p("Be aware that a list of metrics will be automatically calculated per subplots when you download the results (see the list by clicking on the green question mark."),
+                   downloadButton("dwl_subplot_file", label = "Download results at subplot level in .csv format") |>
+                     helper(
+                       colour = "#158A0C",
+                       content = "sp_downloads",
+                       size = "l"
+                     ),
+                   br(),
+                   downloadButton("dwl_shapefile", label = "Download results at subplot level in shapefile format"),
+                   br(),
+                   br(),
+                   downloadButton("dwl_sp_report", label = "Download report")
+                 )
+          )
+        ),
+
+        ## Inventory data preview ----
+        fluidRow(
+          br(),
+          box( title = "Preview of forest inventory data",
+               width = 12,
+               DT::DTOutput("table_divide_plot")
+          ))
       )
     )
   )

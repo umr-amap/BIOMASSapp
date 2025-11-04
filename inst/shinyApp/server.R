@@ -12,6 +12,7 @@ function(input, output, session) {
     hideMenuItem("tab_TAXO")
     hideMenuItem("tab_HEIGHT")
     hideMenuItem("tab_AGB")
+    hideMenuItem("tab_SPATIALISATION")
     hideMenuItem("tab_SP_SUMMARY")
   })
 
@@ -33,7 +34,6 @@ function(input, output, session) {
     feld_already_ticked = FALSE, # when selecting a method in Height item, used to not re-execute the code when another box is ticked (HDlocal or Chave)
     chave_already_ticked = FALSE, # same as above but with the Chave method
     E = NULL, # a vector of E parameter for each plot
-    AGB_sum = list(), # output of summaryByPlot()
     AGB_res = list(), # output of AGB_predict() (in global.R)
     inv_pred = NULL, # data-frame containing tree-level results (for downloads and spatialisation)
     removedPlot = NULL, #removedPlot will contain plots that don't have enough height measurements when building a model stand/region specific or those with diameter not well distributed
@@ -43,434 +43,40 @@ function(input, output, session) {
     gg_check_plot = NULL, # the plot visulisation of check_plot_coord()
     divide_output = NULL, # the output of divide_plot() applied when clicking on "continue" in the spatialisation tab
     grid_dat = NULL, # the grid to display after divide_plot()
-    subplot_summary_output = NULL
+    gg_subplot_summary = NULL, # the plot list of suplot_summary() output
+    subplot_summary_output = NULL,
+    FOS_subplot = NULL # the FOS like results for subplots downloads
   )
 
 
-  # SKIP BUTTON (DEMO MODE) ===================================================
-  observeEvent(input$btn_skip, {
-    rv$df_coord <- df_coord
-    rv$inv <- df_inv
-    rv$inv_pred <- df_inv_pred
-    int_num_col <- names(rv$df_coord)[ sapply(rv$df_coord, class) %in% c("integer", "numeric") ]
-    showElement("id_sel_plot_display")
-    updateRadioButtons(session, "rad_several_plots", selected = "several_plots")
-    #updateRadioButtons(session, "rad_several_plots", selected = "single_plot")
-    updateSelectInput(session, "sel_x_rel_corner", choices = c("<unselected>", int_num_col))
-    updateSelectInput(session, "sel_y_rel_corner", choices = c("<unselected>", int_num_col))
-    updateSelectInput(session, "sel_plot_display", choices = unique(rv$df_coord[,"Plot"]))
-    updateSelectInput(session, "sel_plot_coord", choices = "Plot", selected = "Plot")
-    updateSelectInput(session, "sel_LONG_sup_coord", choices = "Long", selected ="Long" )
-    updateSelectInput(session, "sel_LAT_sup_coord", choices = "Lat", selected ="Lat" )
-    updateSelectInput(session, "sel_PLOT", choices = "Plot", selected = "Plot")
-    # print("input$sel_PLOT")
-    # print(input$sel_PLOT)
-    # print("input$sel_x_rel_corner")
-    # print(input$sel_x_rel_corner)
-    # print("input$sel_x_rel_trees")
-    # print(input$sel_x_rel_trees)
-
-  })
-
-
-
-  # SPATIALISATION -------------------------------------------------------------
-
-  ## show coordinates table content ----
-  observe({
-    output$table_coord_spatialisation <- renderDT(rv$df_coord, options = list(scrollX = TRUE))
-  })
-
-  ## Execute check_plot_coord() and render the plot ----
-  observeEvent(
-    list(input$sel_x_rel_corner, input$sel_y_rel_corner,
-         input$check_trust_GPS_corners, input$num_max_dist,
-         input$sel_x_rel_trees, input$sel_y_rel_trees, input$sel_prop_trees,
-         input$file_RASTER, input$btn_reset_raster),
-    ignoreInit = TRUE, {
-
-      req(input$sel_LONG_sup_coord, input$sel_LAT_sup_coord, input$sel_x_rel_corner, input$sel_y_rel_corner)
-
-      if(input$sel_x_rel_corner!="<unselected>" & input$sel_y_rel_corner!="<unselected>" &
-         input$sel_LONG_sup_coord!="<unselected>" & input$sel_LAT_sup_coord!="<unselected>") {
-
-        # Prepare arguments
-        if(input$rad_several_plots=="several_plots") {
-          arg_plot_ID <- input$sel_plot_coord
-        } else {
-          arg_plot_ID <- NULL
-        }
-        arg_tree_data <- NULL
-        arg_tree_coords <- NULL
-        arg_tree_plot_ID <- NULL
-        arg_prop_trees <- NULL
-
-        if(!input$sel_x_rel_trees %in% c("<unselected>","") & !input$sel_y_rel_trees %in% c("<unselected>","")) {
-          arg_tree_data <- rv$inv_pred
-          arg_tree_coords <- c(input$sel_x_rel_trees, input$sel_y_rel_trees)
-          if(input$rad_several_plots=="several_plots") {
-            arg_tree_plot_ID <- input$sel_PLOT
-          }
-        }
-
-        if( !input$sel_prop_trees %in% c("<unselected>","")) {
-          arg_prop_trees <- input$sel_prop_trees
-        }
-
-        # Execute check_plot_coord
-        # print("head(rv$df_coord)")
-        # print(head(rv$df_coord))
-        # print(c(input$sel_LONG_sup_coord, input$sel_LAT_sup_coord))
-        # print(c(input$sel_LONG_sup_coord, input$sel_LAT_sup_coord))
-        # print(c(input$sel_x_rel_corner, input$sel_y_rel_corner))
-        # print("arg_plot_ID")
-        # print(arg_plot_ID)
-        # print("arg_tree_coords")
-        # print(head(arg_tree_coords))
-        # print(arg_tree_plot_ID)
-
-        rv$checked_plot <- tryCatch({
-          check_plot_coord(corner_data = rv$df_coord,
-                           longlat = c(input$sel_LONG_sup_coord, input$sel_LAT_sup_coord),
-                           rel_coord = c(input$sel_x_rel_corner, input$sel_y_rel_corner),
-                           trust_GPS_corners = input$check_trust_GPS_corners,
-                           draw_plot = FALSE, ask = FALSE,
-                           max_dist = input$num_max_dist,
-                           plot_ID = arg_plot_ID,
-                           tree_data = arg_tree_data, tree_coords = arg_tree_coords,
-                           tree_plot_ID = arg_tree_plot_ID, prop_tree = arg_prop_trees,
-                           ref_raster = rv$file_rast)
-        }, error = function(e) e$message)
-
-        # We'll need a "plot_ID" column in checked_plot$corner_coord, even if there is only 1 plot
-        if(!is.character(rv$checked_plot) && input$rad_several_plots=="single_plot") {
-          rv$checked_plot$corner_coord$plot_ID <- ""
-          # and in checked_plot$tree_data too
-          rv$checked_plot$tree_data$plot_ID <- ""
-
-        }
-
-        # Generate plot visualization
-        if(!is.character(rv$checked_plot)) {
-          if(length(rv$checked_plot$plot_design) == 1) { # if one plot
-            rv$gg_check_plot <- rv$checked_plot$plot_design + custom_theme
-          } else { # if multiple plot, render the plot selected by the user
-            plot_index <- match( input$sel_plot_display, names(rv$checked_plot$plot_design) )
-            rv$gg_check_plot <- rv$checked_plot$plot_design[[plot_index]] + custom_theme
-          }
-        } else {
-          print("rv$checked_plot error:")
-          print(rv$checked_plot)
-          rv$gg_check_plot <- ggplot() +
-            annotate("text", x = 0, y = 0,
-                     label = paste(
-                       "An error occurred when creating the plot visualisation.",
-                       "Ensure that your data is entered correctly in both the settings",
-                       "and the 'load dataset' tab.",
-                       "(an exemple is available at the end of this tab)",
-                       sep = "\n"
-                     ),
-                     size = 5, color = "#e74c3c", fontface = "bold") +
-            theme_void()
-        }
-      } else { # if relative corner coordinates aren't supplied
-        rv$gg_check_plot <- ggplot() +
-          annotate("text", x = 0, y = 0,
-                   label = "Please fill the relative coordinates of the corners. ",
-                   size = 5, color = "black", fontface = "bold") +
-          theme_void()
-
-      }
-      output$out_gg_check_plot <- renderPlot(silentPlot(rv$gg_check_plot))
-    })
-
-  ## Update plot display ----
-  observeEvent(input$sel_plot_display, ignoreInit = TRUE, {
-    if(!is.null(rv$checked_plot) && !is.character(rv$checked_plot)) {
-      plot_index <- match( input$sel_plot_display, names(rv$checked_plot$plot_design) )
-      rv$gg_check_plot <- rv$checked_plot$plot_design[[plot_index]]
-      rv$gg_check_plot <- rv$gg_check_plot + custom_theme
-      output$out_gg_check_plot <- renderPlot(silentPlot(rv$gg_check_plot))
-    }
-  })
-  ## Toggle max_dist setting ----
-  observeEvent(input$check_max_dist, ignoreInit = TRUE, {
-    toggleElement("id_max_dist", condition = input$check_max_dist==TRUE)
-  })
-
-  ## Show tree coordinates options ----
-  observeEvent(list(input$sel_x_rel_corner, input$sel_y_rel_corner), ignoreInit = TRUE, {
-    # Show only if check_plot_coord() with corner coordinates only is successful
-    if(input$sel_x_rel_corner!="<unselected>" & input$sel_y_rel_corner!="<unselected>") {
-
-      if(!is.null(rv$checked_plot) && !is.character(rv$checked_plot)) {
-        showElement("id_coord_trees")
-
-        int_num_col <- names(rv$inv_pred)[ sapply(rv$inv_pred, class) %in% c("integer", "numeric")]
-        for (id in c("sel_x_rel_trees", "sel_y_rel_trees","sel_prop_trees")) {
-          updateSelectInput(session, id, choices = c("<unselected>", int_num_col))
-        }
-        # show inv_pred table content
-        output$table_indiv_pred <- renderDT(rv$inv_pred, options = list(scrollX = TRUE))
-      }
-    }
-  })
-
-  ## Show raster and divide_plot options ----
-  observeEvent(list(input$sel_x_rel_trees, input$sel_y_rel_trees, input$sel_prop_trees), ignoreInit = TRUE, {
-    # Show only if check_plot_coord() with corner coordinates and trees is successful
-    if(input$sel_x_rel_trees!="<unselected>" & input$sel_y_rel_trees!="<unselected>") {
-      if(!is.null(rv$checked_plot) && !is.character(rv$checked_plot)) {
-        showElement("id_raster")
-        showElement("id_divide_plot")
-      }
-    }
-  })
-
-  ## Handle raster upload ----
-  observeEvent(input$file_RASTER, ignoreInit = TRUE, {
-    rv$file_rast <- tryCatch({
-      terra::rast(input$file_RASTER$datapath)
-    }, error = function(e) NULL)
-    if(!is.null(rv$file_rast)) {
-      showElement("id_raster_function")
-      updateSelectInput(session, "sel_raster_function", choices = names(available_functions))
-    }
-  })
-  # Reset the file raster if needed
-  observeEvent(input$btn_reset_raster, {
-    shinyjs::reset("file_RASTER")
-    rv$file_rast <- NULL
-    hideElement("id_raster_function")
-  })
-
-  ## Toggle divide_plot settings ----
-  observeEvent(input$check_divide_plot, ignoreInit = TRUE, {
-    toggleElement("id_divide_plot_settings", condition = input$check_divide_plot==TRUE)
-  })
-
-  ## Process "Continue" button ----
-  observeEvent(input$btn_check_plot_done, {
-
-    ## Error management
-    # Corner relative coordinates should be filed
-    if ( input$sel_x_rel_corner=="<unselected>" | input$sel_y_rel_corner=="<unselected>") {
-      shinyalert("Oops!", "You must enter the relative coordinates of the corners.", type = "error")
-      return()
-    }
-    # Tree relative coordinates should be filed
-    if ( input$sel_x_rel_trees=="<unselected>" | input$sel_y_rel_trees=="<unselected>") {
-      shinyalert("Oops!", "You must enter the relative coordinates of the trees.", type = "error")
-      return()
-    }
-    # check_plot_coord has to be OK
-    if (is.null(rv$checked_plot) | is.character(rv$checked_plot)) {
-      shinyalert("Oops!", "Something went wrong when checking for the coordinates. Please ensure that you have entered the information correctly. You will then be able to continue once the plot has been displayed correctly.", type = "error")
-      return()
-    }
-
-    # Execute divide_plot
-    if(input$check_divide_plot) {
-      rv$divide_output <- tryCatch({
-        divide_plot(corner_data = rv$checked_plot$corner_coord,
-                    rel_coord = c("x_rel","y_rel"),
-                    proj_coord = c("x_proj","y_proj"),
-                    grid_size = input$num_grid_size,
-                    tree_data =  rv$checked_plot$tree_data, tree_coords = c("x_rel","y_rel"),
-                    corner_plot_ID = "plot_ID", tree_plot_ID = "plot_ID",
-                    centred_grid = input$check_centred_grid, grid_tol = 0.9)
-      }, error = function(e) e$message)
-    } else { # if no plot division, recreate the output
-      # recreate sub_corner_coord output
-      sub_corner_coord <- rv$checked_plot$corner_coord
-      if(input$rad_several_plots=="single_plot") {
-        sub_corner_coord$plot_ID <- ""
-      }
-      sub_corner_coord$subplot_ID <- sub_corner_coord$plot_ID
-      # recreate tree_data output
-      tree_data <- rv$checked_plot$tree_data
-      tree_data$subplot_ID <- tree_data$plot #column "plot" has been created in indiv_pred()
-      tree_data$subplot_ID[!tree_data$is_in_plot] <- NA
-      rv$divide_output <- list(sub_corner_coord = sub_corner_coord, tree_data = tree_data)
-    }
-
-    if(is.character(rv$divide_output)) {
-      print("error in divide_plot:")
-      print(rv$divide_output)
-      shinyalert("Oops!", paste0("Something went wrong when dividing your plot.\nError:", rv$divide_output), type = "error")
-      return()
-    } else {
-      # If no error on divide_plot, update tab_SP_SUMMARY
-      showMenuItem("tab_SP_SUMMARY")
-      updateTabItems(session, "mnu_MENU", "tab_SP_SUMMARY")
-      # update input selections in the next tab if not already done
-      if(input$sel_first_metric=="") {
-        int_num_col <- names(rv$divide_output$tree_data)[ sapply(rv$divide_output$tree_data, class) %in% c("integer", "numeric")]
-        int_num_col <- int_num_col[! int_num_col %in% c("plot","plot_ID","subplot_ID","x_proj","y_proj")]
-        updateSelectInput(session, "sel_first_metric", choices = c("<unselected>", int_num_col))
-        updateSelectInput(session, "sel_first_function", choices = c("<unselected>", names(available_functions)))
-      }
-      toggleElement("id_sel_plot_summary", condition = input$rad_several_plots=="several_plots")
-      if(input$rad_several_plots=="several_plots") {
-        updateSelectInput(session,
-                          "sel_plot_display_summary",
-                          choices = unique(rv$df_coord[,"Plot"]),
-                          selected = input$sel_plot_display)
-      }
-      output$table_divide_plot <- renderDT(rv$divide_output$tree_data, options = list(scrollX = TRUE))
-    }
-
-    # if plot divisions, add the grid to rv$gg_check_plot and render it in output$out_gg_subplot_sum before subplot_summary() is called
-    if(input$rad_several_plots == "single_plot") {
-      rv$grid_dat <- rv$divide_output$sub_corner_coord
-    } else {
-      rv$grid_dat <- rv$divide_output$sub_corner_coord[rv$divide_output$sub_corner_coord$plot_ID == input$sel_plot_display,]
-    }
-    gg_grid_check_plot <- rv$gg_check_plot +
-      geom_polygon(data = rv$grid_dat,
-                   mapping = aes(x = x_proj, y=y_proj, group=subplot_ID),
-                   fill = NA, colour="black", linewidth=1)
-    output$out_gg_subplot_sum <- renderPlot(silentPlot(gg_grid_check_plot))
-
-  })
-
-
-
-  # SUMMARISE METRICS ----------------------------------------------------------
-
-  ## Add a metric when clicking "Add a metric" ----
-  observeEvent(input$btn_add_metric, {
-    # Create a unique ID for each new selectInput
-    unique_id <- paste0("select_", input$btn_add_metric)
-    metric_choices <- names(rv$divide_output$tree_data)[!names(rv$divide_output$tree_data) %in%
-                                                          c("is_in_plot","plot","plot_ID","subplot_ID","x_proj","y_proj")]
-    insertUI(
-      selector = "#container_selec_metric",
-      where = "beforeEnd",
-      ui = column(
-        width = 12,
-        div(
-          column(5, selectInput(paste0("sel_metric_", unique_id),
-                                "Which metric ?",
-                                choices = c("<unselected>", metric_choices))),
-          column(5, selectInput(paste0("sel_function_", unique_id),
-                                "Which function to apply?",
-                                choices = c("<unselected>",names(available_functions)))),
-          column(2, checkboxInput(paste0("checkbox_per_ha_", unique_id), "per hectare", value = TRUE))
-        )
-      )
-    )
-  })
-
-  ## Call subplot_summary when clicking on "Summarise" ----
-  observeEvent(input$btn_summarise, {
-
-    if(input$sel_first_metric != "<unselected>" & input$sel_first_function != "<unselected>") {
-
-      # Formatting subplot_summary arguments
-      name_arg_value <- c("sel_first_metric", grep("^sel_metric_select_", names(input), value = TRUE))
-      name_arg_per_ha <- c("check_first_per_ha", grep("^checkbox_per_ha_select", names(input), value = TRUE))
-      name_arg_fun <- c("sel_first_function", grep("^sel_function_select_", names(input), value = TRUE))
-      name_arg_raster_fun <- ifelse(input$sel_raster_function!="",input$sel_raster_function,"mean")
-      arg_raster_fun <- available_functions[[name_arg_raster_fun]]
-
-      if(input$btn_add_metric>=1) {
-        filter_select <- sapply(name_arg_value, function(x) input[[x]] != "<unselected>") &
-          sapply(name_arg_fun, function(x) input[[x]] != "<unselected>")
-
-        arg_value <- sapply(name_arg_value, function(x) input[[x]])[filter_select]
-        arg_per_ha <- sapply(name_arg_per_ha, function(x) input[[x]])[filter_select]
-        arg_fun <- lapply(name_arg_fun, function(x) available_functions[[input[[x]]]])[filter_select]
-        names(arg_fun) <- name_arg_fun[filter_select]
-      } else {
-        arg_value <- input$sel_first_metric
-        arg_per_ha <- input$check_first_per_ha
-        arg_fun <- available_functions[[input$sel_first_function]]
-      }
-
-      rv$subplot_summary_output <- tryCatch({
-        subplot_summary(
-          subplots = rv$divide_output, draw_plot = FALSE,
-          value = arg_value, per_ha = arg_per_ha, fun = arg_fun,
-          ref_raster = rv$file_rast, raster_fun = arg_raster_fun)
-      }, error = function(e) e$message)
-
-      if(!is.character(rv$subplot_summary_output) && input$rad_AGB_MOD=="agbde") {
-        for (h_method in rv$AGB_res) {
-          subplot_summary(
-            subplots = rv$divide_output, draw_plot = FALSE,
-            value = arg_value, per_ha = arg_per_ha, fun = arg_fun,
-            ref_raster = rv$file_rast, raster_fun = arg_raster_fun)
-        }
-      }
-
-
-      if(!is.character(rv$subplot_summary_output)) {
-        metric_names <- names(rv$subplot_summary_output$tree_summary)[!names(rv$subplot_summary_output$tree_summary) %in% c("plot_ID","subplot_ID")]
-        showElement("id_sel_metric_summary")
-        updateSelectInput(session, "sel_metric_display_summary", choices = metric_names)
-        showElement("id_switch_ggplot")
-        updateMaterialSwitch(session, "switch_ggplot", TRUE)
-      }
-
-    } else {
-      shinyalert("Oops!", "Please provide at least one metric to summarise and one function to applied", type = "error")
-    }
-  })
-
-  ## Change the plot and metric visualisation ----
-  observeEvent(list(input$sel_plot_display_summary, input$sel_metric_display_summary, input$switch_ggplot), ignoreInit = TRUE, {
-
-    if(input$switch_ggplot) { # summary visualisation, means that subplot_summary has been called
-      metric_names <- names(rv$subplot_summary_output$tree_summary)[!names(rv$subplot_summary_output$tree_summary) %in% c("plot_ID","subplot_ID")]
-      if(input$rad_several_plots=="several_plots") {
-        #Render the plot_design output (plot_design[[plot_ID]][[metric]])
-        output$out_gg_subplot_sum <- renderPlot(silentPlot(
-          rv$subplot_summary_output$plot_design[[
-            match(input$sel_plot_display_summary, names(rv$subplot_summary_output$plot_design))]][[
-              match(input$sel_metric_display_summary, metric_names)
-            ]]))
-      } else {
-        #Render the plot_design output (plot_design[[metrics]] or just plot_design if only one metric)
-        output$out_gg_subplot_sum <- renderPlot(silentPlot(
-          rv$subplot_summary_output$plot_design[[1]][[
-            match(input$sel_metric_display_summary, metric_names)
-          ]]
-        ))
-
-      }
-    } else { # check_plot (and grid) visualisation
-
-      if(input$rad_several_plots=="several_plots") {
-        plot_index <- match( input$sel_plot_display_summary, names(rv$checked_plot$plot_design) )
-        rv$gg_check_plot <- rv$checked_plot$plot_design[[plot_index]]
-        rv$gg_check_plot <- rv$gg_check_plot + custom_theme
-        rv$grid_dat <- rv$divide_output$sub_corner_coord[rv$divide_output$sub_corner_coord == input$sel_plot_display_summary,]
-      } else {
-        rv$gg_check_plot <- rv$checked_plot$plot_design
-        rv$gg_check_plot <- rv$gg_check_plot + custom_theme
-        rv$grid_dat <- rv$divide_output$sub_corner_coord
-      }
-
-      if(input$check_divide_plot) {
-        output$out_gg_subplot_sum <- renderPlot(
-          rv$gg_check_plot +
-            geom_polygon(data = rv$grid_dat,
-                         mapping = aes(x = x_proj, y=y_proj, group=subplot_ID),
-                         fill = NA, colour="black", linewidth=1)
-        )
-      } else {
-        output$out_gg_subplot_sum <- renderPlot(rv$gg_check_plot)
-      }
-    }
-  })
-
-  # observeEvent(input$switch, ignoreInit = TRUE, {
-  #   if(is.null(rv$subplot_summary_output) || is.character(rv$subplot_summary_output)) {
-  #     updateMaterialSwitch(session, "switch_ggplot", FALSE)
-  #     shinyalert(shinyalert("Nope!", "You can't switch to the metric summary visualisation until you clicked on the 'Summarise' button ", type = "error"))
-  #   }
+  # # SKIP BUTTON (DEMO MODE) ===================================================
+  # observeEvent(input$btn_skip, {
+  #   rv$df_coord <- df_coord
+  #   rv$inv <- df_inv
+  #   rv$inv_pred <- df_inv_pred
+  #   int_num_col <- names(rv$df_coord)[ sapply(rv$df_coord, class) %in% c("integer", "numeric") ]
+  #   #load("~/Documents/NOURAGUES/saves/AGB_res_shiny_nouragues_plots_AGB_local_Feldpausch.Rdata")
+  #   load("~/Documents/prise_en_main_BIOMASS/BiomassApp/AGB_res_shiny_nouragues_201_AGB_local_Feldpausch.Rdata")
+  #   rv$AGB_res <- toto
+  #   showElement("id_sel_plot_display")
+  #   #updateRadioButtons(session, "rad_several_plots", selected = "several_plots")
+  #   updateRadioButtons(session, "rad_several_plots", selected = "single_plot")
+  #   updateSelectInput(session, "sel_x_rel_corner", choices = c("<unselected>", int_num_col))
+  #   updateSelectInput(session, "sel_y_rel_corner", choices = c("<unselected>", int_num_col))
+  #   updateSelectInput(session, "sel_plot_display", choices = unique(rv$df_coord[,"Plot"]))
+  #   updateSelectInput(session, "sel_plot_coord", choices = "Plot", selected = "Plot")
+  #   updateSelectInput(session, "sel_LONG_sup_coord", choices = "Long", selected ="Long" )
+  #   updateSelectInput(session, "sel_LAT_sup_coord", choices = "Lat", selected ="Lat" )
+  #   updateSelectInput(session, "sel_PLOT", choices = "Plot", selected = "Plot")
+  #   # print("input$sel_PLOT")
+  #   # print(input$sel_PLOT)
+  #   # print("input$sel_x_rel_corner")
+  #   # print(input$sel_x_rel_corner)
+  #   # print("input$sel_x_rel_trees")
+  #   # print(input$sel_x_rel_trees)
+  #
   # })
+
 
   # LOAD DATASET ---------------------------------------------------------------
 
@@ -497,10 +103,10 @@ function(input, output, session) {
     }
     updateSelectInput(session, "sel_PLOT", choices = c("<unselected>", names(forest_inv)))
 
-    # show other boxes if the radio button about multiple plots has been ticked
+    # show other hidden boxes
+    showElement("box_DATASET")
     if(!is.null(input$rad_several_plots)){
       showElement("box_FIELDS")
-      showElement("box_DATASET")
       showElement("box_COORD")
     }
   })
@@ -620,7 +226,7 @@ function(input, output, session) {
     toggleElement("id_sel_coord_plot", condition = input$rad_coord == "coord_plot") # show latitude & longitude selection from coordinates data
     toggleElement("sel_plot_coord", # show plot ID selection is several plots
                   condition = input$rad_coord == "coord_plot" & input$rad_several_plots == "several_plots")
-    toggleElement("sel_plot_display", # show which plot to display in spatialisation tab
+    toggleElement("id_sel_plot_display", # show which plot to display in spatialisation tab
                   condition = input$rad_coord == "coord_plot" & input$rad_several_plots == "several_plots")
     toggleElement("sel_plot_display_summary", # show which plot to display in summarised metrics tab
                   condition = input$rad_coord == "coord_plot" & input$rad_several_plots == "several_plots")
@@ -1206,7 +812,7 @@ function(input, output, session) {
                   rv$plot_hd <- ggplot(data = NULL, aes(x = D, col="measured trees")) + # col="measured_trees" to silence the warning message "No shared levels found between `names(values)` of the manual scale and the data's colour values."
                     xlab("Diameter (cm)") +
                     ylab("Height (m)") +
-                    scale_colour_manual(name = "model predictions", values = c("local HD model" = "#619CFF", "Feldpausch" = "#00BA38", "Chave" = "#F8766D", "measured trees" = "black")) +
+                    scale_colour_manual(name = "model predictions", values = c("local_model" = "#619CFF", "Feldpausch" = "#00BA38", "Chave" = "#F8766D", "measured trees" = "black")) +
                     theme_minimal() +
                     theme(
                       legend.position = "bottom",
@@ -1229,7 +835,7 @@ function(input, output, session) {
         if (input$sel_HDmodel_by == "<unselected>"){
           rv$plot_hd <- rv$plot_hd +
             geom_point(data = rv$hd_data, mapping = aes(x = D, y = H, col="measured trees"), size=1.5, na.rm=TRUE) + # measured trees
-            geom_line(aes(y = retrieveH(D, model = rv$hd_model)$H, col = "local HD model"), lwd=1.2) + # HD model
+            geom_line(aes(y = retrieveH(D, model = rv$hd_model)$H, col = "local_model"), lwd=1.2) + # HD model
             ylim( c(0, max(rv$hd_data$H, na.rm = TRUE) + 5))
         } else {
           # creating model lines for each plots/regions/...
@@ -1240,7 +846,7 @@ function(input, output, session) {
           }))
           rv$plot_hd <- rv$plot_hd +
             geom_point(data = rv$hd_data, mapping = aes(x = D, y = H, col = "measured trees", shape = model_for), size=1.5, na.rm=TRUE) + # measured trees
-            geom_line(data = df_lines, mapping = aes(x = D, y = H_pred, col = "local HD model", lty = model_for), lwd=1.2) + #HD model for each plots/regions..
+            geom_line(data = df_lines, mapping = aes(x = D, y = H_pred, col = "local_model", lty = model_for), lwd=1.2) + #HD model for each plots/regions..
             ylim( c(0, max(rv$hd_data$H, na.rm = TRUE) + 5))
         }
       }
@@ -1344,7 +950,7 @@ function(input, output, session) {
     length_progression <- length(input$chkgrp_HEIGHT)*2
 
     # Set method's color
-    color <- c("local HD model" = "#619CFF", Feldpausch = "#F8766D", Chave = "#00BA38", height = "black")
+    color <- c(local_model = "#619CFF", Feldpausch = "#F8766D", Chave = "#00BA38", user_height = "black")
 
 
     # Calculation of AGB ----
@@ -1362,7 +968,6 @@ function(input, output, session) {
         }
         rv$AGB_res[[names(color)[4]]] <- AGB_predict(D = D, WD = WD, errWD = errWD, H = H, errH = errH)
         rv$AGB_res[[names(color)[4]]][["summary"]] <- summaryByPlot(rv$AGB_res[[names(color)[4]]], plot = rv$inv$plot)
-        #newValue[[names(color)[4]]] <- summaryByPlot(rv$AGB_res[[names(color)[4]]], plot = rv$inv$plot)
       }
 
 
@@ -1385,7 +990,6 @@ function(input, output, session) {
           }
 
           rv$AGB_res[[names(color)[1]]][["summary"]] <- summaryByPlot(rv$AGB_res[[names(color)[1]]], plot = rv$hd_data$model_for)
-          #newValue[[names(color)[1]]] <- summaryByPlot(rv$AGB_res[[names(color)[1]]], plot = rv$hd_data$model_for)
 
         } else { # if not stand-specific
           rv$AGB_res[[names(color)[1]]] <- AGB_predict(D, WD, errWD, HDmodel = rv$hd_model)
@@ -1397,7 +1001,6 @@ function(input, output, session) {
           }
 
           rv$AGB_res[[names(color)[1]]][["summary"]] <- summaryByPlot(rv$AGB_res[[names(color)[1]]], plot = rv$inv$plot)
-          #newValue[[names(color)[1]]] <- summaryByPlot(rv$AGB_res[[names(color)[1]]], plot = rv$inv$plot)
         }
         incProgress(1 / length_progression, detail = "AGB using HD local: Done")
       }
@@ -1434,13 +1037,11 @@ function(input, output, session) {
         incProgress(1 / length_progression, detail = "AGB using Chave E: Done")
       }
 
-      #rv$AGB_sum <- newValue
     })
 
     ## Render AGB plot's ----
     # plot the output
     output$out_plot_AGB <- renderPlot({
-      #plot_list(rv$AGB_sum, color, removedPlot = rv$removedPlot)
       plot_list(rv$AGB_res, color, removedPlot = rv$removedPlot)
     })
 
@@ -1453,13 +1054,23 @@ function(input, output, session) {
 
     showElement(id = "box_AGB_res")
     showElement(id = "id_AGB_Report")
+    showElement("id_btn_continue_sp")
+  })
+
+  # button "Continue to spatialisation"s
+  observeEvent( input$btn_continue_sp, ignoreInit = TRUE, {
+    if(input$rad_coord == "coord_plot") {
+      showMenuItem("tab_SPATIALISATION")
+      updateTabItems(session, "mnu_MENU", "tab_SPATIALISATION")
+    } else {
+      shinyalert("To continue with the spatialisation of the AGB, you need to provide the coordinates of the plot corners in the 'Geographic coordinates' box on 'Load dataset' tab.", type = "error")
+    }
   })
 
 
+  ## Download part -----------------------------------------------------------
 
-  # Download part -----------------------------------------------------------
-
-  ## Report ----
+  ### Report ----
   output$dwl_report <- downloadHandler(
     filename = function() {
       paste0("BIOMASS_report_", Sys.Date(), ".html")
@@ -1468,7 +1079,8 @@ function(input, output, session) {
       # Copy the report file to a temporary directory before processing it, in case we don't have write permissions to the current working dir (which can happen when deployed).
       tempReport <- file.path(tempdir(), "report_BIOMASS.Rmd")
       file.copy(
-        from = system.file("Rmarkdown", "report_BIOMASS.Rmd", package = "BIOMASSapp"),
+        #from = system.file("Rmarkdown", "report_BIOMASS.Rmd", package = "BIOMASSapp"),
+        from = "~/BIOMASSapp/inst/Rmarkdown/report_BIOMASS.Rmd",
         tempReport,
         overwrite = TRUE
       )
@@ -1483,7 +1095,7 @@ function(input, output, session) {
   )
 
 
-  ## Tree level results ----
+  ### Tree level results ----
 
   output$dwl_tree_file <- downloadHandler(
     filename = function() {
@@ -1508,7 +1120,7 @@ function(input, output, session) {
   )
 
 
-  ## Plot level results (FOS like csv) ----
+  ### Plot level results (FOS like csv) ----
   output$dwl_plot_file <- downloadHandler(
     filename = function() {
       paste0("plot_level_results_", Sys.Date(), ".csv")
@@ -1553,16 +1165,15 @@ function(input, output, session) {
       # Dividing Lorey's column by BA to get the correct Lorey's heights
       for(x in grep("H_Lorey_", names(out), value = TRUE)) out[[x]] <- round(out[[x]] / out$BA, 2)
 
-      ## Adding AGB's columns by merging  rv$AGB_sum (and rename H_... by H_max_...)
-      for(method in names(rv$AGB_res)) { # method = "local HD model"
+      ## Adding AGB's columns by merging rv$AGB_res[[method]][["summary"]] (and rename H_... by H_max_...)
+      for(method in names(rv$AGB_res)) {
         # get the AGB summary for the current height estimation method
         res <- data.frame(rv$AGB_res[[method]][["summary"]])
         # round the results to 1 digit
         res[,c("AGB", "Cred_2.5", "Cred_97.5")] <- round(res[,c("AGB", "Cred_2.5", "Cred_97.5")], 1)
-        # rename "local HD model" to "local_model" to match the FOS names
-        if(method == "local HD model") method <- "local_model"
+
         # Rename columns depending on the method
-        if(method != "height") { # if x == height, it means that heights were provided by the user, so the column renaming is different
+        if(method != "user_height") { # if x == height, it means that heights were provided by the user, so the column renaming is different
           setnames(res, old = c("AGB","Cred_2.5","Cred_97.5"), new = c(paste0("AGB_",method), paste0("AGB_",method,"_Cred_2.5"), paste0("AGB_",method,"_Cred_97.5")))
           out <- merge(x = out, y = res, by.x = "Plot_ID", by.y = "plot")
           setnames(out, old = paste0("H_",method), new = paste0("H_max_",method))
@@ -1578,10 +1189,499 @@ function(input, output, session) {
     contentType = "text/csv"
   )
 
-  # button "Continue to spatialisation"
-  observeEvent( input$btn_AGB_DONE,
-                ignoreInit = TRUE, {
-                  showElement("id_btn_continue_sp")
-                  print(rv$AGB_res)
-                })
+
+  # SPATIALISATION -------------------------------------------------------------
+
+  ## show coordinates table content ----
+  observe({
+    output$table_coord_spatialisation <- renderDT(rv$df_coord, options = list(scrollX = TRUE))
+  })
+
+  ## Execute check_plot_coord() and render the plot ----
+  observeEvent(
+    list(input$sel_x_rel_corner, input$sel_y_rel_corner,
+         input$check_trust_GPS_corners, input$num_max_dist,
+         input$sel_x_rel_trees, input$sel_y_rel_trees, input$sel_prop_trees,
+         input$file_RASTER, input$btn_reset_raster),
+    ignoreInit = TRUE, {
+
+      req(input$sel_LONG_sup_coord, input$sel_LAT_sup_coord, input$sel_x_rel_corner, input$sel_y_rel_corner)
+
+      if(input$sel_x_rel_corner!="<unselected>" & input$sel_y_rel_corner!="<unselected>" &
+         input$sel_LONG_sup_coord!="<unselected>" & input$sel_LAT_sup_coord!="<unselected>") {
+
+        # Prepare arguments
+        if(input$rad_several_plots=="several_plots") {
+          arg_plot_ID <- input$sel_plot_coord
+        } else {
+          arg_plot_ID <- NULL
+        }
+        arg_tree_data <- NULL
+        arg_tree_coords <- NULL
+        arg_tree_plot_ID <- NULL
+        arg_prop_trees <- NULL
+
+        if(!input$sel_x_rel_trees %in% c("<unselected>","") & !input$sel_y_rel_trees %in% c("<unselected>","")) {
+          arg_tree_data <- rv$inv_pred
+          arg_tree_coords <- c(input$sel_x_rel_trees, input$sel_y_rel_trees)
+          if(input$rad_several_plots=="several_plots") {
+            arg_tree_plot_ID <- input$sel_PLOT
+          }
+        }
+
+        if( !input$sel_prop_trees %in% c("<unselected>","")) {
+          arg_prop_trees <- input$sel_prop_trees
+        }
+
+        # Execute check_plot_coord
+        rv$checked_plot <- tryCatch({
+          check_plot_coord(corner_data = rv$df_coord,
+                           longlat = c(input$sel_LONG_sup_coord, input$sel_LAT_sup_coord),
+                           rel_coord = c(input$sel_x_rel_corner, input$sel_y_rel_corner),
+                           trust_GPS_corners = input$check_trust_GPS_corners,
+                           draw_plot = FALSE, ask = FALSE,
+                           max_dist = input$num_max_dist,
+                           plot_ID = arg_plot_ID,
+                           tree_data = arg_tree_data, tree_coords = arg_tree_coords,
+                           tree_plot_ID = arg_tree_plot_ID, prop_tree = arg_prop_trees,
+                           ref_raster = rv$file_rast)
+        }, error = function(e) e$message)
+
+        # # We'll need a "plot_ID" column in checked_plot$corner_coord, even if there is only 1 plot
+        # if(!is.character(rv$checked_plot) && input$rad_several_plots=="single_plot") {
+        #   rv$checked_plot$corner_coord$plot_ID <- ""
+        #   # and in checked_plot$tree_data too
+        #   rv$checked_plot$tree_data$plot_ID <- ""
+        # }
+
+        # Generate plot visualization
+        if(!is.character(rv$checked_plot)) {
+          if(length(rv$checked_plot$plot_design) == 1) { # if one plot
+            rv$gg_check_plot <- rv$checked_plot$plot_design + custom_theme
+          } else { # if multiple plot, render the plot selected by the user
+            plot_index <- match( input$sel_plot_display, names(rv$checked_plot$plot_design) )
+            rv$gg_check_plot <- rv$checked_plot$plot_design[[plot_index]] + custom_theme
+          }
+        } else {
+          print("rv$checked_plot error:")
+          print(rv$checked_plot)
+          rv$gg_check_plot <- ggplot() +
+            annotate("text", x = 0, y = 0,
+                     label = paste(
+                       "An error occurred when creating the plot visualisation.",
+                       "Ensure that your data is entered correctly in both the settings",
+                       "and the 'load dataset' tab.",
+                       "(an exemple is available at the end of this tab)",
+                       sep = "\n"
+                     ),
+                     size = 5, color = "#e74c3c", fontface = "bold") +
+            theme_void()
+        }
+      } else { # if relative corner coordinates aren't supplied
+        rv$gg_check_plot <- ggplot() +
+          annotate("text", x = 0, y = 0,
+                   label = "Please fill the relative coordinates of the corners. ",
+                   size = 5, color = "black", fontface = "bold") +
+          theme_void()
+
+      }
+      output$out_gg_check_plot <- renderPlot(silentPlot(rv$gg_check_plot))
+    })
+
+  ## Update plot display ----
+  observeEvent(input$sel_plot_display, ignoreInit = TRUE, {
+    if(!is.null(rv$checked_plot) && !is.character(rv$checked_plot)) {
+      plot_index <- match( input$sel_plot_display, names(rv$checked_plot$plot_design) )
+      rv$gg_check_plot <- rv$checked_plot$plot_design[[plot_index]]
+      rv$gg_check_plot <- rv$gg_check_plot + custom_theme
+      output$out_gg_check_plot <- renderPlot(silentPlot(rv$gg_check_plot))
+    }
+  })
+  ## Toggle max_dist setting ----
+  observeEvent(input$check_max_dist, ignoreInit = TRUE, {
+    toggleElement("id_max_dist", condition = input$check_max_dist==TRUE)
+  })
+
+  ## Show tree coordinates options ----
+  observeEvent(list(input$sel_x_rel_corner, input$sel_y_rel_corner), ignoreInit = TRUE, {
+    # Show only if check_plot_coord() with corner coordinates only is successful
+    if(input$sel_x_rel_corner!="<unselected>" & input$sel_y_rel_corner!="<unselected>") {
+
+      if(!is.null(rv$checked_plot) && !is.character(rv$checked_plot)) {
+        showElement("id_coord_trees")
+
+        int_num_col <- names(rv$inv_pred)[ sapply(rv$inv_pred, class) %in% c("integer", "numeric")]
+        for (id in c("sel_x_rel_trees", "sel_y_rel_trees","sel_prop_trees")) {
+          updateSelectInput(session, id, choices = c("<unselected>", int_num_col))
+        }
+        # show inv_pred table content
+        output$table_indiv_pred <- renderDT(rv$inv_pred, options = list(scrollX = TRUE))
+      }
+    }
+  })
+
+  ## Show raster and divide_plot options ----
+  observeEvent(list(input$sel_x_rel_trees, input$sel_y_rel_trees, input$sel_prop_trees), ignoreInit = TRUE, {
+    # Show only if check_plot_coord() with corner coordinates and trees is successful
+    if(input$sel_x_rel_trees!="<unselected>" & input$sel_y_rel_trees!="<unselected>") {
+      if(!is.null(rv$checked_plot) && !is.character(rv$checked_plot)) {
+        showElement("id_raster")
+        showElement("id_divide_plot")
+      }
+    }
+  })
+
+  ## Handle raster upload ----
+  observeEvent(input$file_RASTER, ignoreInit = TRUE, {
+    rv$file_rast <- tryCatch({
+      terra::rast(input$file_RASTER$datapath)
+    }, error = function(e) NULL)
+    if(!is.null(rv$file_rast)) {
+      showElement("id_raster_function")
+      updateSelectInput(session, "sel_raster_function", choices = names(available_functions))
+    }
+  })
+  # Reset the file raster if needed
+  observeEvent(input$btn_reset_raster, {
+    shinyjs::reset("file_RASTER")
+    rv$file_rast <- NULL
+    hideElement("id_raster_function")
+  })
+
+  ## Toggle divide_plot settings ----
+  observeEvent(input$check_divide_plot, ignoreInit = TRUE, {
+    toggleElement("id_divide_plot_settings", condition = input$check_divide_plot==TRUE)
+  })
+
+  ## Process "Continue" button ----
+  observeEvent(input$btn_check_plot_done, {
+
+    ### Error management ----
+    # Corner relative coordinates should be filed
+    if ( input$sel_x_rel_corner=="<unselected>" | input$sel_y_rel_corner=="<unselected>") {
+      shinyalert("Oops!", "You must enter the relative coordinates of the corners.", type = "error")
+      return()
+    }
+    # Tree relative coordinates should be filed
+    if ( input$sel_x_rel_trees=="<unselected>" | input$sel_y_rel_trees=="<unselected>") {
+      shinyalert("Oops!", "You must enter the relative coordinates of the trees.", type = "error")
+      return()
+    }
+    # check_plot_coord has to be OK
+    if (is.null(rv$checked_plot) | is.character(rv$checked_plot)) {
+      shinyalert("Oops!", "Something went wrong when checking for the coordinates. Please ensure that you have entered the information correctly. You will then be able to continue once the plot has been displayed correctly.", type = "error")
+      return()
+    }
+
+    ## Execute divide_plot ----
+    if(input$check_divide_plot) {
+
+      rv$divide_output <- tryCatch({
+        if(input$rad_several_plots == "several_plots") {
+          arg_corner_plot_ID <- "plot_ID"
+          arg_tree_plot_ID <- "plot_ID"
+        } else {
+          arg_corner_plot_ID <- NULL
+          arg_tree_plot_ID <- NULL
+        }
+        divide_plot(corner_data = rv$checked_plot$corner_coord,
+                    rel_coord = c("x_rel","y_rel"),
+                    proj_coord = c("x_proj","y_proj"),
+                    grid_size = input$num_grid_size,
+                    tree_data =  rv$checked_plot$tree_data, tree_coords = c("x_rel","y_rel"),
+                    corner_plot_ID = arg_corner_plot_ID, tree_plot_ID = arg_tree_plot_ID,
+                    centred_grid = input$check_centred_grid, grid_tol = 0.9)
+      }, error = function(e) e$message)
+
+    } else { # if no plot division, recreate the output
+
+      # recreate sub_corner_coord output
+      sub_corner_coord <- rv$checked_plot$corner_coord
+      if(input$rad_several_plots=="single_plot") {
+        sub_corner_coord$plot_ID <- ""
+      }
+      sub_corner_coord$subplot_ID <- as.character(sub_corner_coord$plot_ID)
+      # recreate tree_data output
+      tree_data <- rv$checked_plot$tree_data
+      tree_data$plot_ID <- as.character(tree_data$plot) #column "plot" has been created when setting rv$inv()
+      tree_data$subplot_ID <- as.character(tree_data$plot) #column "plot" has been created when setting rv$inv()
+      tree_data$subplot_ID[!tree_data$is_in_plot] <- NA
+
+      rv$divide_output <- list(sub_corner_coord = sub_corner_coord, tree_data = tree_data)
+    }
+
+    if(is.character(rv$divide_output)) {
+      print("error in divide_plot:")
+      print(rv$divide_output)
+      shinyalert("Oops!", paste0("Something went wrong when dividing your plot.\nError:", rv$divide_output), type = "error")
+      return()
+    } else {
+      # If no error on divide_plot, update tab_SP_SUMMARY
+      showMenuItem("tab_SP_SUMMARY")
+      updateTabItems(session, "mnu_MENU", "tab_SP_SUMMARY")
+      # update input selections in the next tab if not already done
+      if(input$sel_first_metric=="") {
+        int_num_col <- names(rv$divide_output$tree_data)[ sapply(rv$divide_output$tree_data, class) %in% c("integer", "numeric")]
+        int_num_col <- int_num_col[! int_num_col %in% c("plot","plot_ID","subplot_ID","x_proj","y_proj")]
+        updateSelectInput(session, "sel_first_metric", choices = c("<unselected>", int_num_col))
+        updateSelectInput(session, "sel_first_function", choices = c("<unselected>", names(available_functions)))
+      }
+      toggleElement("id_sel_plot_summary", condition = input$rad_several_plots=="several_plots")
+      if(input$rad_several_plots=="several_plots") {
+        updateSelectInput(session,
+                          "sel_plot_display_summary",
+                          choices = unique(rv$df_coord[,"Plot"]),
+                          selected = input$sel_plot_display)
+      }
+      # render the tree_data table
+      output$table_divide_plot <- renderDT(rv$divide_output$tree_data, options = list(scrollX = TRUE))
+
+      ## Apply subplot_summary() to calculated AGBD values from AGBmonteCarlo() ----
+      list_sub_sum <- lapply(rv$AGB_res, function(dat) {
+        subplot_summary(subplots = rv$divide_output, AGB_simu = dat[["AGB_simu"]], per_ha = TRUE)
+      })
+      rv$subplot_summary_output <- merge_subplot_summary(list_sub_sum)
+
+      # update sel_metric_display_summary which will trigger plot display
+      metric_names <- names(rv$subplot_summary_output$tree_summary)[!names(rv$subplot_summary_output$tree_summary) %in% c("plot_ID","subplot_ID")]
+      metric_names <- metric_names[!grepl("_cred_",metric_names)]
+      updateSelectInput(session, "sel_metric_display_summary", choices = metric_names)
+
+    }
+
+  })
+
+
+  # SUMMARISE METRICS ----------------------------------------------------------
+
+  ## Add a metric when clicking "Add a metric" ----
+  observeEvent(input$btn_add_metric, {
+    # Create a unique ID for each new selectInput
+    unique_id <- paste0("select_", input$btn_add_metric)
+    metric_choices <- names(rv$divide_output$tree_data)[!names(rv$divide_output$tree_data) %in%
+                                                          c("is_in_plot","plot","plot_ID","subplot_ID","x_proj","y_proj")]
+    insertUI(
+      selector = "#container_selec_metric",
+      where = "beforeEnd",
+      ui = column(
+        width = 12,
+        div(
+          column(5, selectInput(paste0("sel_metric_", unique_id),
+                                "Which metric ?",
+                                choices = c("<unselected>", metric_choices))),
+          column(5, selectInput(paste0("sel_function_", unique_id),
+                                "Which function to apply?",
+                                choices = c("<unselected>",names(available_functions)))),
+          column(2, checkboxInput(paste0("checkbox_per_ha_", unique_id), "per hectare", value = TRUE))
+        )
+      )
+    )
+  })
+
+  ## Reaction to "Summarise" button ----
+  observeEvent(input$btn_summarise, {
+
+    if(input$sel_first_metric == "<unselected>" & input$sel_first_function == "<unselected>" & is.null(rv$file_rast)) {
+      shinyalert("Oops", "You didn't provide any additionnal metric to summarised. As AGBD is automatically summarised, you can proceed to the download of the results.", type = "error")
+    } else {
+
+      ### Formatting subplot_summary arguments ----
+      name_arg_value <- c("sel_first_metric", grep("^sel_metric_select_", names(input), value = TRUE))
+      name_arg_per_ha <- c("check_first_per_ha", grep("^checkbox_per_ha_select", names(input), value = TRUE))
+      name_arg_fun <- c("sel_first_function", grep("^sel_function_select_", names(input), value = TRUE))
+      name_arg_raster_fun <- ifelse(input$sel_raster_function!="",input$sel_raster_function,"mean")
+      arg_raster_fun <- available_functions[[name_arg_raster_fun]]
+
+      if(input$btn_add_metric>=1) {
+        filter_select <- sapply(name_arg_value, function(x) input[[x]] != "<unselected>") &
+          sapply(name_arg_fun, function(x) input[[x]] != "<unselected>")
+
+        arg_value <- sapply(name_arg_value, function(x) input[[x]])[filter_select]
+        arg_per_ha <- sapply(name_arg_per_ha, function(x) input[[x]])[filter_select]
+        arg_fun <- lapply(name_arg_fun, function(x) available_functions[[input[[x]]]])[filter_select]
+        names(arg_fun) <- name_arg_fun[filter_select]
+      } else {
+        arg_value <- input$sel_first_metric
+        arg_per_ha <- input$check_first_per_ha
+        arg_fun <- available_functions[[input$sel_first_function]]
+      }
+
+      ## Call subplot_summary() ----
+      subplot_summary_value <- tryCatch({
+        subplot_summary(
+          subplots = rv$divide_output, draw_plot = FALSE,
+          value = arg_value, per_ha = arg_per_ha, fun = arg_fun,
+          ref_raster = rv$file_rast, raster_fun = arg_raster_fun)
+      }, error = function(e) e$message)
+
+      if(!is.character(subplot_summary_value)) {
+
+        # Merge subplot_summary_value with rv$subplot_summary_output
+        rv$subplot_summary_output$tree_summary <- cbind(
+          rv$subplot_summary_output$tree_summary,
+          subplot_summary_value$tree_summary[, .SD, .SDcols = !"subplot_ID"])
+
+        rv$subplot_summary_output$polygon <- cbind(
+          rv$subplot_summary_output$polygon,
+          subplot_summary_value$polygon[, .SD, .SDcols = !c("plot_ID","subplot_ID","sf_subplot_polygon")])
+
+        if(input$rad_several_plots == "several_plots") {
+          for(plot_name in names(subplot_summary_value$plot_design)) {
+            rv$subplot_summary_output$plot_design[[plot_name]] <- c(
+              rv$subplot_summary_output$plot_design[[plot_name]], subplot_summary_value$plot_design[[plot_name]])
+          }
+        } else {
+          rv$subplot_summary_output$plot_design <- c(
+            rv$subplot_summary_output$plot_design, subplot_summary_value$plot_design)
+
+        }
+
+        # Update metric selection
+        metric_names <- names(rv$subplot_summary_output$tree_summary)[!names(rv$subplot_summary_output$tree_summary) %in% c("plot_ID","subplot_ID")]
+        metric_names <- metric_names[!grepl("_cred_",metric_names)]
+        updateSelectInput(session, "sel_metric_display_summary", choices = metric_names)
+        updateMaterialSwitch(session, "switch_ggplot", TRUE)
+
+        ### Create FOS like results at subplot level ----
+        rv$FOS_subplot <- FOS_subplot_res(
+          checked_plot = rv$checked_plot,
+          divide_output = rv$divide_output,
+          subplot_summary_output = rv$subplot_summary_output)
+
+      }
+    }
+  })
+
+  ## Change the plot and metric visualisation ----
+  observeEvent(list(input$sel_plot_display_summary, input$sel_metric_display_summary, input$switch_ggplot), ignoreInit = TRUE, {
+
+    if(input$switch_ggplot) { # summary visualisation
+      metric_names <- names(rv$subplot_summary_output$tree_summary)[!names(rv$subplot_summary_output$tree_summary) %in% c("plot_ID","subplot_ID")]
+      metric_names <- metric_names[!grepl("_cred_",metric_names)]
+
+      if(input$rad_several_plots=="several_plots") {
+        #Render the plot_design output (plot_design[[plot_ID]][[metric]])
+        output$out_gg_subplot_sum <- renderPlot(silentPlot(
+          rv$subplot_summary_output$plot_design[[
+            match(input$sel_plot_display_summary, names(rv$subplot_summary_output$plot_design))]][[
+              match(input$sel_metric_display_summary, metric_names)
+            ]]))
+      } else {
+        #Render the plot_design output (plot_design[[metrics]] or just plot_design if only one metric)
+        output$out_gg_subplot_sum <- renderPlot(silentPlot(
+          rv$subplot_summary_output$plot_design[[
+            match(input$sel_metric_display_summary, metric_names)
+          ]]
+        ))
+
+      }
+    } else { # check_plot (and grid) visualisation
+
+      if(input$rad_several_plots=="several_plots") {
+
+        plot_index <- match( input$sel_plot_display_summary, names(rv$checked_plot$plot_design) )
+        rv$gg_check_plot <- rv$checked_plot$plot_design[[plot_index]]
+        rv$gg_check_plot <- rv$gg_check_plot + custom_theme
+
+        grid_dat <- rv$divide_output$sub_corner_coord[rv$divide_output$sub_corner_coord$plot_ID == input$sel_plot_display_summary,]
+
+      } else {
+
+        rv$gg_check_plot <- rv$checked_plot$plot_design
+        rv$gg_check_plot <- rv$gg_check_plot + custom_theme
+
+        grid_dat <- rv$divide_output$sub_corner_coord
+
+      }
+
+      if(input$check_divide_plot) {
+        output$out_gg_subplot_sum <- renderPlot(
+          rv$gg_check_plot +
+            geom_polygon(data = grid_dat,
+                         mapping = aes(x = x_proj, y=y_proj, group=subplot_ID),
+                         fill = NA, colour="black", linewidth=1)
+        )
+      } else {
+        output$out_gg_subplot_sum <- renderPlot(rv$gg_check_plot)
+      }
+    }
+
+  })
+
+
+
+  ## Spatialised (sub)plot level results (FOS like csv) ----
+  output$dwl_subplot_file <- downloadHandler(
+    filename = function() {
+      paste0("spatialised_results_", Sys.Date(), ".csv")
+    },
+    content = function(file) {
+
+      if(is.null(rv$FOS_subplot)) {
+        rv$FOS_subplot <- FOS_subplot_res(
+          checked_plot = rv$checked_plot,
+          divide_output = rv$divide_output,
+          subplot_summary_output = rv$subplot_summary_output)
+      }
+
+      write.csv(rv$FOS_subplot, file, row.names = FALSE)
+
+    },
+    contentType = "text/csv"
+  )
+
+  ## Shapefile download ----
+  output$dwl_shapefile <- downloadHandler(
+    filename = function() {
+      paste0("spatialised_results_", Sys.Date(), ".gpkg")
+    },
+    content = function(file) {
+
+      if(length(unique(rv$checked_plot$UTM_code$UTM_code)) != 1 ) {
+        shinyalert("Oops", "It seems that your plots do not share the same UTM code, which is required in order to download the shapefiles.", type = "error")
+        return(NULL)
+      }
+
+      if(is.null(rv$FOS_subplot)) {
+        rv$FOS_subplot <- FOS_subplot_res(
+          checked_plot = rv$checked_plot,
+          divide_output = rv$divide_output,
+          subplot_summary_output = rv$subplot_summary_output)
+      }
+
+      # Add rv$FOS_subplot to rv$subplot_summary_output$polygon
+      polygons <- rv$subplot_summary_output$polygon[,1:3]
+      polygons <- cbind(polygons, rv$FOS_subplot[,-c(1,2)])
+
+      sf::st_crs(polygons) <- unique(unique(rv$checked_plot$UTM_code$UTM_code))
+      sf::st_write(polygons, file, delete_dsn = TRUE)
+
+    },
+    contentType = NULL
+  )
+
+  ### Report ----
+  output$dwl_sp_report <- downloadHandler(
+    filename = function() {
+      paste0("BIOMASS_sp_report_", Sys.Date(), ".html")
+    },
+    content = function(file) {
+      # Copy the report file to a temporary directory before processing it, in case we don't have write permissions to the current working dir (which can happen when deployed).
+      tempReport <- file.path(tempdir(), "report_BIOMASS.Rmd")
+      file.copy(
+        #from = system.file("Rmarkdown", "report_BIOMASS.Rmd", package = "BIOMASSapp"),
+        from = "~/BIOMASSapp/inst/Rmarkdown/report_BIOMASS.Rmd",
+        tempReport,
+        overwrite = TRUE
+      )
+
+      if (file.exists(file)) {
+        file.remove(file)
+      }
+
+      rmarkdown::render(tempReport, output_file = file)
+    },
+    contentType = "text/html"
+  )
+
 }
