@@ -6,6 +6,7 @@ suppressPackageStartupMessages({
   library(shinyalert)
   library(shinyFeedback)
   library(shinyhelper)
+  library(shinyWidgets)
   library(data.table)
   library(ggplot2)
   library(leaflet)
@@ -13,10 +14,33 @@ suppressPackageStartupMessages({
   library(knitr)
   library(measurements)
   library(DT)
-  library(BIOMASS)
+  #library(BIOMASS)
+  devtools::load_all("~/BIOMASS/")
+  library(terra)
 })
 
 source("legal_notice.R")
+
+custom_theme <- theme(
+  legend.text = element_text(size=13),
+  legend.title = element_text(size=15),
+  plot.title = element_text(size=18))
+
+# df_coord <- read.csv("~/NouraguesCoords.csv")
+# df_inv <- read.csv("~/NouraguesTrees.csv")
+# df_inv$D[1] <- NA
+# df_inv_pred <- read.csv("~/Documents/prise_en_main_BIOMASS/BiomassApp/rv_inv_pred_multiple_plots.csv")
+# df_inv_pred$plot <- df_inv_pred$Plot
+
+# df_coord <- read.csv("~/NouraguesPlot201.csv")
+# df_inv <- read.csv("~/NouraguesTrees201.csv")
+# df_inv$plot <- ""
+# df_inv$D[1] <- NA
+# df_inv_pred <- read.csv("~/Documents/prise_en_main_BIOMASS/BiomassApp/rv_inv_pred_201.csv")
+# df_inv_pred$plot <- ""
+
+
+available_functions <- list("mean"=mean,"sum"=sum,"median"=median,"sd"=sd,"var"=var)
 
 # set maximum input file size (here 30Mo)
 options(shiny.maxRequestSize = 30 * 1024^2)
@@ -72,8 +96,8 @@ tstrsplit_NA <- function(x, pattern = " ", count = 2) {
   split
 }
 
-
-AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, errH = NULL, region = NULL, E_vec = NULL, coord = NULL, model_by = NULL) {
+# AGB_predict() returns the output of AGB_MonteCarlo(), with an additional element representing individual estimations (rather than the median of the simulations to ensure reproducibility of the estimations).
+AGB_predict <- function(D, WD, errWD = NULL, H = NULL, HDmodel = NULL, errH = NULL, region = NULL, E_vec = NULL, coord = NULL, model_by = NULL) {
 
   # Setting parameters for stand-specific HD local model
   if (!is.null(HDmodel) && !is.null(model_by)) {
@@ -82,93 +106,62 @@ AGB_predict <- function(AGBmod, D, WD, errWD = NULL, H = NULL, HDmodel = NULL, e
     WD <- WD[valid_plots]
     errWD <- if (!is.null(errWD)) errWD[valid_plots]
     model_by <- model_by[valid_plots]
-
-    if(length(D) != length(sapply(HDmodel, function(x) x$input$H))) {
-
-    }
   }
 
-  # AGB without error propagation
-  # The output will be in a list format to standardise it with the error propagation output
-  if (AGBmod == "agb") {
-
-    if (!is.null(E_vec)) { # Chave method
-      # Modified Eq 7 from Chave et al. 2014 Global change biology
-      # We apply the formula instead of calling computeAGB with a coord argument (which call computeE() which is time consuming)
-      AGB <- exp(-2.023977 - 0.89563505 * E_vec + 0.92023559 * log(WD) + 2.79495823 * log(D) - 0.04606298 * (log(D)^2)) / 1000
-      return(list(AGB_pred = as.matrix(AGB)))
-    }
-
-    if (!is.null(HDmodel)) { # HD model
-      H <- retrieveH(D, model = HDmodel, plot = model_by)$H
-    }
-
-    if (!is.null(region)) { # feld region
-      H <- retrieveH(D, region = region)$H
-    }
-
-    AGB <- list(AGB_pred = as.matrix(computeAGB(D, WD, H = H)))
+  if( !is.null(errH) ) { # heights (and errH) provided by the user
+    AGB <- AGBmonteCarlo(
+      D, Dpropag = "chave2004",
+      WD, errWD,
+      H = H, errH = errH
+    )
+    AGB[["AGB_pred"]] <-  as.matrix(computeAGB(D, WD, H = H))
   }
 
-  # AGB with error
-  # We will add (to the AGB list output) the AGB_pred element containing individual AGB predictions, similarly to AGB without propagation (for the downloads)
-  if (AGBmod == "agbe") {
+  if (!is.null(region)) { # feld region
+    H <- retrieveH(D, region = region)
+    errH <- H$RSE
+    H <- H$H
+    AGB <- AGBmonteCarlo(
+      D, Dpropag = "chave2004",
+      WD, errWD,
+      H = H, errH = errH
+    )
+    AGB[["AGB_pred"]] <- as.matrix(computeAGB(D, WD, H = H))
+  }
 
-    if( !is.null(errH) ) { # heights (and errH) provided by the user
-      AGB <- AGBmonteCarlo(
-        D, Dpropag = "chave2004",
-        WD, errWD,
-        H = H, errH = errH,
-        plot = model_by
-      )
-      AGB[["AGB_pred"]] <- AGB_predict("agb", D, WD, errWD, H = H, errH = errH, model_by = model_by)$AGB_pred
-    }
+  if(!is.null(HDmodel)) { # HD local model
+    AGB <- AGBmonteCarlo(
+      D, Dpropag = "chave2004",
+      WD, errWD,
+      HDmodel = HDmodel
+    )
+    H <- retrieveH(D, model = HDmodel, plot = model_by)$H
+    AGB[["AGB_pred"]] <- as.matrix(computeAGB(D, WD, H = H))
+  }
 
-    if (!is.null(region)) { # feld region
-      H <- retrieveH(D, region = region)
-      errH <- H$RSE
-      H <- H$H
-      AGB <- AGBmonteCarlo(
-        D, Dpropag = "chave2004",
-        WD, errWD,
-        H = H, errH = errH,
-        plot = model_by,
-      )
-      AGB[["AGB_pred"]] <- AGB_predict("agb", D, WD, errWD, H = H, errH = errH, model_by = model_by)$AGB_pred
-    }
-
-    if(!is.null(HDmodel)) { # HD local model
-      AGB <- AGBmonteCarlo(
-        D, Dpropag = "chave2004",
-        WD, errWD,
-        HDmodel = HDmodel,
-        plot = model_by
-      )
-      AGB[["AGB_pred"]] <- AGB_predict("agb", D, WD, errWD, HDmodel = HDmodel, model_by = model_by)$AGB_pred
-    }
-
-    if(!is.null(coord)) { # Chave's AGB equation
-      AGB <- AGBmonteCarlo(
-        D, Dpropag = "chave2004",
-        WD, errWD,
-        coord = coord
-      )
-      # We don't want to call back AGB_predict so we will take the mean of the 1000 simu
-      AGB[["AGB_pred"]] <- as.matrix(apply(AGB$AGB_simu,1,mean))
-    }
+  if(!is.null(coord)) { # Chave's AGB equation
+    AGB <- AGBmonteCarlo(
+      D, Dpropag = "chave2004",
+      WD, errWD,
+      coord = coord
+    )
+    # Modified Eq 7 from Chave et al. 2014 Global change biology
+    # We apply the formula instead of calling computeAGB with a coord argument (which call computeE() which is time consuming)
+    pred_AGB <- exp(-2.023977 - 0.89563505 * E_vec + 0.92023559 * log(WD) + 2.79495823 * log(D) - 0.04606298 * (log(D)^2)) / 1000
+    AGB[["AGB_pred"]] <- as.matrix(pred_AGB)
   }
 
   return(AGB)
 }
 
-indiv_pred <- function(inv, rad_height, H, AGB_res, chkgrp_HEIGHT, sel_HDmodel_by, hd_data, hd_model, D, region, coord){
+indiv_pred <- function(inv, rad_height, H, AGB_res, chkgrp_HEIGHT, sel_HDmodel_by, hd_data, hd_model, D, region, E, coord_plot){
 
   inv_h_pred <- inv
 
   if(!is.null(rad_height) && rad_height == "h_each_tree") {
     inv_h_pred$H_mes <- H
     inv_h_pred$H_Lorey_mes <- H * inv_h_pred$BA
-    inv_h_pred$AGB <- round(as.vector(AGB_res[["height"]]$AGB_pred), 3)
+    inv_h_pred$AGB <- round(as.vector(AGB_res[["user_height"]]$AGB_pred), 3)
     return(inv_h_pred)
   }
   if ("HDloc" %in% chkgrp_HEIGHT) {
@@ -182,40 +175,45 @@ indiv_pred <- function(inv, rad_height, H, AGB_res, chkgrp_HEIGHT, sel_HDmodel_b
 
     } else {
       inv_h_pred$H_local_model <- round(retrieveH(D, hd_model)$H, 2)
-        if( rad_height == "h_some_tree") {
-          # if some tree heights have been provided, we need to replace the estimated height by the measured heights
-          inv_h_pred$H_local_model[!is.na(hd_data$H)] <- round(hd_data$H[!is.na(hd_data$H)], 2)
-        }
+      if( rad_height == "h_some_tree") {
+        # if some tree heights have been provided, we need to replace the estimated height by the measured heights
+        inv_h_pred$H_local_model[!is.na(hd_data$H)] <- round(hd_data$H[!is.na(hd_data$H)], 2)
+      }
     }
     inv_h_pred$H_Lorey_local_model <- inv_h_pred$H_local_model * inv_h_pred$BA
-    inv_h_pred$AGB_local_model <- round(as.vector(AGB_res[["local HD model"]]$AGB_pred), 3)
+    inv_h_pred$AGB_local_model <- round(as.vector(AGB_res[["local_model"]]$AGB_pred), 3)
   }
   if ("feld" %in% chkgrp_HEIGHT) {
     inv_h_pred$H_Feldpausch <- round( retrieveH(D,
                                                 region = region[ match( inv_h_pred[["plot"]] ,
                                                                         table = region$plot),
                                                                  "feld_region"]
-                                                )$H, 2)
+    )$H, 2)
     inv_h_pred$H_Lorey_Feldpausch <- inv_h_pred$H_Feldpausch * inv_h_pred$BA
     inv_h_pred$AGB_Feldpausch <- round(as.vector(AGB_res[["Feldpausch"]]$AGB_pred), 3)
   }
   if ("chave" %in% chkgrp_HEIGHT) {
-    inv_h_pred$H_Chave <- round(retrieveH(D, coord = coord[,c("long","lat")])$H, 2)
+    df_E <- data.frame(plot = coord_plot$plot, E = E)
+    logD <- log(D)
+    logH <- 0.893 - df_E[match(inv$plot , table = df_E$plot) , "E"] + 0.760 * logD - 0.0340 * I(logD^2) # eq 6a Chave et al. 2014
+    RSE <- 0.243
+    inv_h_pred$H_Chave = round(as.numeric(exp(logH + 0.5 * RSE^2)),2)
     inv_h_pred$H_Lorey_Chave <- inv_h_pred$H_Chave * inv_h_pred$BA
     inv_h_pred$AGB_Chave <- round(as.vector(AGB_res[["Chave"]]$AGB_pred), 3)
+
   }
   return(inv_h_pred)
 }
 
 
-plot_list <- function(list, color, AGBmod, removedPlot = NULL) {
+plot_list <- function(list, color, removedPlot = NULL) {
 
   ### Formatting the data-frame which will be used for ggplot
   df_res <- rbindlist(lapply(names(list), function(i) { # looping on methods
-    x <- list[[i]]
+    x <- list[[i]][["summary"]]
     x$method <- i
     if(!is.null(removedPlot)) {
-      # Adding a row containing NA's for plots which were not in local HD model
+      # Adding a row containing NA's for plots which were not in local_model
       removed_plot_res <- rbindlist(lapply(removedPlot[! removedPlot %in% x$plot], function(x) data.frame(plot=x, AGB=NA, Cred_2.5=NA, Cred_97.5=NA, method=i)))
       x <- rbindlist(list(x,removed_plot_res))
     }
@@ -232,13 +230,9 @@ plot_list <- function(list, color, AGBmod, removedPlot = NULL) {
     theme_minimal() +
     scale_color_manual(values = color) +
     xlab(NULL) + ylab("AGB (Mg)") +
-    theme(axis.title = element_text(size = rel(1.2)))
-
-  if(AGBmod == "agb") {
-    render_plot <- render_plot + geom_point(aes(y = AGB), size = 2, position = position_dodge(width = 0.2) )
-  } else {
-    render_plot <- render_plot + geom_errorbar(aes(ymin = Cred_2.5, ymax = Cred_97.5), position = "dodge",  width = 0.1)
-  }
+    theme(axis.title = element_text(size = rel(1.2))) +
+    geom_errorbar(aes(ymin = Cred_2.5, ymax = Cred_97.5), position = position_dodge(width = 0.1), width = 0.1) +
+    geom_point(aes(y = AGB), position = position_dodge(width=0.1))
 
   if ( length(unique(df_res$method)) != 1 ) { # if several method for estimating tree heights
     # Add a great legend
@@ -268,3 +262,124 @@ plot_list <- function(list, color, AGBmod, removedPlot = NULL) {
 
   return(render_plot)
 }
+
+# Function that merge a list of subplot_summary outputs into a single standard output
+merge_subplot_summary <- function(list_sub_sum) {
+
+  # Create standard empty outputs
+  out <- list()
+  out$tree_summary <- list_sub_sum[[1]][["tree_summary"]][,"subplot_ID"]
+  out$polygon <- list_sub_sum[[1]][["polygon"]][,c("plot_ID","subplot_ID","sf_subplot_polygon")]
+  out$long_AGB_simu <- list_sub_sum[[1]][["long_AGB_simu"]][,c("plot_ID","subplot_ID","N_simu","x_center","y_center")]
+  if( length(list_sub_sum[[1]][["plot_design"]]) == 1 ) {
+    out$plot_design <- list()
+  } else {
+    out$plot_design <- lapply(list_sub_sum[[1]][["plot_design"]], function(x) NULL)
+  }
+
+  for (H_method in names(list_sub_sum)) { # H_method = "Feldpausch"
+
+    res <- list_sub_sum[[H_method]]
+
+    # rename AGBD variables to match the current method
+    if(H_method != "user_height") {
+      names(res$tree_summary) <- gsub("AGBD",paste0("AGBD_",H_method), names(res$tree_summary))
+      names(res$polygon) <- gsub("AGBD",paste0("AGBD_",H_method), names(res$polygon))
+      names(res$long_AGB_simu) <- gsub("AGBD",paste0("AGBD_",H_method), names(res$long_AGB_simu))
+      if( length(res$plot_design) != 1 ) {
+        res$plot_design <- lapply(res$plot_design, function(x) {
+          new_title <- gsub("AGBD",paste0("AGBD_",H_method), x$labels$title)
+          x <- x + labs(title = new_title)
+        })
+      } else {
+        new_title <- gsub("AGBD",paste0("AGBD_",H_method), res$plot_design$labels$title)
+        res$plot_design <- res$plot_design + labs(title = new_title)
+      }
+    }
+
+    # merge current outputs to "out"
+    out$tree_summary <- out$tree_summary[res$tree_summary, on ="subplot_ID"]
+    out$polygon <- cbind(out$polygon, res$polygon[, grep("AGBD_", names(res$polygon))])
+    out$polygon$sf_subplot_polygon.1 <- NULL
+    out$long_AGB_simu <- out$long_AGB_simu[res$long_AGB_simu, on = c("plot_ID","subplot_ID","N_simu","x_center","y_center")]
+    if (length(res$plot_design) != 1) {
+      for(plot_name in names(out$plot_design)) {
+        out$plot_design[[plot_name]] <- c(out$plot_design[[plot_name]], res$plot_design[[plot_name]])
+      }
+    } else {
+      out$plot_design <- c(out$plot_design, res$plot_design)
+    }
+  }
+
+  return(out)
+
+}
+
+# Function to retrieve latitude/longitude from projected coordinates
+UTM_to_longlat <- function(xy_dat, df_UTM_code) {
+  out <- proj4::project(xy = xy_dat[,c("x_center","y_center")],
+                        proj = unique(df_UTM_code$UTM_code[df_UTM_code$plot_ID == unique(xy_dat$plot_ID)]),
+                        inverse = TRUE)
+  return(out)
+}
+
+# Function to creat FOS like results at subplot level
+FOS_subplot_res <- function(checked_plot, divide_output, subplot_summary_output) {
+
+  ### results will contain for each (sub)plot:
+  # Plot_ID, subplot_ID, Ndens, Lat_cnt, Lon_cnt, MinDBH, MaxDBH, BA, Wood density(mean), H_Lorey_..., H_max_..., AGBD_..., AGBD_..._Cred_2.5, AGBD_..._Cred_97.5, metric_function_per_ha
+
+  # Create Lat_cnt and Lon_cnt columns
+  xy_dat <- subplot_summary_output$long_AGB_simu[N_simu==1,] # One simulation contains center coordinates of each subplot
+  xy_dat[, c("Lon_cnt","Lat_cnt") := UTM_to_longlat(.SD, checked_plot$UTM_code),
+         by = c("plot_ID","subplot_ID"), .SDcols=colnames(xy_dat)]
+  xy_dat <- xy_dat[,c("plot_ID","subplot_ID","Lon_cnt","Lat_cnt")]
+
+  ### divide_output$tree_data contains plot_ID, subplot_ID, Lat, Long, Diameter, BA, Wood density, H_Lorey_... and H_...
+  if( ! "Plot_ID" %in% names(divide_output$tree_data)) setnames(divide_output$tree_data, old = "plot", new = "Plot_ID")
+  if( ! "D" %in% names(divide_output$tree_data)) setnames(divide_output$tree_data, old = input$sel_DIAMETER, new = "D")
+
+  # Summarize by plot: Ndens, MinDBH, MaxDBH, BA (sum of individual BA), Wood density (mean), H_Lorey_...(sum) and H_... (max)
+  subplot_values <- c("D", "D", "D", "BA", "WD")
+
+  H_Lorey_names <- grep("H_Lorey", names(divide_output$tree_data), value = TRUE)
+  H_method_names <- grep("^H_(?!Lorey).*", names(divide_output$tree_data), value = TRUE, perl = TRUE)
+  subplot_values <- c(subplot_values, H_Lorey_names, H_method_names)
+
+  fun_list <- list(Ndens = length, MinDBH = min, MaxDBH = max, BA = sum, WD = mean)
+  fun_H_Lorey <- lapply(H_Lorey_names, function(x) return(sum))
+  fun_H_method <- lapply(H_method_names, function(x) return(max))
+  fun_list <- c(fun_list, fun_H_Lorey, fun_H_method)
+  per_ha_vec <- c(Ndens = TRUE, MinDBH = FALSE, MaxDBH = FALSE, BA = TRUE, WD = FALSE)
+  per_ha_vec <- c(per_ha_vec, rep(FALSE, length(H_Lorey_names)), rep(FALSE, length(H_method_names)))
+
+  print("divide_output$tree_data")
+  print(divide_output$tree_data)
+  res_subplot <- subplot_summary(subplots = divide_output,
+                                 value = subplot_values, per_ha = per_ha_vec,
+                                 fun = fun_list, draw_plot = FALSE)
+
+  res_subplot_tree_summary <- res_subplot$tree_summary
+  # Dividing Lorey's column by BA to get the correct Lorey's heights
+  for(x in grep("H_Lorey_", names(res_subplot_tree_summary), value = TRUE)) {
+    res_subplot_tree_summary[[x]] <- round(res_subplot_tree_summary[[x]] / res_subplot_tree_summary$BA, 2)
+  }
+
+  # Setting standard names
+  setnames(res_subplot_tree_summary,
+           old = c("D_length_per_ha", "D_min",  "D_max",  "BA_sum_per_ha"),
+           new = c("Ndens",           "MinDBH", "MaxDBH", "BA"))
+  # Remove "_sum" in H_Lorey_..._sum"
+  names(res_subplot_tree_summary)[grep("^H_Lorey.*sum$", names(res_subplot_tree_summary))] <- gsub(
+    pattern = "_sum", replacement = "",
+    x = names(res_subplot_tree_summary)[grep("^H_Lorey.*sum$", names(res_subplot_tree_summary))])
+
+  ### Merging corner and res_subplot_tree_summary
+  res <- xy_dat[res_subplot_tree_summary, on = "subplot_ID"]
+
+  ### Merging res and subplot_summary_output$tree_summary (which contains subplot_ID, AGBD_... columns and the summarised metrics (including the raster one))
+  res <- res[data.table(subplot_summary_output$tree_summary), on = "subplot_ID"]
+
+  return(res)
+}
+

@@ -1,0 +1,1 @@
+As you have already provided the longitude and latitude of the plot's corners, the next step is to establish a correspondence between the plot's GPS coordinate system and the relative (local) coordinate system. See the dataset of coordinates in the example provided in the first tab of this app (Geographic coordinates: Download an example).

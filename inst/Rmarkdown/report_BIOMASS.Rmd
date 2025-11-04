@@ -13,11 +13,15 @@ output:
 
 ```{r setup, include=FALSE}
 library(knitr)
+library(cowplot)
+library(htmltools)
+library(kableExtra)
 knitr::opts_chunk$set(echo = FALSE, comment = NA, fig.align = "center")
 # Allow to include inline R expressions in asis chunks
 knit_engines$set(asis = function(options) {
   if (options$echo && options$eval) knit_child(text = options$code)
 })
+disp_sp <- !is.null(rv$subplot_summary_output)
 ```
 
 # Forest inventory dataset
@@ -87,7 +91,7 @@ A dataset containing plot's coordinates has been provided (`r input$file_coord$n
 </font>
 ```
 ```{r, eval = disp_coord_plot}
-  kable(rv$coord_plot, digits = 3, align = "c")
+kable(rv$coord_plot, digits = 3, align = "c")
 ```
 
 ```{r localisation, eval = disp_plot_location, fig.width=12, fig.height=7}
@@ -357,20 +361,13 @@ In the graph above, the line(s) represent model predictions based on diameter va
 
 # Above Ground Biomass estimates
 
-```{asis, echo = (input$rad_AGB_MOD == "agb") }
-<font size="4.5">
-Estimates of AGB were calculated without confidence intervals as no error propagation was requested. Below are the results of the estimates at plot level (in Mg):
-</font>
-```
 
-```{asis, echo = (input$rad_AGB_MOD == "agbe") }
 <font size="4.5">
 Estimates of AGB were calculated with 95% confidence intervals, using error propagation with the following uncertainties: 
 
 * uncertainty about the **model parameters** of the AGB allometric equation (Chave et al. 2014)
 * uncertainty about the **diameter** values using the implemented example of Chave et al. 2004 where small errors are applied on 95% of the trees and large errors to the remaining 5%
 </font>
-```
 
 ```{asis, echo = (input$sel_WD != "<unselected>") }
 <font size="4.5">
@@ -400,29 +397,91 @@ Estimates of AGB were calculated with 95% confidence intervals, using error prop
 </font>
 ```
 
-```{asis, echo = (input$rad_AGB_MOD == "agbe") }
 <font size="4.5">
-
 Below are the results of the estimates at plot level (in Mg):
 </font>
-```
-
 
 
 ```{r plot biomass, echo=FALSE, fig.align='center', fig.width=12, fig.height=7, message=FALSE, warning=FALSE}
+color <- c(local_model = "#619CFF", Feldpausch = "#F8766D", Chave = "#00BA38", user_height = "black")
 
-rv$AGB_sum
-
-color <- c("local HD model" = "#619CFF", Feldpausch = "#F8766D", Chave = "#00BA38", height = "black")
-
-plot_list(list = rv$AGB_sum, color = color, AGBmod = input$rad_AGB_MOD)
+plot_list(list = rv$AGB_res, color = color)
 
 ```
 
+```{asis, echo = disp_sp}
+# Spatialisation
+<font size="4.5">
+The coordinates of the plot corners and the relative coordinates of the trees have been checked:
+</font>
+```
 
-```{r }
+```{r checked_plot, echo=FALSE, fig.align='center', fig.width=6, fig.height=6, message=FALSE, warning=FALSE}
+if(disp_sp) {
+  for(i in rv$checked_plot$plot_design) {
+    print(i)
+  }
+}
+```
 
+```{asis, echo = disp_sp & !is.null(rv$file_rast)}
+<font size="4.5">
+The **background colour** of the plots above corresponds to the **values of the raster provided**.
+</font>
+```
 
+```{asis, echo = disp_sp & input$check_divide_plot}
+<font size="4.5">
+The plots were then **divided into subplots**, each measuring `r input$num_grid_size` meters by `r input$num_grid_size` meters.
+</font>
+```
+
+```{asis, echo = disp_sp}
+<font size="4.5">
+Therefore, the AGB can be expressed in terms of AGB per hectare (AGBD):
+</font>
+```
+
+```{r plot_AGBD, echo=FALSE, fig.align='center', fig.width=8, fig.height=7, message=FALSE, warning=FALSE}
+if(disp_sp) {
+  if(input$rad_several_plots=="several_plots") {
+    for(plot_ID in names(rv$subplot_summary_output$plot_design)) {
+      print(cowplot::plot_grid(plotlist = rv$subplot_summary_output$plot_design[[plot_ID]][1:length(rv$AGB_res)]))
+    }
+  } else {
+    print(rv$subplot_summary_output$plot_design[1:length(rv$AGB_res)])
+  }
+}
+```
+
+```{asis, echo = disp_sp}
+<font size="4.5">
+Finally, here are all the metrics that were calculated by subplots:
+</font>
+```
+
+```{r final_results, echo=FALSE, fig.align='center', fig.width=8, fig.height=7, message=FALSE, warning=FALSE, results='asis'}
+if(disp_sp) {
+  tab <- rv$FOS_subplot
+  tab <- tab %>%
+    kable(format = "html", caption = "FOS like results at subplot level") %>%
+    kable_styling(
+      bootstrap_options = c("striped", "hover", "condensed", "responsive"),
+      full_width = TRUE,
+      position = "center"
+    ) %>%
+    row_spec(0, background = "#156620", color = "white", bold = TRUE)
+  
+  div(style = "overflow-x:auto; white-space:nowrap; max-width:100%",
+      HTML(tab, format = "html", digits = 3, align="c")
+  )
+}
+```
+
+<br>
+<br>
+
+```{r}
 citation("BIOMASS")
 ```
 
