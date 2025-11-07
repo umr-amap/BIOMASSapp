@@ -976,4 +976,3 @@ The resulting confidence intervals represent the **2.5th and 97.5th percentiles*
     )
   ))
 )
-

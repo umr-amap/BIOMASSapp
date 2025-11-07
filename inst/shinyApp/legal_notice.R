@@ -20,8 +20,9 @@ legalNoticeBslib <- function(year, owner) {
 }
 
 # UI helper function to add footer to a dashboard page
-dashboardAddFooter <- function(page, footer) {
-  htmltools::tagAppendChild(page, footer, "div.wrapper")
+dashboardAddFooter <- function(page, footer, where=c("page", "sidebar")) {
+  where <- match.arg(where)
+  htmltools::tagAppendChild(page, footer, ifelse(where=="page", "div.wrapper", "div.wrapper>aside"))
 }
 
 # SERVER
