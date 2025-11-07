@@ -17,6 +17,7 @@ suppressPackageStartupMessages({
   #library(BIOMASS)
   devtools::load_all("~/BIOMASS/")
   library(terra)
+  library(bslib)
 })
 
 source("legal_notice.R")
@@ -54,24 +55,6 @@ autoCloseApp <- function(session=getDefaultReactiveDomain()) {
       stopApp()
     })
   }
-}
-
-# UI add an id to a tag
-setId <- function(tag, id) {
-  htmltools::tagAppendAttributes(tag, id=id)
-}
-
-# add an id to a box so that it can be shown/hidden easily
-boxWithId <- function(..., id=NULL) {
-  box(...) |> setId(id)
-}
-
-# hide/show menu item
-hideMenuItem <- function(tabName) {
-  shinyjs::hide(selector = sprintf("a[data-value='%s']", tabName))
-}
-showMenuItem <- function(tabName) {
-  shinyjs::show(selector = sprintf("a[data-value='%s']", tabName))
 }
 
 # suppress warnings of ggplots (essentially for "Removed x row containing missing values or values outside the scale range")
@@ -353,8 +336,6 @@ FOS_subplot_res <- function(checked_plot, divide_output, subplot_summary_output)
   per_ha_vec <- c(Ndens = TRUE, MinDBH = FALSE, MaxDBH = FALSE, BA = TRUE, WD = FALSE)
   per_ha_vec <- c(per_ha_vec, rep(FALSE, length(H_Lorey_names)), rep(FALSE, length(H_method_names)))
 
-  print("divide_output$tree_data")
-  print(divide_output$tree_data)
   res_subplot <- subplot_summary(subplots = divide_output,
                                  value = subplot_values, per_ha = per_ha_vec,
                                  fun = fun_list, draw_plot = FALSE)
