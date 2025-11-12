@@ -1,3 +1,7 @@
+* version 2.0
+- BIOMASSapp has 2 new navigation tab which allow to validate plot corners and tree coordinates by visualization, upload a raster file, divide plot(s) into subplots, and calculate AGBD and any tree metric at subplot level
+- Switch the interface to a bslib interface
+
 * version 1.2
 - Added help and explanations for users
 - allow the user to provide unique coordinates using two numeric inputs

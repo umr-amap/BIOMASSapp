@@ -6,29 +6,16 @@
 
 #terms of uses, Legal Notice (Informations/mentions légales), Credits (Crédits)
 
-# UI CSS style
-legalNoticeCSS <- function() {
-  htmltools::singleton(inlineCSS("
-    footer.legal_notice {
-      position:absolute;
-      bottom:0;
-      width:100%;
-      color: white;
-      background-color: #222d32;
-        z-index: 1000;
-      text-align: center;
-    }
-"))
-}
-
 # UI notice that floats at bottom
-legalNotice <- function(year, owner) {
-  tagList(
-    legalNoticeCSS(),
-    tags$footer(class="legal_notice",
-      span(glue::glue("GPL 3 license, {year}, {owner}")),br(),
-      actionLink("legal_notice", "Legal notice")
-    )
+legalNoticeBslib <- function(year, owner) {
+
+  tags$div(
+    class = "mt-auto pt-4",
+    style = "border-top: 1px solid rgba(255,255,255,0.2); font-size: 0.9em; text-align: center;",
+    span(glue::glue("GPL 3 license, {year}, {owner}")),
+    br(),
+    actionLink("legal_notice", "Legal notice",
+               style = "color: inherit; text-decoration: underline;")
   )
 }
 

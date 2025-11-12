@@ -1,25 +1,52 @@
 function(input, output, session) {
 
-  # Initialization -------------------------------------------------------------
+  # Initialisation ----
 
-  # stop the serveur in the end of the session
+  # stop the serveur at the end of the session
   autoCloseApp() # version compatible local/server
   observe_helpers(help_dir = "helpfiles")
   legalNoticeHandler(includeMarkdown("helpfiles/legal_notice.md"), size = "l")
 
-  observe({
-    # hide few menu at the begining
-    hideMenuItem("tab_TAXO")
-    hideMenuItem("tab_HEIGHT")
-    hideMenuItem("tab_AGB")
-    hideMenuItem("tab_SPATIALISATION")
-    hideMenuItem("tab_SP_SUMMARY")
+  # Legal notice
+  legal_content <- shiny::includeMarkdown("helpfiles/legal_notice.md")
+  legalNoticeBslib(2025, "UMR AMAP")
+
+  observeEvent(input$selected_tab, {
+    # Hide all nav items
+    shinyjs::hide("tab_LOAD")
+    shinyjs::hide("tab_TAXO")
+    shinyjs::hide("tab_HEIGHT")
+    shinyjs::hide("tab_AGB")
+    shinyjs::hide("tab_SPATIALISATION")
+    shinyjs::hide("tab_SP_SUMMARY")
+
+    # remove the active class of all links
+    shinyjs::removeClass("nav_link_load", "active")
+    shinyjs::removeClass("nav_link_taxo", "active")
+    shinyjs::removeClass("nav_link_height", "active")
+    shinyjs::removeClass("nav_link_agb", "active")
+    shinyjs::removeClass("nav_link_spatial", "active")
+    shinyjs::removeClass("nav_link_summary", "active")
+
+    # Display the selected item and active the link
+    shinyjs::show(input$selected_tab)
+    link_id <- switch(input$selected_tab,
+                      "tab_LOAD" = "nav_link_load",
+                      "tab_TAXO" = "nav_link_taxo",
+                      "tab_HEIGHT" = "nav_link_height",
+                      "tab_AGB" = "nav_link_agb",
+                      "tab_SPATIALISATION" = "nav_link_spatial",
+                      "tab_SP_SUMMARY" = "nav_link_summary"
+    )
+    shinyjs::addClass(link_id, "active")
   })
+
+
 
   # Preparing forest_inv to receive input$file_DATASET thanks to <<-
   forest_inv <- NULL
 
-  # Reactive values:  ----------------------------------------------------------
+  ## Reactive values:  ----
   rv <- reactiveValues(
     inv = NULL, # forest inventory data-frame (created when clicking on 'Continue' in 'Load dataset' item)
     df_h_sup = NULL, # supplementary height data-frame (e.g NouraguesHD)
@@ -49,35 +76,6 @@ function(input, output, session) {
   )
 
 
-  # # SKIP BUTTON (DEMO MODE) ===================================================
-  # observeEvent(input$btn_skip, {
-  #   rv$df_coord <- df_coord
-  #   rv$inv <- df_inv
-  #   rv$inv_pred <- df_inv_pred
-  #   int_num_col <- names(rv$df_coord)[ sapply(rv$df_coord, class) %in% c("integer", "numeric") ]
-  #   #load("~/Documents/NOURAGUES/saves/AGB_res_shiny_nouragues_plots_AGB_local_Feldpausch.Rdata")
-  #   load("~/Documents/prise_en_main_BIOMASS/BiomassApp/AGB_res_shiny_nouragues_201_AGB_local_Feldpausch.Rdata")
-  #   rv$AGB_res <- toto
-  #   showElement("id_sel_plot_display")
-  #   #updateRadioButtons(session, "rad_several_plots", selected = "several_plots")
-  #   updateRadioButtons(session, "rad_several_plots", selected = "single_plot")
-  #   updateSelectInput(session, "sel_x_rel_corner", choices = c("<unselected>", int_num_col))
-  #   updateSelectInput(session, "sel_y_rel_corner", choices = c("<unselected>", int_num_col))
-  #   updateSelectInput(session, "sel_plot_display", choices = unique(rv$df_coord[,"Plot"]))
-  #   updateSelectInput(session, "sel_plot_coord", choices = "Plot", selected = "Plot")
-  #   updateSelectInput(session, "sel_LONG_sup_coord", choices = "Long", selected ="Long" )
-  #   updateSelectInput(session, "sel_LAT_sup_coord", choices = "Lat", selected ="Lat" )
-  #   updateSelectInput(session, "sel_PLOT", choices = "Plot", selected = "Plot")
-  #   # print("input$sel_PLOT")
-  #   # print(input$sel_PLOT)
-  #   # print("input$sel_x_rel_corner")
-  #   # print(input$sel_x_rel_corner)
-  #   # print("input$sel_x_rel_trees")
-  #   # print(input$sel_x_rel_trees)
-  #
-  # })
-
-
   # LOAD DATASET ---------------------------------------------------------------
 
   ## Forest inventory file actions ----
@@ -94,6 +92,7 @@ function(input, output, session) {
 
     # update the values of the select inputs with the column names
     int_num_col <- names(forest_inv)[ sapply(forest_inv, class) %in% c("integer", "numeric")]
+    print("observe file_dataset")
     for (id in c("sel_DIAMETER", "sel_WD")) {
       updateSelectInput(session, id, choices = c("<unselected>", int_num_col))
     }
@@ -129,27 +128,23 @@ function(input, output, session) {
       showElement("box_COORD")
     }
     # Show plot's IDs selection
-    toggleElement("sel_PLOT", condition = req(input$rad_several_plots) == "several_plots")
-    updateSelectInput(session, "sel_PLOT", choices = c("<unselected>", names(forest_inv)))
+    toggleElement("id_sel_PLOT", condition = req(input$rad_several_plots) == "several_plots")
   })
 
   ## Warnings ----
 
-  # Hide/Show "information required" message for several plots
-  observe({
-    req(input$rad_several_plots, input$sel_PLOT)
-    if( (input$rad_several_plots == "single_plot") | (input$rad_several_plots =="several_plots" & ! input$sel_PLOT %in% c("<unselected>","")) ) {
-      hideElement("msg_several_plots")
-    } else {
-      showElement("msg_several_plots")
-    }
+  # If plot IDs is unselected => red box
+  observeEvent(list(input$rad_several_plots,input$sel_PLOT), {
+    feedbackWarning("sel_PLOT",
+                   show = input$sel_PLOT == "<unselected>",
+                   text = "Compulsory argument", icon = NULL)
   })
 
   # If the diameter is unselected => red box
   observeEvent(input$sel_DIAMETER, {
-    feedbackDanger("sel_DIAMETER",
+    feedbackWarning("sel_DIAMETER",
                    show = input$sel_DIAMETER == "<unselected>",
-                   text = "Compulsory argument" )
+                   text = "Compulsory argument", icon=NULL)
   })
   # if the wd or genus not selected (but not both)
   observe({
@@ -174,8 +169,8 @@ function(input, output, session) {
     updateSelectInput(session, "sel_HDmodel_by", choices = c("<unselected>", names(forest_inv)))
     toggleElement("id_sel_h",
                   condition = input$rad_height %in% c("h_each_tree","h_some_tree"))
-    # toggleElement("id_set_errH",
-    #               condition = input$rad_height %in% c("h_each_tree","h_some_tree"))
+    toggleElement("id_set_errH",
+                  condition = input$rad_height == "h_each_tree")
     toggleElement("id_sel_HDmodel_by", # stand-specific local HD models only if height of some tree in the same dataset and several plots
                   condition = (input$rad_height == "h_some_tree" & req(input$rad_several_plots) == "several_plots") )
     toggleElement("id_file_h_sup",
@@ -276,17 +271,21 @@ function(input, output, session) {
       # if no dataset is provided
       error_occured <- TRUE
       shinyalert("Oops!", "You need to load a forest inventory file !", type = "error")
+      return()
     } else if ( is.null(input$rad_several_plots) ) {
       # if the number of plot is not provide
       error_occured <- TRUE
       shinyalert("Oops!", "You need to answer to the question : Does your dataset contain several plots?", type = "error")
+      return()
     } else if (input$rad_several_plots =="several_plots" && input$sel_PLOT == "<unselected>" ) {
       # if the column corresponding to the plot IDs is unselected
       error_occured <- TRUE
       shinyalert("Oops!", "The column containing the plots IDs is unselected", type = "error")
+      return()
     } else if (input$sel_DIAMETER == "<unselected>") { # if diameter is not selected
       error_occured <- TRUE
       shinyalert("Oops!", "D is unselected", type = "error")
+      return()
     } else if (!xor(input$sel_WD == "<unselected>", input$sel_GENUS == "<unselected>")) {
       # if the wd is not selected or genus not selected but not the two
       error_occured <- TRUE
@@ -295,10 +294,12 @@ function(input, output, session) {
       # if the H radio button has not been ticked
       error_occured <- TRUE
       shinyalert("Oops!", "Height information has not been provided", type = "error")
+      return()
     } else if ( input$rad_height %in% c("h_each_tree","h_some_tree") && input$sel_H == "<unselected>" ) {
       # if the H column is unselected
       error_occured <- TRUE
       shinyalert("Oops!", "Height column is unselected", type = "error")
+      return()
     } else if ( input$rad_height == "h_sup_data" && is.null(input$file_h_sup)){
       # if the H-D relationship is in another dataset which have not been loaded
       error_occured <- TRUE
@@ -307,10 +308,12 @@ function(input, output, session) {
       # if the H or D column (of the sup dataset containing H-D relationship) are unselected
       error_occured <- TRUE
       shinyalert("Oops!", "Diameter and/or Height column(s) of the dataset containing a subset of well-measured trees is/are unselected ", type = "error")
+      return()
     } else if (input$rad_height == "h_none" && (is.null(input$rad_coord) || input$rad_coord %in% c("","coord_none"))  ) {
       # if no height measurements and no coordinates
       error_occured <- TRUE
       shinyalert("Oops!", "To estimate tree heights, you either need a subset of well-measured trees or the coordinates of the plots", type = "error")
+      return()
     } else if (!is.null(input$rad_coord) && input$rad_coord == "coord_each_tree" & (input$sel_LONG == "<unselected>" | input$sel_LAT == "<unselected>")) {
       # if the coordinates of each tree is ticked but one of the two (long or lat) is not selected
       error_occured <- TRUE
@@ -319,29 +322,44 @@ function(input, output, session) {
       # if the coordinates of the plots (in another dataset) is ticked but the dataset has not been loaded
       error_occured <- TRUE
       shinyalert("Oops!", "The dataset containing the coordinates of the plot(s) has not been loaded", type = "error")
+      return()
     } else if (!is.null(input$rad_coord) && input$rad_coord == "coord_plot" && (input$sel_LAT_sup_coord == "<unselected>" | input$sel_LONG_sup_coord == "<unselected>") ) {
       # if the Latitude or Longitude column (of the sup dataset containing plot's coordinates) are unselected
       error_occured <- TRUE
       shinyalert("Oops!", "Latitude and/or Longitude column(s) of the dataset containing the coordinates of the plot(s) is/are unselected ", type = "error")
+      return()
     } else if (!is.null(input$rad_coord) && input$rad_coord == "coord_plot" && input$rad_several_plots == "several_plots" & input$sel_plot_coord == "<unselected>") {
       # if the plots IDs column for sup coord is unselected
       error_occured <- TRUE
       shinyalert("Oops!", "Plots IDs of the dataset containing the coordinates of the plot(s) is unselected ", type = "error")
+      return()
     } else if (!is.null(input$rad_coord) && input$rad_coord == "coord_manually" && (is.na(input$num_lat) | is.na(input$num_long))) {
       error_occured <- TRUE
       shinyalert("Oops!", "The manually specified latitude/longitude are not recognised as a numerical value. Make sure that there is no space character at the beginning/end of your input.", type = "error")
+      return()
     } else if (input$sel_WD == "<unselected>") {
       # if the WD is not selected then show the tab TAXO
-      showMenuItem("tab_TAXO")
-      updateTabItems(session, "mnu_MENU", "tab_TAXO")
+      shinyjs::show("nav_item_taxo")
+      shinyjs::hide("tab_LOAD")
+      shinyjs::show("tab_TAXO")
+      shinyjs::removeClass("nav_link_load", "active")
+      shinyjs::addClass("nav_link_taxo", "active")
+
     } else { # If no error and WD already exists
-      if (input$rad_height == "h_each_tree") { # if heights are not to estimate
-        showMenuItem("tab_AGB")
-        updateTabItems(session, "mnu_MENU", "tab_AGB")
+      if (input$rad_height == "h_each_tree") {
+        # if heights are not to estimate, show AGB tab
+        shinyjs::show("nav_item_agb")
+        shinyjs::hide("tab_LOAD")
+        shinyjs::show("tab_AGB")
+        shinyjs::removeClass("nav_link_load", "active")
+        shinyjs::addClass("nav_link_agb", "active")
       } else {
         # else show the height tab
-        showMenuItem("tab_HEIGHT")
-        updateTabItems(session, "mnu_MENU", "tab_HEIGHT")
+        shinyjs::show("nav_item_height")
+        shinyjs::hide("tab_LOAD")
+        shinyjs::show("tab_HEIGHT")
+        shinyjs::removeClass("nav_link_load", "active")
+        shinyjs::addClass("nav_link_height", "active")
       }
     }
 
@@ -531,12 +549,18 @@ function(input, output, session) {
       shinyalert("Oops", "Somethings went wrong, please check this", type = "error")
     } else {
       if (input$rad_height == "h_each_tree") { # if heights are not to estimate
-        showMenuItem("tab_AGB")
-        updateTabItems(session, "mnu_MENU", "tab_AGB")
+        shinyjs::show("nav_item_agb")
+        shinyjs::hide("tab_HEIGHT")
+        shinyjs::show("tab_AGB")
+        shinyjs::removeClass("nav_link_height", "active")
+        shinyjs::addClass("nav_link_agb", "active")
       } else {
         # else show the height tab
-        showMenuItem("tab_HEIGHT")
-        updateTabItems(session, "mnu_MENU", "tab_HEIGHT")
+        shinyjs::show("nav_item_height")
+        shinyjs::hide("tab_TAXO")
+        shinyjs::show("tab_HEIGHT")
+        shinyjs::removeClass("nav_link_taxo", "active")
+        shinyjs::addClass("nav_link_height", "active")
       }
     }
   })
@@ -634,13 +658,20 @@ function(input, output, session) {
         return()
       } else {
         # render the table
+
         if (input$sel_HDmodel_by == "<unselected>"){
-          output$out_tab_HD <- renderTable(tab_modelHD[, -3], digits = 4)
+          render_tab_modelHD <- DT::formatRound(table = DT::datatable(tab_modelHD[, -3],
+                                                               options(dom = 't')),
+                                                columns=c("RSE","Average_bias"),
+                                                digits = 3)
+          output$out_tab_HD <- renderDT(render_tab_modelHD)
         } else { # If one model per plot/region/whatever, compute the mean of RMSE and Average_bias over all models
           tab_modelHD <- do.call(rbind,tab_modelHD)
           tab_modelHD <- data.table(tab_modelHD[,-3])
-          tab_modelHD <- tab_modelHD[, lapply(.SD, mean) , by = method]
-          output$out_tab_HD <- renderTable(tab_modelHD, digits = 4)
+          tab_modelHD <- tab_modelHD[, lapply(.SD, function(x) round(mean(x), 3)) , by = method]
+          output$out_tab_HD <- renderDT(DT::datatable(tab_modelHD,
+                                                      options(dom = 't'))
+          )
         }
 
         # update the radio button with the method and choose the minimum of the RSE
@@ -724,7 +755,9 @@ function(input, output, session) {
                        # print the list of regions in data-frame format
                        render_region <- rv$region
                        names(render_region)[2] <- "Feldpausch region"
-                       output$out_tab_feld <- renderTable(render_region, digits = 4, align = "l")
+                       output$out_tab_feld <- renderDT(DT::datatable(render_region,
+                                                                     options(dom = 't'))
+                       )
 
                        showElement("box_RESULT_FELD")
                      }
@@ -767,7 +800,7 @@ function(input, output, session) {
               addCircleMarkers(
                 addProviderTiles(
                   leaflet(data = rv$coord_plot),
-                  "OpenStreetMap.Mapnik"),
+                  "Stadia.StamenTerrainBackground"),
                 lng = ~long, lat = ~lat, color = "#10A836"),
               lng1 = -90, lng2 = 90, lat1 = -60, lat2 = 75)
           })
@@ -779,9 +812,11 @@ function(input, output, session) {
 
           # print the list of E parameters in data-frame format
           render_E <- data.frame(plot = as.character(isolate(rv$coord_plot$plot)),
-                                 E =  rv$E)
+                                 E =  round(rv$E,4))
           names(render_E)[2] <- "Bioclimatic predictor E"
-          output$out_tab_chave <- renderTable(render_E, digits = 4, align = "l")
+          output$out_tab_chave <- renderDT(DT::datatable(render_E,
+                                                         options(dom = 't'))
+          )
 
           print("End of Chave's method !")
 
@@ -902,8 +937,12 @@ function(input, output, session) {
     if (is.null(input$chkgrp_HEIGHT)) {
       shinyalert("Oops", "Select at least one HD model", type = "error")
     } else {
-      showMenuItem("tab_AGB")
-      updateTabItems(session, "mnu_MENU", "tab_AGB")
+      shinyjs::show("nav_item_agb")
+      shinyjs::hide("tab_HEIGHT")
+      shinyjs::show("tab_AGB")
+      shinyjs::removeClass("nav_link_height", "active")
+      shinyjs::addClass("nav_link_agb", "active")
+
       hideElement("box_AGB_res") # if user has already calculate AGBs
       hideElement("id_AGB_Report")
     }
@@ -1060,8 +1099,11 @@ function(input, output, session) {
   # button "Continue to spatialisation"s
   observeEvent( input$btn_continue_sp, ignoreInit = TRUE, {
     if(input$rad_coord == "coord_plot") {
-      showMenuItem("tab_SPATIALISATION")
-      updateTabItems(session, "mnu_MENU", "tab_SPATIALISATION")
+      shinyjs::show("nav_item_spatial")
+      shinyjs::hide("tab_AGB")
+      shinyjs::show("tab_SPATIALISATION")
+      shinyjs::removeClass("nav_link_agb", "active")
+      shinyjs::addClass("nav_link_spatial", "active")
     } else {
       shinyalert("To continue with the spatialisation of the AGB, you need to provide the coordinates of the plot corners in the 'Geographic coordinates' box on 'Load dataset' tab.", type = "error")
     }
@@ -1308,6 +1350,7 @@ function(input, output, session) {
     if(input$sel_x_rel_corner!="<unselected>" & input$sel_y_rel_corner!="<unselected>") {
 
       if(!is.null(rv$checked_plot) && !is.character(rv$checked_plot)) {
+        showElement("id_param_check_plot")
         showElement("id_coord_trees")
 
         int_num_col <- names(rv$inv_pred)[ sapply(rv$inv_pred, class) %in% c("integer", "numeric")]
@@ -1338,7 +1381,6 @@ function(input, output, session) {
     }, error = function(e) NULL)
     if(!is.null(rv$file_rast)) {
       showElement("id_raster_function")
-      updateSelectInput(session, "sel_raster_function", choices = names(available_functions))
     }
   })
   # Reset the file raster if needed
@@ -1390,7 +1432,7 @@ function(input, output, session) {
                     grid_size = input$num_grid_size,
                     tree_data =  rv$checked_plot$tree_data, tree_coords = c("x_rel","y_rel"),
                     corner_plot_ID = arg_corner_plot_ID, tree_plot_ID = arg_tree_plot_ID,
-                    centred_grid = input$check_centred_grid, grid_tol = 0.9)
+                    grid_tol = 0.9)
       }, error = function(e) e$message)
 
     } else { # if no plot division, recreate the output
@@ -1417,8 +1459,11 @@ function(input, output, session) {
       return()
     } else {
       # If no error on divide_plot, update tab_SP_SUMMARY
-      showMenuItem("tab_SP_SUMMARY")
-      updateTabItems(session, "mnu_MENU", "tab_SP_SUMMARY")
+      shinyjs::show("nav_item_summary")
+      shinyjs::hide("tab_SPATIALISATION")
+      shinyjs::show("tab_SP_SUMMARY")
+      shinyjs::removeClass("nav_link_spatial", "active")
+      shinyjs::addClass("nav_link_summary", "active")
       # update input selections in the next tab if not already done
       if(input$sel_first_metric=="") {
         int_num_col <- names(rv$divide_output$tree_data)[ sapply(rv$divide_output$tree_data, class) %in% c("integer", "numeric")]
@@ -1463,17 +1508,19 @@ function(input, output, session) {
     insertUI(
       selector = "#container_selec_metric",
       where = "beforeEnd",
-      ui = column(
-        width = 12,
-        div(
-          column(5, selectInput(paste0("sel_metric_", unique_id),
-                                "Which metric ?",
-                                choices = c("<unselected>", metric_choices))),
-          column(5, selectInput(paste0("sel_function_", unique_id),
-                                "Which function to apply?",
-                                choices = c("<unselected>",names(available_functions)))),
-          column(2, checkboxInput(paste0("checkbox_per_ha_", unique_id), "per hectare", value = TRUE))
-        )
+
+      ui = layout_columns(
+        col_widths = c(5, 5, 2),
+        selectInput(paste0("sel_metric_", unique_id),
+                    label = NULL,
+                    choices = c("<unselected>", metric_choices)
+        ),
+        selectInput(paste0("sel_function_", unique_id),
+                    label=NULL,
+                    choices = c("<unselected>",names(available_functions))
+        ),
+        checkboxInput(paste0("checkbox_per_ha_", unique_id),
+                        label = "per ha", value = TRUE)
       )
     )
   })
@@ -1543,10 +1590,13 @@ function(input, output, session) {
         updateMaterialSwitch(session, "switch_ggplot", TRUE)
 
         ### Create FOS like results at subplot level ----
-        rv$FOS_subplot <- FOS_subplot_res(
+
+        rv$FOS_subplot <- tryCatch({
+          FOS_subplot_res(
           checked_plot = rv$checked_plot,
           divide_output = rv$divide_output,
           subplot_summary_output = rv$subplot_summary_output)
+        }, error = function(e) e$message)
 
       }
     }
