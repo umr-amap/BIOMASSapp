@@ -745,110 +745,119 @@ The resulting confidence intervals represent the **2.5th and 97.5th percentiles*
       col_widths = c(8, 4),
 
       ## Plot visualisation box ----
-      card(
-        full_screen = TRUE,
-        card_header("Plot Visualization", class = "custom_card_header"),
-        card_body(
-          plotOutput("out_gg_check_plot", height = "600px"),
-          hidden(div(
-            id = "id_sel_plot_display",
-            selectInput("sel_plot_display", "Plot to display:", choices = NULL)
-          ))
+      div(
+        card(
+          full_screen = TRUE,
+          card_header("Plot Visualization", class = "custom_card_header"),
+          card_body(
+            div(
+              style = "height: 800px;",
+              plotOutput("out_gg_check_plot", height = "100%"),
+              hidden(div(
+                id = "id_sel_plot_display",
+                selectInput("sel_plot_display", "Plot to display:", choices = NULL)
+              ))
+            )
+          )
         )
       ),
 
       ## Settings box ----
-      card(
-        card_header("Settings", class = "custom_card_header"),
-        card_body(
-          ### Plot corners ----
-          h4("Coordinates of plot corners", class = "text-primary"),
-          # Selection of relative corner coordinates
-          p("Select the columns corresponding to the relative coordinates of the corners (in meters):", class = "text-muted"),
-          layout_columns(
-            col_widths = c(6, 6),
-            selectInput("sel_x_rel_corner", "Relative X", choices = NULL),
-            selectInput("sel_y_rel_corner", "Relative Y", choices = NULL) |>
-              helper(colour = "#158A0C", content = "sel_rel_coord_corners")
-          ),
+      div(
+        card(
+          card_header("Settings", class = "custom_card_header"),
+          card_body(
 
-          # Checkboxes for check_plot_coord arguments
-          hidden(
-            div(
-              id = "id_param_check_plot",
-              checkboxInput(
-                "check_trust_GPS_corners",
-                "Trust GPS coordinates of corners",
-                value = TRUE
-              ) |> helper(colour = "#158A0C", content = "trust_GPS_corners"),
+            ### Plot corners ----
+            h4("Coordinates of plot corners", class = "text-primary"),
+            # Selection of relative corner coordinates
+            p("Select the columns corresponding to the relative coordinates of the corners (in meters):", class = "text-muted"),
+            layout_columns(
+              col_widths = c(6, 6),
+              selectInput("sel_x_rel_corner", "Relative X", choices = NULL),
+              selectInput("sel_y_rel_corner", "Relative Y", choices = NULL) |>
+                helper(colour = "#158A0C", content = "sel_rel_coord_corners")
+            ),
 
+            # Checkboxes for check_plot_coord arguments
+            hidden(
+              div(
+                id = "id_param_check_plot",
+                checkboxInput(
+                  "check_trust_GPS_corners",
+                  "Trust GPS coordinates of corners",
+                  value = TRUE
+                ) |> helper(colour = "#158A0C", content = "trust_GPS_corners"),
+
+                checkboxInput(
+                  width='100%',
+                  "check_max_dist",
+                  "Multiple GPS measurements per corner",
+                  value = FALSE
+                )
+              )),
+
+            hidden(div( # numericInput for max_dist argument
+              id = "id_max_dist",
+              numericInput(
+                "num_max_dist",
+                "Maximum distance for outlier detection (m):",
+                value = 15,
+                min = 0.1, width='100%'
+              ) |> helper(colour = "#158A0C", content = "max_dist")
+            )),
+
+            ### Tree Coordinates ----
+            hidden(div(
+              id = "id_coord_trees",
+              hr(),
+              h4("Tree Coordinates", class = "text-primary"),
+              p("Select the column corresponding to the relative coordinates of the trees (in meters):", class = "text-muted"),
+              layout_columns(
+                col_widths = c(6, 6),
+                selectInput("sel_x_rel_trees", "Relative X", choices = NULL),
+                selectInput("sel_y_rel_trees", "Relative Y", choices = NULL) |>
+                  helper(colour = "#158A0C", content = "sel_rel_coord_trees")
+              ),
+              selectInput("sel_prop_trees", "Select a tree metric to display proportionally:",
+                          choices = NULL, width='100%')
+            )),
+
+            ###  Raster Upload ----
+            hidden(div(
+              id = "id_raster",
+              hr(),
+              h4("Raster File (Optional)", class = "text-primary") |>
+                helper(colour = "#158A0C", content = "raster_file"),
+              layout_columns(
+                col_widths = c(10, 2),
+                fileInput(
+                  "file_RASTER",
+                  "Upload a raster file",
+                  accept = c(".tif", ".grd", ".jpg", ".jpeg", ".png", ".hgt", ".vrt", ".hdf", ".hdf5", ".adf")
+                ),
+                actionButton("btn_reset_raster", "Reset", style = "margin-top: 32px; background-color: white; color: black; border: 1px solid #ccc;" )
+              )
+            )),
+
+            ### divide_plot settings ----
+            hidden(div(
+              id = "id_divide_plot",
+              hr(),
+              h4("Divide Plot (Optional)", class = "text-primary"),
               checkboxInput(
-                "check_max_dist",
-                "Multiple GPS measurements per corner",
+                "check_divide_plot",
+                "Divide plot(s) into subplots",
                 value = FALSE
               )
             )),
 
-          hidden(div( # numericInput for max_dist argument
-            id = "id_max_dist",
-            numericInput(
-              "num_max_dist",
-              "Maximum distance for outlier detection (m):",
-              value = 15,
-              min = 0.1, width='100%'
-            ) |> helper(colour = "#158A0C", content = "max_dist")
-          )),
-
-          ### Tree Coordinates ----
-          hidden(div(
-            id = "id_coord_trees",
-            hr(),
-            h4("Tree Coordinates", class = "text-primary"),
-            p("Select the column corresponding to the relative coordinates of the trees (in meters):", class = "text-muted"),
-            layout_columns(
-              col_widths = c(6, 6),
-              selectInput("sel_x_rel_trees", "Relative X", choices = NULL),
-              selectInput("sel_y_rel_trees", "Relative Y", choices = NULL) |>
-                helper(colour = "#158A0C", content = "sel_rel_coord_trees")
-            ),
-            selectInput("sel_prop_trees", "Select a tree metric to display proportionally:",
-                        choices = NULL, width='100%')
-          )),
-
-          ###  Raster Upload ----
-          hidden(div(
-            id = "id_raster",
-            hr(),
-            h4("Raster File (Optional)", class = "text-primary") |>
-              helper(colour = "#158A0C", content = "raster_file"),
-            layout_columns(
-              col_widths = c(10, 2),
-              fileInput(
-                "file_RASTER",
-                "Upload a raster file",
-                accept = c(".tif", ".grd", ".jpg", ".jpeg", ".png", ".hgt", ".vrt", ".hdf", ".hdf5", ".adf")
-              ),
-              actionButton("btn_reset_raster", "Reset", style = "margin-top: 32px; background-color: white; color: black; border: 1px solid #ccc;" )
-            )
-          )),
-
-          ### divide_plot settings ----
-          hidden(div(
-            id = "id_divide_plot",
-            hr(),
-            h4("Divide Plot (Optional)", class = "text-primary"),
-            checkboxInput(
-              "check_divide_plot",
-              "Divide plot(s) into subplots",
-              value = FALSE
-            )
-          )),
-
-          hidden(div(
-            id = "id_divide_plot_settings",
-            numericInput("num_grid_size", "Grid size:", value = 50, min = 1)
-            #checkboxInput("check_centred_grid", "Centre the grid", value = TRUE)
-          ))
+            hidden(div(
+              id = "id_divide_plot_settings",
+              numericInput("num_grid_size", "Grid size:", value = 50, min = 1)
+              #checkboxInput("check_centred_grid", "Centre the grid", value = TRUE)
+            ))
+          )
         )
       )
     ),
@@ -934,6 +943,7 @@ The resulting confidence intervals represent the **2.5th and 97.5th percentiles*
 
           hidden(div(
             id = "id_raster_function",
+            hr(),
             selectInput("sel_raster_function",
                         label = p("Function to applied to the values of the provided", strong("raster"),":"),
                         choices = names(available_functions), width='100%')
