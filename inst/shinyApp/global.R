@@ -22,25 +22,16 @@ suppressPackageStartupMessages({
 
 source("legal_notice.R")
 
+# Set custom theme for ggplot
 custom_theme <- theme(
   legend.text = element_text(size=13),
   legend.title = element_text(size=15),
   plot.title = element_text(size=18))
 
-# df_coord <- read.csv("~/NouraguesCoords.csv")
-# df_inv <- read.csv("~/NouraguesTrees.csv")
-# df_inv$D[1] <- NA
-# df_inv_pred <- read.csv("~/Documents/prise_en_main_BIOMASS/BiomassApp/rv_inv_pred_multiple_plots.csv")
-# df_inv_pred$plot <- df_inv_pred$Plot
+# Set method's color for heights
+color_height <- c(local_model = "#619CFF", Feldpausch = "#F8766D", Chave = "#00BA38", user_height = "black")
 
-# df_coord <- read.csv("~/NouraguesPlot201.csv")
-# df_inv <- read.csv("~/NouraguesTrees201.csv")
-# df_inv$plot <- ""
-# df_inv$D[1] <- NA
-# df_inv_pred <- read.csv("~/Documents/prise_en_main_BIOMASS/BiomassApp/rv_inv_pred_201.csv")
-# df_inv_pred$plot <- ""
-
-
+# Defining available functions for subplot_summary()
 available_functions <- list("mean"=mean,"sum"=sum,"median"=median,"sd"=sd,"var"=var)
 
 # set maximum input file size (here 30Mo)
@@ -189,7 +180,7 @@ indiv_pred <- function(inv, rad_height, H, AGB_res, chkgrp_HEIGHT, sel_HDmodel_b
 }
 
 
-plot_list <- function(list, color, removedPlot = NULL) {
+plot_list <- function(list, removedPlot = NULL) {
 
   ### Formatting the data-frame which will be used for ggplot
   df_res <- rbindlist(lapply(names(list), function(i) { # looping on methods
@@ -211,7 +202,7 @@ plot_list <- function(list, color, removedPlot = NULL) {
   render_plot <- ggplot(df_res, aes(x = plot, colour = method)) +
     xlab(NULL) + ylab("AGB (Mg)") +
     theme_minimal() +
-    scale_color_manual(values = color) +
+    scale_color_manual(values = color_height) +
     xlab(NULL) + ylab("AGB (Mg)") +
     theme(axis.title = element_text(size = rel(1.2))) +
     geom_errorbar(aes(ymin = Cred_2.5, ymax = Cred_97.5), position = position_dodge(width = 0.1), width = 0.1) +

@@ -403,9 +403,7 @@ Below are the results of the estimates at plot level (in Mg):
 
 
 ```{r plot biomass, echo=FALSE, fig.align='center', fig.width=12, fig.height=7, message=FALSE, warning=FALSE}
-color <- c(local_model = "#619CFF", Feldpausch = "#F8766D", Chave = "#00BA38", user_height = "black")
-
-plot_list(list = rv$AGB_res, color = color)
+plot_list(list = rv$AGB_res)
 
 ```
 

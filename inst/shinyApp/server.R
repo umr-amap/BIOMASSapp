@@ -83,8 +83,7 @@ function(input, output, session) {
     # Read forest inventory upload
     forest_inv <<- fread(
       file = req(input$file_DATASET)$datapath,
-      #skip = ifelse(is.na(input$num_skip_line) || input$num_skip_line == 0, "__auto__", input$num_skip_line),
-      data.table = FALSE
+      data.table = FALSE,
     )
 
     # show forest inventory content
@@ -386,6 +385,10 @@ function(input, output, session) {
       ### Unit conversions
       # Diameter
       rv$inv[,input$sel_DIAMETER] <- conv_unit(rv$inv[,input$sel_DIAMETER], input$rad_units_diameter, "cm")
+      if(sum(is.na(rv$inv[,input$sel_DIAMETER]))!=0) {
+        shinyalert("Warning:", "Some NA's are detected in your diameter values. The calculation of the AGB will not take into account trees linked to these values.", type = "warning")
+        rv$inv <- rv$inv[!is.na(rv$inv[,input$sel_DIAMETER]),]
+      }
       # WD (note that errWD unit will be changed when clicking on the 'Go on' button for AGB calculation)
       if (input$sel_WD != "<unselected>") {
         if(input$rad_units_wd == "kg.m-3") {
@@ -550,9 +553,9 @@ function(input, output, session) {
     } else {
       if (input$rad_height == "h_each_tree") { # if heights are not to estimate
         shinyjs::show("nav_item_agb")
-        shinyjs::hide("tab_HEIGHT")
+        shinyjs::hide("tab_TAXO")
         shinyjs::show("tab_AGB")
-        shinyjs::removeClass("nav_link_height", "active")
+        shinyjs::removeClass("nav_link_taxo", "active")
         shinyjs::addClass("nav_link_agb", "active")
       } else {
         # else show the height tab
@@ -841,7 +844,7 @@ function(input, output, session) {
                   print("Plotting basic plot")
                   toggleElement("box_plot_comparison", condition = !is.null(input$chkgrp_HEIGHT))
 
-                  D_max <- max(rv$inv$D, ifelse(test = is.null(rv$df_h_sup), yes = 0, no = max(rv$df_h_sup[,input$sel_D_sup_data], na.rm=TRUE)))
+                  D_max <- max(rv$inv$D, ifelse(test = is.null(rv$df_h_sup), yes = 0, no = max(rv$df_h_sup[,input$sel_D_sup_data], na.rm=TRUE)), na.rm = TRUE)
                   D <<- 1:D_max
 
                   rv$plot_hd <- ggplot(data = NULL, aes(x = D, col="measured trees")) + # col="measured_trees" to silence the warning message "No shared levels found between `names(values)` of the manual scale and the data's colour values."
@@ -925,9 +928,9 @@ function(input, output, session) {
       }
     }
 
-    # Render the plot
-    output$out_plot_comp <- renderPlot(silentPlot(rv$plot_hd))
   })
+  # Render the plot
+  output$out_plot_comp <- renderPlot(silentPlot(rv$plot_hd))
 
   ## Done button actions -------------------------------------------------------
   observe({
@@ -988,10 +991,6 @@ function(input, output, session) {
     # Get the number of height estimation's methods
     length_progression <- length(input$chkgrp_HEIGHT)*2
 
-    # Set method's color
-    color <- c(local_model = "#619CFF", Feldpausch = "#F8766D", Chave = "#00BA38", user_height = "black")
-
-
     # Calculation of AGB ----
 
     withProgress(message = "AGB calculation", value = 0, {
@@ -1005,8 +1004,8 @@ function(input, output, session) {
           you may construct a height-diameter model to overcome that issue.",
                      type = "warning")
         }
-        rv$AGB_res[[names(color)[4]]] <- AGB_predict(D = D, WD = WD, errWD = errWD, H = H, errH = errH)
-        rv$AGB_res[[names(color)[4]]][["summary"]] <- summaryByPlot(rv$AGB_res[[names(color)[4]]], plot = rv$inv$plot)
+        rv$AGB_res[[names(color_height)[4]]] <- AGB_predict(D = D, WD = WD, errWD = errWD, H = H, errH = errH)
+        rv$AGB_res[[names(color_height)[4]]][["summary"]] <- summaryByPlot(rv$AGB_res[[names(color_height)[4]]], plot = rv$inv$plot)
       }
 
 
@@ -1017,7 +1016,7 @@ function(input, output, session) {
         incProgress(1 / length_progression, detail = "AGB using HD local: Calculating...")
 
         if( input$sel_HDmodel_by != "<unselected>" ) { # if stand-specific models
-          rv$AGB_res[[names(color)[1]]] <- AGB_predict(D = rv$hd_data$D,
+          rv$AGB_res[[names(color_height)[1]]] <- AGB_predict(D = rv$hd_data$D,
                                                        WD = WD[rv$inv$plot %in% rv$hd_data$model_for],
                                                        errWD = errWD[rv$inv$plot %in% rv$hd_data$model_for],
                                                        HDmodel = rv$hd_model, model_by =  rv$hd_data$model_for)
@@ -1025,21 +1024,21 @@ function(input, output, session) {
           # if incomplete heights have been provided, for these heights, we need to replace the AGB estimates calculated with HDmodel by the AGB estimates calculated directly with H and errH
           if( input$rad_height == "h_some_tree") {
             AGB_user_H <- suppressWarnings(AGB_predict(D = rv$hd_data$D, WD = WD[rv$inv$plot %in% rv$hd_data$model_for], errWD = errWD[rv$inv$plot %in% rv$hd_data$model_for], H = rv$hd_data$H, errH = errH))
-            rv$AGB_res[[names(color)[1]]]$AGB_pred[!is.na(AGB_user_H$AGB_pred)] <- AGB_user_H$AGB_pred[!is.na(AGB_user_H$AGB_pred)]
+            rv$AGB_res[[names(color_height)[1]]]$AGB_pred[!is.na(AGB_user_H$AGB_pred)] <- AGB_user_H$AGB_pred[!is.na(AGB_user_H$AGB_pred)]
           }
 
-          rv$AGB_res[[names(color)[1]]][["summary"]] <- summaryByPlot(rv$AGB_res[[names(color)[1]]], plot = rv$hd_data$model_for)
+          rv$AGB_res[[names(color_height)[1]]][["summary"]] <- summaryByPlot(rv$AGB_res[[names(color_height)[1]]], plot = rv$hd_data$model_for)
 
         } else { # if not stand-specific
-          rv$AGB_res[[names(color)[1]]] <- AGB_predict(D, WD, errWD, HDmodel = rv$hd_model)
+          rv$AGB_res[[names(color_height)[1]]] <- AGB_predict(D, WD, errWD, HDmodel = rv$hd_model)
 
           # for incomplete heights provided
           if( input$rad_height == "h_some_tree") {
             AGB_user_H <- suppressWarnings(AGB_predict(D = rv$hd_data$D, WD = WD, errWD = errWD, H = rv$hd_data$H, errH = errH))
-            rv$AGB_res[[names(color)[1]]]$AGB_pred[!is.na(AGB_user_H$AGB_pred)] <- AGB_user_H$AGB_pred[!is.na(AGB_user_H$AGB_pred)]
+            rv$AGB_res[[names(color_height)[1]]]$AGB_pred[!is.na(AGB_user_H$AGB_pred)] <- AGB_user_H$AGB_pred[!is.na(AGB_user_H$AGB_pred)]
           }
 
-          rv$AGB_res[[names(color)[1]]][["summary"]] <- summaryByPlot(rv$AGB_res[[names(color)[1]]], plot = rv$inv$plot)
+          rv$AGB_res[[names(color_height)[1]]][["summary"]] <- summaryByPlot(rv$AGB_res[[names(color_height)[1]]], plot = rv$inv$plot)
         }
         incProgress(1 / length_progression, detail = "AGB using HD local: Done")
       }
@@ -1051,9 +1050,8 @@ function(input, output, session) {
         print("AGB calculation for Feldpausch's method: ")
         incProgress(1 / length_progression, detail = "AGB using Feldpausch region: Calculating...")
 
-        rv$AGB_res[[names(color)[2]]] <- AGB_predict(D, WD, errWD, region = rv$region[match(rv$inv$plot , table = rv$region$plot) , "feld_region"])
-        rv$AGB_res[[names(color)[2]]][["summary"]] <- summaryByPlot(AGB_val = rv$AGB_res[[names(color)[2]]], plot = rv$inv$plot)
-        #newValue[[names(color)[2]]] <- summaryByPlot(AGB_val = rv$AGB_res[[names(color)[2]]], plot = rv$inv$plot)
+        rv$AGB_res[[names(color_height)[2]]] <- AGB_predict(D, WD, errWD, region = rv$region[match(rv$inv$plot , table = rv$region$plot) , "feld_region"])
+        rv$AGB_res[[names(color_height)[2]]][["summary"]] <- summaryByPlot(AGB_val = rv$AGB_res[[names(color_height)[2]]], plot = rv$inv$plot)
 
         incProgress(1 / length_progression, detail = "AGB using Feldpausch region: Done")
       }
@@ -1066,22 +1064,15 @@ function(input, output, session) {
 
         df_E <- data.frame(plot = rv$coord_plot$plot, E = rv$E)
 
-        rv$AGB_res[[names(color)[3]]] <- AGB_predict(D=D, WD=WD, errWD=errWD,
+        rv$AGB_res[[names(color_height)[3]]] <- AGB_predict(D=D, WD=WD, errWD=errWD,
                                                      coord = isolate(rv$coord[,c("long","lat")]),
                                                      E_vec = df_E[match(rv$inv$plot , table = df_E$plot) , "E"])
 
-        rv$AGB_res[[names(color)[3]]][["summary"]] <- summaryByPlot(AGB_val = rv$AGB_res[[names(color)[3]]], plot = rv$inv$plot)
-        #newValue[[names(color)[3]]] <- summaryByPlot(AGB_val = rv$AGB_res[[names(color)[3]]], plot = rv$inv$plot)
+        rv$AGB_res[[names(color_height)[3]]][["summary"]] <- summaryByPlot(AGB_val = rv$AGB_res[[names(color_height)[3]]], plot = rv$inv$plot)
 
         incProgress(1 / length_progression, detail = "AGB using Chave E: Done")
       }
 
-    })
-
-    ## Render AGB plot's ----
-    # plot the output
-    output$out_plot_AGB <- renderPlot({
-      plot_list(rv$AGB_res, color, removedPlot = rv$removedPlot)
     })
 
     ## Calculation of individual tree metrics
@@ -1095,9 +1086,18 @@ function(input, output, session) {
     showElement(id = "id_AGB_Report")
     showElement("id_btn_continue_sp")
   })
+  ## plot the output ----
+  output$out_plot_AGB <- renderPlot({
+    plot_list(rv$AGB_res, removedPlot = rv$removedPlot)
+  })
 
   # button "Continue to spatialisation"s
   observeEvent( input$btn_continue_sp, ignoreInit = TRUE, {
+    if(is.null(rv$AGB_res)) {
+      shinyalert("Oops,","You need first to calculate the AGB before continuing to Spatialization.")
+      return(NULL)
+    }
+
     if(input$rad_coord == "coord_plot") {
       shinyjs::show("nav_item_spatial")
       shinyjs::hide("tab_AGB")
@@ -1105,7 +1105,7 @@ function(input, output, session) {
       shinyjs::removeClass("nav_link_agb", "active")
       shinyjs::addClass("nav_link_spatial", "active")
     } else {
-      shinyalert("To continue with the spatialisation of the AGB, you need to provide the coordinates of the plot corners in the 'Geographic coordinates' box on 'Load dataset' tab.", type = "error")
+      shinyalert("To continue with the spatialisation of the AGB, you need to provide the coordinates of the plot corners in the 'Geographic coordinates' box on the 'Load dataset' tab.", type = "error")
     }
   })
 
@@ -1235,9 +1235,7 @@ function(input, output, session) {
   # SPATIALISATION -------------------------------------------------------------
 
   ## show coordinates table content ----
-  observe({
-    output$table_coord_spatialisation <- renderDT(rv$df_coord, options = list(scrollX = TRUE))
-  })
+  output$table_coord_spatialisation <- renderDT(rv$df_coord, options = list(scrollX = TRUE))
 
   ## Execute check_plot_coord() and render the plot ----
   observeEvent(
@@ -1289,13 +1287,6 @@ function(input, output, session) {
                            ref_raster = rv$file_rast)
         }, error = function(e) e$message)
 
-        # # We'll need a "plot_ID" column in checked_plot$corner_coord, even if there is only 1 plot
-        # if(!is.character(rv$checked_plot) && input$rad_several_plots=="single_plot") {
-        #   rv$checked_plot$corner_coord$plot_ID <- ""
-        #   # and in checked_plot$tree_data too
-        #   rv$checked_plot$tree_data$plot_ID <- ""
-        # }
-
         # Generate plot visualization
         if(!is.character(rv$checked_plot)) {
           if(length(rv$checked_plot$plot_design) == 1) { # if one plot
@@ -1327,8 +1318,8 @@ function(input, output, session) {
           theme_void()
 
       }
-      output$out_gg_check_plot <- renderPlot(silentPlot(rv$gg_check_plot))
     })
+  output$out_gg_check_plot <- renderPlot(silentPlot(rv$gg_check_plot))
 
   ## Update plot display ----
   observeEvent(input$sel_plot_display, ignoreInit = TRUE, {
@@ -1336,7 +1327,6 @@ function(input, output, session) {
       plot_index <- match( input$sel_plot_display, names(rv$checked_plot$plot_design) )
       rv$gg_check_plot <- rv$checked_plot$plot_design[[plot_index]]
       rv$gg_check_plot <- rv$gg_check_plot + custom_theme
-      output$out_gg_check_plot <- renderPlot(silentPlot(rv$gg_check_plot))
     }
   })
   ## Toggle max_dist setting ----
@@ -1478,8 +1468,6 @@ function(input, output, session) {
                           choices = unique(rv$df_coord[,"Plot"]),
                           selected = input$sel_plot_display)
       }
-      # render the tree_data table
-      output$table_divide_plot <- renderDT(rv$divide_output$tree_data, options = list(scrollX = TRUE))
 
       ## Apply subplot_summary() to calculated AGBD values from AGBmonteCarlo() ----
       list_sub_sum <- lapply(rv$AGB_res, function(dat) {
@@ -1488,13 +1476,16 @@ function(input, output, session) {
       rv$subplot_summary_output <- merge_subplot_summary(list_sub_sum)
 
       # update sel_metric_display_summary which will trigger plot display
+      updateSelectInput(session, "sel_metric_display_summary", choices = NULL)
       metric_names <- names(rv$subplot_summary_output$tree_summary)[!names(rv$subplot_summary_output$tree_summary) %in% c("plot_ID","subplot_ID")]
       metric_names <- metric_names[!grepl("_cred_",metric_names)]
       updateSelectInput(session, "sel_metric_display_summary", choices = metric_names)
 
     }
-
   })
+
+  # render the tree_data table
+  output$table_divide_plot <- renderDT(rv$divide_output$tree_data, options = list(scrollX = TRUE))
 
 
   # SUMMARISE METRICS ----------------------------------------------------------
@@ -1548,9 +1539,14 @@ function(input, output, session) {
         arg_fun <- lapply(name_arg_fun, function(x) available_functions[[input[[x]]]])[filter_select]
         names(arg_fun) <- name_arg_fun[filter_select]
       } else {
-        arg_value <- input$sel_first_metric
+        if(input$sel_first_metric == "<unselected>" || input$sel_first_function == "<unselected>") {
+          arg_value <- NULL
+          arg_fun <- sum
+        } else {
+          arg_value <- input$sel_first_metric
+          arg_fun <- available_functions[[input$sel_first_function]]
+        }
         arg_per_ha <- input$check_first_per_ha
-        arg_fun <- available_functions[[input$sel_first_function]]
       }
 
       ## Call subplot_summary() ----
@@ -1598,6 +1594,8 @@ function(input, output, session) {
           subplot_summary_output = rv$subplot_summary_output)
         }, error = function(e) e$message)
 
+      } else { # print message error
+        print(subplot_summary_value)
       }
     }
   })
@@ -1611,18 +1609,15 @@ function(input, output, session) {
 
       if(input$rad_several_plots=="several_plots") {
         #Render the plot_design output (plot_design[[plot_ID]][[metric]])
-        output$out_gg_subplot_sum <- renderPlot(silentPlot(
-          rv$subplot_summary_output$plot_design[[
-            match(input$sel_plot_display_summary, names(rv$subplot_summary_output$plot_design))]][[
-              match(input$sel_metric_display_summary, metric_names)
-            ]]))
+        rv$gg_subplot_sum <- rv$subplot_summary_output$plot_design[[
+          match(input$sel_plot_display_summary, names(rv$subplot_summary_output$plot_design))]][[
+            match(input$sel_metric_display_summary, metric_names)
+            ]]
       } else {
         #Render the plot_design output (plot_design[[metrics]] or just plot_design if only one metric)
-        output$out_gg_subplot_sum <- renderPlot(silentPlot(
-          rv$subplot_summary_output$plot_design[[
+        rv$gg_subplot_sum <- rv$subplot_summary_output$plot_design[[
             match(input$sel_metric_display_summary, metric_names)
           ]]
-        ))
 
       }
     } else { # check_plot (and grid) visualisation
@@ -1645,18 +1640,20 @@ function(input, output, session) {
       }
 
       if(input$check_divide_plot) {
-        output$out_gg_subplot_sum <- renderPlot(
-          rv$gg_check_plot +
-            geom_polygon(data = grid_dat,
-                         mapping = aes(x = x_proj, y=y_proj, group=subplot_ID),
-                         fill = NA, colour="black", linewidth=1)
-        )
+        rv$gg_subplot_sum <- rv$gg_check_plot +
+          geom_polygon(data = grid_dat,
+                       mapping = aes(x = x_proj, y=y_proj, group=subplot_ID),
+                       fill = NA, colour="black", linewidth=1) +
+          custom_theme
       } else {
-        output$out_gg_subplot_sum <- renderPlot(rv$gg_check_plot)
+        rv$gg_subplot_sum <- rv$gg_check_plot + custom_theme
       }
     }
 
   })
+  output$out_gg_subplot_sum <- renderPlot(rv$gg_subplot_sum)
+
+
 
 
 
