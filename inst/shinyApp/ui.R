@@ -830,7 +830,7 @@ The resulting confidence intervals represent the **2.5th and 97.5th percentiles*
               h4("Raster File (Optional)", class = "text-primary") |>
                 helper(colour = "#158A0C", content = "raster_file"),
               layout_columns(
-                col_widths = c(10, 2),
+                col_widths = c(9, 3),
                 fileInput(
                   "file_RASTER",
                   "Upload a raster file",

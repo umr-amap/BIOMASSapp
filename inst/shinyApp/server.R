@@ -281,6 +281,11 @@ function(input, output, session) {
       error_occured <- TRUE
       shinyalert("Oops!", "The column containing the plots IDs is unselected", type = "error")
       return()
+    } else if (input$rad_several_plots == "several_plots" && input$sel_PLOT != "<unselected>" && length(unique(forest_inv[,input$sel_PLOT])) == 1 ) {
+      # if only one plot is detected
+      error_occured <- TRUE
+      shinyalert("Oops!", "You specified that your dataset contains several plots but only one is detected.", type = "error")
+      return()
     } else if (input$sel_DIAMETER == "<unselected>") { # if diameter is not selected
       error_occured <- TRUE
       shinyalert("Oops!", "D is unselected", type = "error")
@@ -1713,6 +1718,14 @@ function(input, output, session) {
       paste0("BIOMASS_sp_report_", Sys.Date(), ".html")
     },
     content = function(file) {
+
+      if(is.null(rv$FOS_subplot)) {
+        rv$FOS_subplot <- FOS_subplot_res(
+          checked_plot = rv$checked_plot,
+          divide_output = rv$divide_output,
+          subplot_summary_output = rv$subplot_summary_output)
+      }
+
       # Copy the report file to a temporary directory before processing it, in case we don't have write permissions to the current working dir (which can happen when deployed).
       tempReport <- file.path(tempdir(), "report_BIOMASS.Rmd")
       file.copy(

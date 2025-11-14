@@ -416,8 +416,12 @@ The coordinates of the plot corners and the relative coordinates of the trees ha
 
 ```{r checked_plot, echo=FALSE, fig.align='center', fig.width=6, fig.height=6, message=FALSE, warning=FALSE}
 if(disp_sp) {
-  for(i in rv$checked_plot$plot_design) {
-    print(i)
+  if(is.list(rv$checked_plot$plot_design)) {
+    for(i in rv$checked_plot$plot_design) {
+      print(i)
+    }
+  } else {
+    print(rv$checked_plot$plot_design)
   }
 }
 ```
@@ -461,13 +465,13 @@ Finally, here are all the metrics that were calculated by subplots:
 ```{r final_results, echo=FALSE, fig.align='center', fig.width=8, fig.height=7, message=FALSE, warning=FALSE, results='asis'}
 if(disp_sp) {
   tab <- rv$FOS_subplot
-  tab <- tab %>%
-    kable(format = "html", caption = "FOS like results at subplot level") %>%
+  tab <- tab |> 
+    kable(format = "html", caption = "FOS like results at subplot level") |> 
     kable_styling(
       bootstrap_options = c("striped", "hover", "condensed", "responsive"),
       full_width = TRUE,
       position = "center"
-    ) %>%
+    )  |> 
     row_spec(0, background = "#156620", color = "white", bold = TRUE)
   
   div(style = "overflow-x:auto; white-space:nowrap; max-width:100%",
