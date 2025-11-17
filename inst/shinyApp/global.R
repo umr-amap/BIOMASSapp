@@ -14,6 +14,7 @@ suppressPackageStartupMessages({
   library(knitr)
   library(measurements)
   library(DT)
+  remotes::install_github('umr-amap/BIOMASS')
   library(BIOMASS)
   library(terra)
   library(bslib)
