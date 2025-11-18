@@ -135,15 +135,15 @@ function(input, output, session) {
   # If plot IDs is unselected => red box
   observeEvent(list(input$rad_several_plots,input$sel_PLOT), {
     feedbackWarning("sel_PLOT",
-                   show = input$sel_PLOT == "<unselected>",
-                   text = "Compulsory argument", icon = NULL)
+                    show = input$sel_PLOT == "<unselected>",
+                    text = "Compulsory argument", icon = NULL)
   })
 
   # If the diameter is unselected => red box
   observeEvent(input$sel_DIAMETER, {
     feedbackWarning("sel_DIAMETER",
-                   show = input$sel_DIAMETER == "<unselected>",
-                   text = "Compulsory argument", icon=NULL)
+                    show = input$sel_DIAMETER == "<unselected>",
+                    text = "Compulsory argument", icon=NULL)
   })
   # if the wd or genus not selected (but not both)
   observe({
@@ -669,7 +669,7 @@ function(input, output, session) {
 
         if (input$sel_HDmodel_by == "<unselected>"){
           render_tab_modelHD <- DT::formatRound(table = DT::datatable(tab_modelHD[, -3],
-                                                               options(dom = 't')),
+                                                                      options(dom = 't')),
                                                 columns=c("RSE","Average_bias"),
                                                 digits = 3)
           output$out_tab_HD <- renderDT(render_tab_modelHD)
@@ -803,14 +803,16 @@ function(input, output, session) {
           return()
 
         } else {
+
           output$plot_MAP <- renderLeaflet({
-            fitBounds(
+            rv$coord_plot |>
+              leaflet() |>
+              addProviderTiles("OpenStreetMap.Mapnik") |>
               addCircleMarkers(
-                addProviderTiles(
-                  leaflet(data = rv$coord_plot),
-                  "Stadia.StamenTerrainBackground"),
-                lng = ~long, lat = ~lat, color = "#10A836"),
-              lng1 = -90, lng2 = 90, lat1 = -60, lat2 = 75)
+                lng = ~long, lat = ~lat,
+                color = "#459433") |>
+              fitBounds(lng1 = -90, lng2 = 90, lat1 = -60, lat2 = 75)
+
           })
 
           showElement("box_MAP")
@@ -1022,9 +1024,9 @@ function(input, output, session) {
 
         if( input$sel_HDmodel_by != "<unselected>" ) { # if stand-specific models
           rv$AGB_res[[names(color_height)[1]]] <- AGB_predict(D = rv$hd_data$D,
-                                                       WD = WD[rv$inv$plot %in% rv$hd_data$model_for],
-                                                       errWD = errWD[rv$inv$plot %in% rv$hd_data$model_for],
-                                                       HDmodel = rv$hd_model, model_by =  rv$hd_data$model_for)
+                                                              WD = WD[rv$inv$plot %in% rv$hd_data$model_for],
+                                                              errWD = errWD[rv$inv$plot %in% rv$hd_data$model_for],
+                                                              HDmodel = rv$hd_model, model_by =  rv$hd_data$model_for)
 
           # if incomplete heights have been provided, for these heights, we need to replace the AGB estimates calculated with HDmodel by the AGB estimates calculated directly with H and errH
           if( input$rad_height == "h_some_tree") {
@@ -1070,8 +1072,8 @@ function(input, output, session) {
         df_E <- data.frame(plot = rv$coord_plot$plot, E = rv$E)
 
         rv$AGB_res[[names(color_height)[3]]] <- AGB_predict(D=D, WD=WD, errWD=errWD,
-                                                     coord = isolate(rv$coord[,c("long","lat")]),
-                                                     E_vec = df_E[match(rv$inv$plot , table = df_E$plot) , "E"])
+                                                            coord = isolate(rv$coord[,c("long","lat")]),
+                                                            E_vec = df_E[match(rv$inv$plot , table = df_E$plot) , "E"])
 
         rv$AGB_res[[names(color_height)[3]]][["summary"]] <- summaryByPlot(AGB_val = rv$AGB_res[[names(color_height)[3]]], plot = rv$inv$plot)
 
@@ -1516,7 +1518,7 @@ function(input, output, session) {
                     choices = c("<unselected>",names(available_functions))
         ),
         checkboxInput(paste0("checkbox_per_ha_", unique_id),
-                        label = "per ha", value = TRUE)
+                      label = "per ha", value = TRUE)
       )
     )
   })
@@ -1594,9 +1596,9 @@ function(input, output, session) {
 
         rv$FOS_subplot <- tryCatch({
           FOS_subplot_res(
-          checked_plot = rv$checked_plot,
-          divide_output = rv$divide_output,
-          subplot_summary_output = rv$subplot_summary_output)
+            checked_plot = rv$checked_plot,
+            divide_output = rv$divide_output,
+            subplot_summary_output = rv$subplot_summary_output)
         }, error = function(e) e$message)
 
       } else { # print message error
@@ -1617,12 +1619,12 @@ function(input, output, session) {
         rv$gg_subplot_sum <- rv$subplot_summary_output$plot_design[[
           match(input$sel_plot_display_summary, names(rv$subplot_summary_output$plot_design))]][[
             match(input$sel_metric_display_summary, metric_names)
-            ]]
+          ]]
       } else {
         #Render the plot_design output (plot_design[[metrics]] or just plot_design if only one metric)
         rv$gg_subplot_sum <- rv$subplot_summary_output$plot_design[[
-            match(input$sel_metric_display_summary, metric_names)
-          ]]
+          match(input$sel_metric_display_summary, metric_names)
+        ]]
 
       }
     } else { # check_plot (and grid) visualisation
