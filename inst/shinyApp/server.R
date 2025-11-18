@@ -1537,10 +1537,10 @@ function(input, output, session) {
       name_arg_raster_fun <- ifelse(input$sel_raster_function!="",input$sel_raster_function,"mean")
       arg_raster_fun <- available_functions[[name_arg_raster_fun]]
 
-      if(input$btn_add_metric>=1) {
-        filter_select <- sapply(name_arg_value, function(x) input[[x]] != "<unselected>") &
-          sapply(name_arg_fun, function(x) input[[x]] != "<unselected>")
+      filter_select <- sapply(name_arg_value, function(x) input[[x]] != "<unselected>") &
+        sapply(name_arg_fun, function(x) input[[x]] != "<unselected>")
 
+      if(input$btn_add_metric>=1 && sum(filter_select)>1 ) {
         arg_value <- sapply(name_arg_value, function(x) input[[x]])[filter_select]
         arg_per_ha <- sapply(name_arg_per_ha, function(x) input[[x]])[filter_select]
         arg_fun <- lapply(name_arg_fun, function(x) available_functions[[input[[x]]]])[filter_select]
