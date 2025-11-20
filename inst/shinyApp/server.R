@@ -818,7 +818,14 @@ function(input, output, session) {
           showElement("box_MAP")
 
           # Compute bioclimatic parameter E for each plot
-          rv$E <- tryCatch(computeE(isolate(rv$coord_plot[, c("long", "lat")])), error = function(e) e)
+          rv$E <- tryCatch(
+            computeE(isolate(rv$coord_plot[, c("long", "lat")])),
+            error = function(e) NULL )
+
+          if(is.null(rv$E)) {
+            shinyalert("Oops", "It looks like the coordinates of the plot corners are incorrect. Please check that you have not mixed up the latitudes and longitudes.", type = "error")
+            return()
+          }
 
           # print the list of E parameters in data-frame format
           render_E <- data.frame(plot = as.character(isolate(rv$coord_plot$plot)),
