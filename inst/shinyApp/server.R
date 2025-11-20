@@ -42,13 +42,9 @@ function(input, output, session) {
   })
 
 
-
-  # Preparing forest_inv to receive input$file_DATASET thanks to <<-
-  forest_inv <- NULL
-
   ## Reactive values:  ----
   rv <- reactiveValues(
-    inv = NULL, # forest inventory data-frame (created when clicking on 'Continue' in 'Load dataset' item)
+    inv = NULL, # forest inventory data-frame
     df_h_sup = NULL, # supplementary height data-frame (e.g NouraguesHD)
     df_coord = NULL, # supplementary plot coordinates data-frame (e.g NouraguesCoord)
     wd = NULL, # output of getWoodDensity()
@@ -81,25 +77,24 @@ function(input, output, session) {
   ## Forest inventory file actions ----
   observeEvent(input$file_DATASET, ignoreInit = TRUE, {
     # Read forest inventory upload
-    forest_inv <<- fread(
+    rv$inv <- fread(
       file = req(input$file_DATASET)$datapath,
       data.table = FALSE,
     )
 
     # show forest inventory content
-    output$table_DATASET <- renderDT(forest_inv, options = list(scrollX = TRUE))
+    output$table_DATASET <- renderDT(rv$inv, options = list(scrollX = TRUE))
 
     # update the values of the select inputs with the column names
-    int_num_col <- names(forest_inv)[ sapply(forest_inv, class) %in% c("integer", "numeric")]
-    print("observe file_dataset")
+    int_num_col <- names(rv$inv)[ sapply(rv$inv, class) %in% c("integer", "numeric")]
     for (id in c("sel_DIAMETER", "sel_WD")) {
       updateSelectInput(session, id, choices = c("<unselected>", int_num_col))
     }
-    char_col <- names(forest_inv)[ sapply(forest_inv, class) %in% "character" ]
+    char_col <- names(rv$inv)[ sapply(rv$inv, class) %in% "character" ]
     for (id in c("sel_GENUS", "sel_SPECIES")) {
       updateSelectInput(session, id, choices = c("<unselected>", char_col))
     }
-    updateSelectInput(session, "sel_PLOT", choices = c("<unselected>", names(forest_inv)))
+    updateSelectInput(session, "sel_PLOT", choices = c("<unselected>", names(rv$inv)))
 
     # show other hidden boxes
     showElement("box_DATASET")
@@ -107,6 +102,31 @@ function(input, output, session) {
       showElement("box_FIELDS")
       showElement("box_COORD")
     }
+
+    ### Reset ----
+    # When the user go back to Load Dataset
+    # Reset rv$inv_pred
+    rv$inv_pred <- NULL
+    # Hide all nav items
+    shinyjs::hide("nav_item_taxo")
+    shinyjs::hide("nav_item_height")
+    shinyjs::hide("nav_item_agb")
+    shinyjs::hide("nav_item_spatial")
+    shinyjs::hide("nav_item_summary")
+    # Reset settings
+    if(!is.null(input$rad_height)) {
+      updateRadioButtons(inputId = "rad_several_plots", selected = character(0))
+      updateRadioButtons(inputId = "rad_height", selected = character(0))
+      updateRadioButtons(inputId = "rad_coord", selected = character(0))
+    }
+    # Reset taxonomy & WD
+    updateRadioButtons(inputId = "rad_WD", selected = character(0))
+    hideElement("box_RESULT_TAXO")
+    hideElement("btn_TAXO_DONE")
+    # Reset Continue button in HD and AGB tab
+    hideElement("btn_HD_DONE")
+    hideElement("id_btn_continue_sp")
+
   })
 
   # Dowload button for the forest inventory example (NouraguesTrees with ~ 120 simulated heights)
@@ -121,7 +141,7 @@ function(input, output, session) {
   # Reaction to "Does your dataset contain several plots?"
   observeEvent(input$rad_several_plots, {
     # show other boxes if the forest inv file has been uploaded
-    if(!is.null(forest_inv)){
+    if(!is.null(rv$inv)){
       showElement("box_FIELDS")
       showElement("box_DATASET")
       showElement("box_COORD")
@@ -163,9 +183,9 @@ function(input, output, session) {
   ## Height ----
   ### height radio button actions ----
   observeEvent(input$rad_height, {
-    int_num_col <- names(forest_inv)[ sapply(forest_inv, class) %in% c("integer", "numeric")]
+    int_num_col <- names(rv$inv)[ sapply(rv$inv, class) %in% c("integer", "numeric")]
     updateSelectInput(session, "sel_H", choices = c("<unselected>", int_num_col))
-    updateSelectInput(session, "sel_HDmodel_by", choices = c("<unselected>", names(forest_inv)))
+    updateSelectInput(session, "sel_HDmodel_by", choices = c("<unselected>", names(rv$inv)))
     toggleElement("id_sel_h",
                   condition = input$rad_height %in% c("h_each_tree","h_some_tree"))
     toggleElement("id_set_errH",
@@ -210,7 +230,7 @@ function(input, output, session) {
     # Coordinates of each trees:
     if(input$rad_coord == "coord_each_tree") {
       # Show latitude and longitude select inputs for forest inventory table
-      int_num_col <- names(forest_inv)[ sapply(forest_inv, class) %in% c("integer", "numeric")]
+      int_num_col <- names(rv$inv)[ sapply(rv$inv, class) %in% c("integer", "numeric")]
       updateSelectInput(session, "sel_LAT", choices = c("<unselected>", int_num_col))
       updateSelectInput(session, "sel_LONG", choices = c("<unselected>", int_num_col))
     }
@@ -281,7 +301,7 @@ function(input, output, session) {
       error_occured <- TRUE
       shinyalert("Oops!", "The column containing the plots IDs is unselected", type = "error")
       return()
-    } else if (input$rad_several_plots == "several_plots" && input$sel_PLOT != "<unselected>" && length(unique(forest_inv[,input$sel_PLOT])) == 1 ) {
+    } else if (input$rad_several_plots == "several_plots" && input$sel_PLOT != "<unselected>" && length(unique(rv$inv[,input$sel_PLOT])) == 1 ) {
       # if only one plot is detected
       error_occured <- TRUE
       shinyalert("Oops!", "You specified that your dataset contains several plots but only one is detected.", type = "error")
@@ -312,6 +332,11 @@ function(input, output, session) {
       # if the H or D column (of the sup dataset containing H-D relationship) are unselected
       error_occured <- TRUE
       shinyalert("Oops!", "Diameter and/or Height column(s) of the dataset containing a subset of well-measured trees is/are unselected ", type = "error")
+      return()
+    } else if (is.null(input$rad_coord)) {
+      # if the coordinates radio button has not been ticked
+      error_occured <- TRUE
+      shinyalert("Oops!", "Coordinates information has not been provided", type = "error")
       return()
     } else if (input$rad_height == "h_none" && (is.null(input$rad_coord) || input$rad_coord %in% c("","coord_none"))  ) {
       # if no height measurements and no coordinates
@@ -377,8 +402,6 @@ function(input, output, session) {
 
     ## Setting rv$inv ----
     if(!error_occured) {
-
-      rv$inv <- forest_inv
 
       ### Setting the plot column that contains plotID
       if(input$rad_several_plots == "several_plots" && input$sel_PLOT != "<unselected>" ) {
@@ -969,9 +992,7 @@ function(input, output, session) {
 
   # AGB ----
 
-  observeEvent(input$btn_AGB_DONE, {
-
-    print("Reaction to 'Go on' button for AGB calculation")
+  observeEvent(input$btn_calculate_AGB, {
 
     ## Reset the individual tree results (created when downloading results)
     if(!is.null(rv$inv_pred)) rv$inv_pred <- NULL
@@ -1008,7 +1029,6 @@ function(input, output, session) {
     # Calculation of AGB ----
 
     withProgress(message = "AGB calculation", value = 0, {
-      #newValue <- list()
 
       ## Heights provided by the user ----
       if(input$rad_height == "h_each_tree") {

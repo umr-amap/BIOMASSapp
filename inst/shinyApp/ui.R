@@ -676,7 +676,7 @@ The resulting confidence intervals represent the **2.5th and 97.5th percentiles*
           "),
           div(
             class = "text-center mt-4",
-            actionButton("btn_AGB_DONE", "Calculate AGB", class = "btn-primary btn-lg text-white")
+            actionButton("btn_calculate_AGB", "Calculate AGB", class = "btn-primary btn-lg text-white")
           )
         )
       ),
@@ -752,7 +752,7 @@ The resulting confidence intervals represent the **2.5th and 97.5th percentiles*
           card_body(
             div(
               style = "height: 800px;",
-              plotOutput("out_gg_check_plot", height = "100%"),
+              plotOutput("out_gg_check_plot", height = "90%"),
               hidden(div(
                 id = "id_sel_plot_display",
                 selectInput("sel_plot_display", "Plot to display:", choices = NULL)
