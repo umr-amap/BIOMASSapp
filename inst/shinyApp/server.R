@@ -1275,7 +1275,8 @@ function(input, output, session) {
   observeEvent(
     list(input$sel_x_rel_corner, input$sel_y_rel_corner,
          input$check_trust_GPS_corners, input$num_max_dist,
-         input$sel_x_rel_trees, input$sel_y_rel_trees, input$sel_prop_trees,
+         input$sel_x_rel_trees, input$sel_y_rel_trees,
+         input$sel_prop_trees, input$num_threshold_tree,
          input$file_RASTER, input$btn_reset_raster),
     ignoreInit = TRUE, {
 
@@ -1294,6 +1295,7 @@ function(input, output, session) {
         arg_tree_coords <- NULL
         arg_tree_plot_ID <- NULL
         arg_prop_trees <- NULL
+        arg_threshold_tree <- NULL
 
         if(!input$sel_x_rel_trees %in% c("<unselected>","") & !input$sel_y_rel_trees %in% c("<unselected>","")) {
           arg_tree_data <- rv$inv_pred
@@ -1305,6 +1307,9 @@ function(input, output, session) {
 
         if( !input$sel_prop_trees %in% c("<unselected>","")) {
           arg_prop_trees <- input$sel_prop_trees
+        }
+        if( !is.null(input$sel_prop_trees) && !is.na(input$num_threshold_tree) ) {
+          arg_threshold_tree <- input$num_threshold_tree
         }
 
         # Execute check_plot_coord
@@ -1318,6 +1323,7 @@ function(input, output, session) {
                            plot_ID = arg_plot_ID,
                            tree_data = arg_tree_data, tree_coords = arg_tree_coords,
                            tree_plot_ID = arg_tree_plot_ID, prop_tree = arg_prop_trees,
+                           threshold_tree = arg_threshold_tree,
                            ref_raster = rv$file_rast)
         }, error = function(e) e$message)
 
