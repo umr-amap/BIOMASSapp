@@ -819,8 +819,14 @@ The resulting confidence intervals represent the **2.5th and 97.5th percentiles*
                 selectInput("sel_y_rel_trees", "Relative Y", choices = NULL) |>
                   helper(colour = "#158A0C", content = "sel_rel_coord_trees")
               ),
-              selectInput("sel_prop_trees", "Select a tree metric to display proportionally:",
-                          choices = NULL, width='100%')
+
+              layout_columns(
+                col_widths = c(8, 4),
+                selectInput("sel_prop_trees", "Select a tree metric to display:",
+                            choices = NULL, width='100%'),
+                numericInput("num_threshold_tree", "Display threshold:", value = NA)
+              ),
+
             )),
 
             ###  Raster Upload ----
