@@ -514,7 +514,7 @@ Coordinates (**latitude and longitude**) must be expressed in **decimal degrees*
                        width="100%")
         ) |> helper(colour = "#158A0C", content = "wd_extraction"),
 
-        actionButton("btn_TAXO_RESULT", strong("Process"), class = "btn-primary w-100 mt-3 text-white")
+        hidden(actionButton("btn_TAXO_RESULT", strong("Process"), class = "btn-primary w-100 mt-3 text-white"))
       )
     ),
 

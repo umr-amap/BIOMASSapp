@@ -575,6 +575,9 @@ function(input, output, session) {
   })
 
   # when the taxo is done
+  observe({
+    toggle("btn_TAXO_RESULT", condition = !is.null(input$rad_WD))
+  })
   observeEvent(input$btn_TAXO_DONE, {
     if (!is.data.frame(rv$wd)) {
       shinyalert("Oops", "Somethings went wrong, please check this", type = "error")
@@ -732,7 +735,7 @@ function(input, output, session) {
         H = rv$hd_data$H,
         method = input$rad_HDMOD,
         plot = rv$hd_data$model_for,
-        useWeight = TRUE
+        useWeight = FALSE
       )
     }, error = function(e) NULL, warning = function(e) NULL, message = function(e) NULL)
   })
