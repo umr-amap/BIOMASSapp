@@ -79,7 +79,7 @@ function(input, output, session) {
     # Read forest inventory upload
     rv$inv <- fread(
       file = req(input$file_DATASET)$datapath,
-      data.table = FALSE,
+      data.table = FALSE, fill = TRUE, blank.lines.skip = TRUE
     )
 
     # show forest inventory content
@@ -254,7 +254,7 @@ function(input, output, session) {
     # Read plot coordinates upload
     rv$df_coord <- fread(
       file = req(input$file_coord)$datapath,
-      data.table = FALSE)
+      data.table = FALSE, fill = TRUE, blank.lines.skip = TRUE)
 
     # show coordinates table content
     output$table_coord <- renderDT(rv$df_coord,
