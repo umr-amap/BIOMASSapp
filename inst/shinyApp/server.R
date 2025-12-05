@@ -1193,7 +1193,7 @@ function(input, output, session) {
       # Remove the Lorey"s height columns (used in plot level results but not in tree level ones)
       n_lorey_col <- grep("H_Lorey", names(out)) # column number of the plot columnn (use of [length(...)] in case user has already a "plot" column)
 
-      write.csv(as.data.frame(out[,-c(n_plot_col,n_lorey_col)]), file, row.names = FALSE)
+      write.csv(as.data.frame(out[,-na.omit(c(n_plot_col,n_lorey_col))]), file, row.names = FALSE)
     },
     contentType = "text/csv"
   )
@@ -1508,7 +1508,7 @@ function(input, output, session) {
       if(input$rad_several_plots=="several_plots") {
         updateSelectInput(session,
                           "sel_plot_display_summary",
-                          choices = unique(rv$df_coord[,"Plot"]),
+                          choices = unique(rv$df_coord[,input$sel_plot_coord]),
                           selected = input$sel_plot_display)
       }
 

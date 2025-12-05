@@ -33,6 +33,8 @@ color_height <- c(local_model = "#619CFF", Feldpausch = "#F8766D", Chave = "#00B
 
 # Defining available functions for subplot_summary()
 available_functions <- list("mean"=mean,"sum"=sum,"median"=median,"sd"=sd,"var"=var)
+Ndens <- function(x, na.rm = TRUE) length(na.omit(x))
+
 
 # set maximum input file size (here 30Mo)
 options(shiny.maxRequestSize = 30 * 1024^2)
@@ -139,7 +141,8 @@ indiv_pred <- function(inv, rad_height, H, AGB_res, chkgrp_HEIGHT, sel_HDmodel_b
     return(inv_h_pred)
   }
   if ("HDloc" %in% chkgrp_HEIGHT) {
-    if( !is.null(sel_HDmodel_by) && sel_HDmodel_by != "<unselected>" ) { # if stand-specific models
+    # if stand-specific models
+    if( !is.null(sel_HDmodel_by) && sel_HDmodel_by != "<unselected>" ) {
       inv_h_pred$H_local_model <- round(retrieveH(hd_data$D, hd_model, plot = hd_data$model_for)$H, 2)
 
       # if some tree heights have been provided, we need to replace the estimated height by the measured heights
@@ -148,6 +151,7 @@ indiv_pred <- function(inv, rad_height, H, AGB_res, chkgrp_HEIGHT, sel_HDmodel_b
       }
 
     } else {
+    # if stand-specific models
       inv_h_pred$H_local_model <- round(retrieveH(D, hd_model)$H, 2)
       if( rad_height == "h_some_tree") {
         # if some tree heights have been provided, we need to replace the estimated height by the measured heights
@@ -290,9 +294,9 @@ merge_subplot_summary <- function(list_sub_sum) {
 }
 
 # Function to retrieve latitude/longitude from projected coordinates
-UTM_to_longlat <- function(xy_dat, df_UTM_code) {
-  out <- proj4::project(xy = xy_dat[,c("x_center","y_center")],
-                        proj = unique(df_UTM_code$UTM_code[df_UTM_code$plot_ID == unique(xy_dat$plot_ID)]),
+UTM_to_longlat <- function(xy_dt, df_UTM_code) { # xy_dt = xy_dat[]
+  out <- proj4::project(xy = xy_dt[,c("x_center","y_center")],
+                        proj = unique(df_UTM_code$UTM_code[df_UTM_code$plot_ID == unique(xy_dt$plot_ID)]),
                         inverse = TRUE)
   return(out)
 }
@@ -305,12 +309,12 @@ FOS_subplot_res <- function(checked_plot, divide_output, subplot_summary_output)
 
   # Create Lat_cnt and Lon_cnt columns
   xy_dat <- subplot_summary_output$long_AGB_simu[N_simu==1,] # One simulation contains center coordinates of each subplot
-  xy_dat[, c("Lon_cnt","Lat_cnt") := UTM_to_longlat(.SD, checked_plot$UTM_code),
-         by = c("plot_ID","subplot_ID"), .SDcols=colnames(xy_dat)]
+  xy_dat[, c("Lon_cnt","Lat_cnt") := UTM_to_longlat(.SD, df_UTM_code = checked_plot$UTM_code),
+         by = c("plot_ID"), .SDcols=colnames(xy_dat)]
   xy_dat <- xy_dat[,c("plot_ID","subplot_ID","Lon_cnt","Lat_cnt")]
 
   ### divide_output$tree_data contains plot_ID, subplot_ID, Lat, Long, Diameter, BA, Wood density, H_Lorey_... and H_...
-  if( ! "Plot_ID" %in% names(divide_output$tree_data)) setnames(divide_output$tree_data, old = "plot", new = "Plot_ID")
+  if( ! "Plot_ID" %in% names(divide_output$tree_data)) setnames(divide_output$tree_data, old = "plot_ID", new = "Plot_ID")
   if( ! "D" %in% names(divide_output$tree_data)) setnames(divide_output$tree_data, old = input$sel_DIAMETER, new = "D")
 
   # Summarize by plot: Ndens, MinDBH, MaxDBH, BA (sum of individual BA), Wood density (mean), H_Lorey_...(sum) and H_... (max)
@@ -320,7 +324,7 @@ FOS_subplot_res <- function(checked_plot, divide_output, subplot_summary_output)
   H_method_names <- grep("^H_(?!Lorey).*", names(divide_output$tree_data), value = TRUE, perl = TRUE)
   subplot_values <- c(subplot_values, H_Lorey_names, H_method_names)
 
-  fun_list <- list(Ndens = length, MinDBH = min, MaxDBH = max, BA = sum, WD = mean)
+  fun_list <- list(Ndens = Ndens, MinDBH = min, MaxDBH = max, BA = sum, WD = mean)
   fun_H_Lorey <- lapply(H_Lorey_names, function(x) return(sum))
   fun_H_method <- lapply(H_method_names, function(x) return(max))
   fun_list <- c(fun_list, fun_H_Lorey, fun_H_method)
@@ -329,7 +333,7 @@ FOS_subplot_res <- function(checked_plot, divide_output, subplot_summary_output)
 
   res_subplot <- subplot_summary(subplots = divide_output,
                                  value = subplot_values, per_ha = per_ha_vec,
-                                 fun = fun_list, draw_plot = FALSE)
+                                 fun = fun_list, draw_plot = FALSE, na.rm=TRUE)
 
   res_subplot_tree_summary <- res_subplot$tree_summary
   # Dividing Lorey's column by BA to get the correct Lorey's heights
@@ -339,8 +343,8 @@ FOS_subplot_res <- function(checked_plot, divide_output, subplot_summary_output)
 
   # Setting standard names
   setnames(res_subplot_tree_summary,
-           old = c("D_length_per_ha", "D_min",  "D_max",  "BA_sum_per_ha"),
-           new = c("Ndens",           "MinDBH", "MaxDBH", "BA"))
+           old = c("D_Ndens_per_ha", "D_min",  "D_max",  "BA_sum_per_ha"), # subplot_summary can't deal with fun = arg_fun = list(user_def_fun, ...). But this would be happen only in this app and in this situation.
+           new = c("Ndens",          "MinDBH", "MaxDBH", "BA"))
   # Remove "_sum" in H_Lorey_..._sum"
   names(res_subplot_tree_summary)[grep("^H_Lorey.*sum$", names(res_subplot_tree_summary))] <- gsub(
     pattern = "_sum", replacement = "",
