@@ -79,7 +79,7 @@ function(input, output, session) {
     # Read forest inventory upload
     rv$inv <- fread(
       file = req(input$file_DATASET)$datapath,
-      data.table = FALSE,
+      data.table = FALSE, fill = TRUE, blank.lines.skip = TRUE
     )
 
     # show forest inventory content
@@ -254,7 +254,7 @@ function(input, output, session) {
     # Read plot coordinates upload
     rv$df_coord <- fread(
       file = req(input$file_coord)$datapath,
-      data.table = FALSE)
+      data.table = FALSE, fill = TRUE, blank.lines.skip = TRUE)
 
     # show coordinates table content
     output$table_coord <- renderDT(rv$df_coord,
@@ -575,6 +575,9 @@ function(input, output, session) {
   })
 
   # when the taxo is done
+  observe({
+    toggle("btn_TAXO_RESULT", condition = !is.null(input$rad_WD))
+  })
   observeEvent(input$btn_TAXO_DONE, {
     if (!is.data.frame(rv$wd)) {
       shinyalert("Oops", "Somethings went wrong, please check this", type = "error")
@@ -732,7 +735,7 @@ function(input, output, session) {
         H = rv$hd_data$H,
         method = input$rad_HDMOD,
         plot = rv$hd_data$model_for,
-        useWeight = TRUE
+        useWeight = FALSE
       )
     }, error = function(e) NULL, warning = function(e) NULL, message = function(e) NULL)
   })
@@ -1190,7 +1193,7 @@ function(input, output, session) {
       # Remove the Lorey"s height columns (used in plot level results but not in tree level ones)
       n_lorey_col <- grep("H_Lorey", names(out)) # column number of the plot columnn (use of [length(...)] in case user has already a "plot" column)
 
-      write.csv(as.data.frame(out[,-c(n_plot_col,n_lorey_col)]), file, row.names = FALSE)
+      write.csv(as.data.frame(out[,-na.omit(c(n_plot_col,n_lorey_col))]), file, row.names = FALSE)
     },
     contentType = "text/csv"
   )
@@ -1505,7 +1508,7 @@ function(input, output, session) {
       if(input$rad_several_plots=="several_plots") {
         updateSelectInput(session,
                           "sel_plot_display_summary",
-                          choices = unique(rv$df_coord[,"Plot"]),
+                          choices = unique(rv$df_coord[,input$sel_plot_coord]),
                           selected = input$sel_plot_display)
       }
 
