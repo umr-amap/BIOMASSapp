@@ -191,7 +191,8 @@ To estimate the **Above Ground Biomass (AGB)** of a forest inventory, **3 parame
             "Choose a CSV file",
             accept = c("text/csv", "text/comma-separated-values,text/plain", ".csv"),
             buttonLabel = "Browse...",
-            placeholder = "No file selected"
+            placeholder = "No file selected",
+            multiple = FALSE
           ) |> helper(colour = "#158A0C", content = "inv_dataset"),
 
           radioButtons( inputId = "rad_several_plots",
@@ -344,7 +345,8 @@ To estimate the **Above Ground Biomass (AGB)** of a forest inventory, **3 parame
               "file_h_sup",
               "Upload supplementary Height-Diameter data (.csv)",
               accept = c("text/csv", "text/comma-separated-values,text/plain", ".csv"),
-              width = "100%"
+              width = "100%",
+              multiple = FALSE
             ),
             layout_columns(
               col_widths = c(6, 6),
@@ -413,7 +415,8 @@ Coordinates (**latitude and longitude**) must be expressed in **decimal degrees*
               fileInput(
                 "file_coord",
                 "Upload coordinates CSV file",
-                accept = c("text/csv", "text/comma-separated-values,text/plain", ".csv")
+                accept = c("text/csv", "text/comma-separated-values,text/plain", ".csv"),
+                multiple = FALSE
               )
             )),
 
@@ -840,7 +843,8 @@ The resulting confidence intervals represent the **2.5th and 97.5th percentiles*
                 fileInput(
                   "file_RASTER",
                   "Upload a raster file",
-                  accept = c(".tif", ".grd", ".jpg", ".jpeg", ".png", ".hgt", ".vrt", ".hdf", ".hdf5", ".adf")
+                  accept = c(".tif", ".grd", ".jpg", ".jpeg", ".png", ".hgt", ".vrt", ".hdf", ".hdf5", ".adf"),
+                  multiple = FALSE
                 ),
                 actionButton("btn_reset_raster", "Reset", style = "margin-top: 32px; background-color: white; color: black; border: 1px solid #ccc;" )
               )
