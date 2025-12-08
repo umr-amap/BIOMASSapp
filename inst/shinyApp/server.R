@@ -679,7 +679,8 @@ function(input, output, session) {
         suppressMessages(modelHD(
           D = rv$hd_data$D,
           H = rv$hd_data$H,
-          plot = rv$hd_data$model_for
+          plot = rv$hd_data$model_for,
+          bayesian = FALSE
         ))
       }, error = function(e) NULL)
 
@@ -735,7 +736,8 @@ function(input, output, session) {
         H = rv$hd_data$H,
         method = input$rad_HDMOD,
         plot = rv$hd_data$model_for,
-        useWeight = FALSE
+        useWeight = FALSE,
+        bayesian = FALSE
       )
     }, error = function(e) NULL, warning = function(e) NULL, message = function(e) NULL)
   })
@@ -1158,8 +1160,8 @@ function(input, output, session) {
       # Copy the report file to a temporary directory before processing it, in case we don't have write permissions to the current working dir (which can happen when deployed).
       tempReport <- file.path(tempdir(), "report_BIOMASS.Rmd")
       file.copy(
-        #from = system.file("Rmarkdown", "report_BIOMASS.Rmd", package = "BIOMASSapp"),
-        from = "~/BIOMASSapp/inst/Rmarkdown/report_BIOMASS.Rmd",
+        from = system.file("Rmarkdown", "report_BIOMASS.Rmd", package = "BIOMASSapp"),
+        #from = "~/BIOMASSapp/inst/Rmarkdown/report_BIOMASS.Rmd",
         tempReport,
         overwrite = TRUE
       )
@@ -1767,8 +1769,8 @@ function(input, output, session) {
       # Copy the report file to a temporary directory before processing it, in case we don't have write permissions to the current working dir (which can happen when deployed).
       tempReport <- file.path(tempdir(), "report_BIOMASS.Rmd")
       file.copy(
-        #from = system.file("Rmarkdown", "report_BIOMASS.Rmd", package = "BIOMASSapp"),
-        from = "~/BIOMASSapp/inst/Rmarkdown/report_BIOMASS.Rmd",
+        from = system.file("Rmarkdown", "report_BIOMASS.Rmd", package = "BIOMASSapp"),
+        #from = "~/BIOMASSapp/inst/Rmarkdown/report_BIOMASS.Rmd",
         tempReport,
         overwrite = TRUE
       )

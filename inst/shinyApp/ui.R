@@ -172,6 +172,8 @@ To estimate the **Above Ground Biomass (AGB)** of a forest inventory, **3 parame
 - The **diameter** (DBH: Diameter at Breast Height for trees > 10 cm)
 - The **wood density** (a method for estimating this parameter based on taxonomy is proposed when wood density data are not available)
 - The **height** (three methods for estimating this parameter are proposed when height data are not available)
+
+If you have LiDAR data to link to the biomass of the plots (typically a Canopy Height Model in raster form), this data should be provided in the 'Spatialization' section once the AGB has been calculated.
         ")
       )
     ),
