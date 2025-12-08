@@ -75,7 +75,7 @@ function(input, output, session) {
   # LOAD DATASET ---------------------------------------------------------------
 
   ## Forest inventory file actions ----
-  observeEvent(input$file_DATASET, ignoreInit = TRUE, {
+  observeEvent(input$file_DATASET, ignoreInit = TRUE,  {
     # Read forest inventory upload
     rv$inv <- fread(
       file = req(input$file_DATASET)$datapath,
@@ -294,7 +294,7 @@ function(input, output, session) {
     } else if ( is.null(input$rad_several_plots) ) {
       # if the number of plot is not provide
       error_occured <- TRUE
-      shinyalert("Oops!", "You need to answer to the question : Does your dataset contain several plots?", type = "error")
+      shinyalert("Oops!", "You need to answer the question : Does your dataset contain several plots?", type = "error")
       return()
     } else if (input$rad_several_plots =="several_plots" && input$sel_PLOT == "<unselected>" ) {
       # if the column corresponding to the plot IDs is unselected

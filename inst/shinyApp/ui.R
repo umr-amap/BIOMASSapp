@@ -1,12 +1,4 @@
 # Modern BIOMASS Application UI with bslib
-library(bslib)
-library(shiny)
-library(shinyjs)
-library(shinyFeedback)
-library(shinyhelper)
-library(DT)
-library(shinycssloaders)
-library(leaflet)
 
 # Define theme
 app_theme <- bs_theme(
@@ -79,6 +71,7 @@ page <- page_sidebar(
     useShinyFeedback(),
     useShinyjs(),
 
+    # Manage navigation items ----
     div(class = "nav-item",
         tags$a(
           class = "nav-link-custom active",
@@ -163,15 +156,14 @@ page <- page_sidebar(
     class = "tab-content",
 
     card(
-      #card_header(h4("Getting Started",  style = "font-weight: bold;"), class = "bg-primary text-white"),
       card_header("Getting Started", class = "custom_card_header"),
       card_body(
         markdown("
-To estimate the **Above Ground Biomass (AGB)** of a forest inventory, **3 parameters** are required:
+To estimate the **Above Ground Biomass (AGB)** of a forest inventory, **3 variables** are required:
 
 - The **diameter** (DBH: Diameter at Breast Height for trees > 10 cm)
-- The **wood density** (a method for estimating this parameter based on taxonomy is proposed when wood density data are not available)
-- The **height** (three methods for estimating this parameter are proposed when height data are not available)
+- The **wood density** (a method for estimating this variable based on taxonomy is proposed when wood density data are not available)
+- The **height** (three methods for estimating this variable are proposed when height data are not available)
 
 If you have LiDAR data to link to the biomass of the plots (typically a Canopy Height Model in raster form), this data should be provided in the 'Spatialization' section once the AGB has been calculated.
         ")
@@ -179,8 +171,6 @@ If you have LiDAR data to link to the biomass of the plots (typically a Canopy H
     ),
 
     layout_columns(
-      # width = 1/3,
-      # heights_equal = "row",
       col_widths = c(3, 5, 4),
 
       ## Forest Inventory File Card ----
@@ -219,11 +209,11 @@ If you have LiDAR data to link to the biomass of the plots (typically a Canopy H
         )
       ),
 
-      ## Required Parameters Card ----
+      ## Required Variables Card ----
       hidden(
         card(
           id = "box_FIELDS",
-          card_header("Required Parameters", class = "custom_card_header"),
+          card_header("Required Variables", class = "custom_card_header"),
           card_body(
             ### Diameter ----
             h4("Diameter", class = "text-primary"),
@@ -599,8 +589,11 @@ Coordinates (**latitude and longitude**) must be expressed in **decimal degrees*
           card_header("Feldpausch et al. (2012)", class = "custom_card_header"),
           card_body(
             p("Region(s) used in Feldpausch model:"),
-            DT::DTOutput("out_tab_feld") |>
-              helper(colour = "#158A0C", content = "feld_region")
+            div(
+              DT::DTOutput("out_tab_feld") |>
+                helper(colour = "#158A0C", content = "feld_region"),
+              style = "overflow-y: auto;"
+            )
           )
         )
       ),
@@ -672,7 +665,7 @@ Coordinates (**latitude and longitude**) must be expressed in **decimal degrees*
         card_header("AGB Estimation", class = "custom_card_header"),
         card_body(
           markdown("
-AGB and its uncertainty are estimated with **error propagation** of the three main parameters:
+AGB and its uncertainty are estimated with **error propagation** of the three main variables:
 - Diameter
 - Wood density
 - Height
@@ -791,7 +784,7 @@ The resulting confidence intervals represent the **2.5th and 97.5th percentiles*
                 checkboxInput(
                   "check_trust_GPS_corners",
                   "Trust GPS coordinates of corners",
-                  value = TRUE
+                  value = FALSE
                 ) |> helper(colour = "#158A0C", content = "trust_GPS_corners"),
 
                 checkboxInput(
@@ -866,8 +859,7 @@ The resulting confidence intervals represent the **2.5th and 97.5th percentiles*
 
             hidden(div(
               id = "id_divide_plot_settings",
-              numericInput("num_grid_size", "Grid size:", value = 50, min = 1)
-              #checkboxInput("check_centred_grid", "Centre the grid", value = TRUE)
+              numericInput("num_grid_size", "Grid size (in m):", value = 50, min = 1)
             ))
           )
         )
